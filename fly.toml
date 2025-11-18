@@ -1,0 +1,35 @@
+# Fly.io 配置文件 - 後端 API
+
+app = "talent-search-api"
+primary_region = "nrt"  # 東京區域（離台灣最近）
+
+[build]
+  # 使用 Dockerfile 建置
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+  PYTHON_VERSION = "3.10"
+  DB_HOST = "localhost"
+  DB_PORT = "5432"
+  LLM_API_HOST = "https://api.siliconflow.cn"
+  LLM_MODEL = "deepseek-ai/DeepSeek-V3"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false  # 不自動停止
+  auto_start_machines = true
+  min_machines_running = 1    # 至少保持 1 個運行
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

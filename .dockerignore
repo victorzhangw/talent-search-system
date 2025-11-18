@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+*.egg-info/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 測試
+tests/
+*.test.py
+
+# 文檔
+docs/
+*.md
+README*
+
+# 前端
+frontend/
+assets/
+*.html
+*.css
+*.js
+
+# 配置
+.env
+.env.*
+*.pem
+*.key
+private-key*
+
+# 其他
+*.log
+*.db
+*.sqlite
+.DS_Store
+Thumbs.db
