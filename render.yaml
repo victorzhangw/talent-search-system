@@ -35,9 +35,8 @@ services:
     healthCheckPath: /health
 
   # 前端靜態網站
-  - type: web
+  - type: static
     name: talent-search-frontend
-    runtime: node
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
