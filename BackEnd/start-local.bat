@@ -18,6 +18,6 @@ echo ✅ 環境變數已載入
 echo 🚀 啟動 API 服務...
 echo.
 
-python app.py
+python talent_search_api.py
 
 pause
