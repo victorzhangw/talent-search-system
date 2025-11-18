@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if is_edit %}編輯{% else %}新增{% endif %}爬蟲配置 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'crawler_config_list' %}">爬蟲配置管理</a></li>
+<li class="breadcrumb-item active">{% if is_edit %}編輯{% else %}新增{% endif %}配置</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear me-2"></i>
+                        {% if is_edit %}編輯爬蟲配置{% else %}新增爬蟲配置{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- 基本設定 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="bi bi-info-circle me-2"></i>基本設定
+                                </h6>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="name" class="form-label fw-bold">配置名稱 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                    value="{% if config %}{{ config.name }}{% endif %}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="base_url" class="form-label fw-bold">爬蟲基礎網址 <span class="text-danger">*</span></label>
+                                <input type="url" class="form-control" id="base_url" name="base_url" 
+                                    value="{% if config %}{{ config.base_url }}{% else %}https://pi.perception-group.com/{% endif %}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="username" class="form-label fw-bold">登入帳號 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                    value="{% if config %}{{ config.username }}{% endif %}" required
+                                    placeholder="請輸入PI系統登入帳號">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="password" class="form-label fw-bold">登入密碼 <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="password" name="password" 
+                                    value="{% if config %}{{ config.password }}{% endif %}" required
+                                    placeholder="請輸入PI系統登入密碼">
+                            </div>
+                        </div>
+                        
+                        <!-- 狀態設定 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary border-bottom pb-2">
+                                    <i class="bi bi-toggle-on me-2"></i>狀態設定
+                                </h6>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                                        {% if not config or config.is_active %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="is_active">
+                                        啟用此配置
+                                    </label>
+                                    <div class="form-text">停用後將無法使用此配置進行爬蟲作業</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 操作按鈕 -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'crawler_config_list' %}" class="btn btn-outline-secondary">
+                                        <i class="bi bi-arrow-left me-1"></i>返回列表
+                                    </a>
+                                    <div>
+                                        {% if is_edit %}
+                                            <button type="button" class="btn btn-outline-info me-2" onclick="testConnection()">
+                                                <i class="bi bi-play-circle me-1"></i>測試連接
+                                            </button>
+                                        {% endif %}
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            {% if is_edit %}更新配置{% else %}建立配置{% endif %}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-lightbulb me-2"></i>配置說明
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h6>基本設定</h6>
+                        <ul class="mb-0 small">
+                            <li><strong>配置名稱</strong>：用於識別此配置</li>
+                            <li><strong>基礎網址</strong>：PI 系統的登入網址</li>
+                            <li><strong>帳號密碼</strong>：PI 系統的登入憑證</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <h6>安全提醒</h6>
+                        <p class="small mb-0">
+                            密碼將以加密方式儲存，但建議使用專用的PI系統帳號進行爬蟲作業。
+                        </p>
+                    </div>
+                    
+                    <div class="alert alert-success">
+                        <h6>測試建議</h6>
+                        <p class="small mb-0">
+                            建立配置後，建議先進行連接測試確認爬蟲功能正常運作。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 測試連接 Modal -->
+<div class="modal fade" id="testModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-play-circle text-info me-2"></i>連接測試
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="testResult">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">測試中...</span>
+                        </div>
+                        <p class="mt-2">正在測試連接...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function testConnection() {
+    const modal = new bootstrap.Modal(document.getElementById('testModal'));
+    modal.show();
+    
+    // 重置測試結果
+    document.getElementById('testResult').innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">測試中...</span>
+            </div>
+            <p class="mt-2">正在測試連接...</p>
+        </div>
+    `;
+    
+    // 模擬測試（實際應該呼叫後端API）
+    setTimeout(() => {
+        const success = Math.random() > 0.3; // 70% 成功率
+        
+        if (success) {
+            document.getElementById('testResult').innerHTML = `
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong>連接成功！</strong><br>
+                    爬蟲配置可以正常連接到PI系統
+                </div>
+                <div class="small text-muted">
+                    <p><strong>測試時間：</strong>${new Date().toLocaleString()}</p>
+                    <p><strong>響應時間：</strong>1.2秒</p>
+                </div>
+            `;
+        } else {
+            document.getElementById('testResult').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle me-2"></i>
+                    <strong>連接失敗！</strong><br>
+                    無法連接到PI系統，請檢查配置
+                </div>
+                <div class="small text-muted">
+                    <p><strong>錯誤訊息：</strong>登入憑證無效或網站無法訪問</p>
+                    <p><strong>建議：</strong>請確認帳號密碼是否正確，或檢查網路連接</p>
+                </div>
+            `;
+        }
+    }, 2000);
+}
+</script>
+{% endblock %}

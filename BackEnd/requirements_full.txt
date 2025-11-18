@@ -1,0 +1,17 @@
+# FastAPI 和 Web 服務器
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# 數據庫
+psycopg2-binary==2.9.9
+
+# SSH 隧道
+sshtunnel==0.4.0
+paramiko==3.4.0
+
+# HTTP 客戶端（用於 LLM API）
+httpx==0.25.1
+
+# 其他依賴
+python-multipart==0.0.6

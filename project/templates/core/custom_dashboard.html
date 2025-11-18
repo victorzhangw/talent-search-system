@@ -1,0 +1,654 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}儀表板 - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.dashboard-card {
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    margin-right: 15px;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+.welcome-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.quick-action-btn {
+    border-radius: 8px;
+    padding: 15px;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: all 0.3s ease;
+}
+
+.quick-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    color: inherit;
+    text-decoration: none;
+}
+
+.project-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.project-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+
+.project-metric {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+
+.project-metric span:first-child {
+    color: #6c757d;
+}
+
+.project-actions .btn {
+    flex: 1;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active"><a href="{% url 'home' %}">首頁</a></li>
+<!-- <li class="breadcrumb-item active">儀表板</li> -->
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- 歡迎橫幅 -->
+    <div class="welcome-banner">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-1">
+                    {% if user.user_type == 'enterprise' %}
+                        歡迎回來，{{ user.enterprise_profile.company_name|default:user.username }}！
+                    {% elif user.user_type == 'individual' %}
+                        歡迎回來，{{ user.individual_profile.real_name|default:user.username }}！
+                    {% else %}
+                        歡迎回來，管理員！
+                    {% endif %}
+                </h2>
+                <p class="mb-0">
+                    {% if user.user_type == 'enterprise' %}
+                        管理您的測驗邀請，追蹤受測者表現
+                    {% elif user.user_type == 'individual' %}
+                        查看可用測驗，管理個人檔案
+                    {% else %}
+                        監控系統運作，管理用戶和測驗項目
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-4 text-end">
+                {% if user.user_type == 'enterprise' %}
+                    <i class="bi bi-building display-4"></i>
+                {% elif user.user_type == 'individual' %}
+                    <i class="bi bi-person display-4"></i>
+                {% else %}
+                    <i class="bi bi-shield-check display-4"></i>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 企業用戶儀表板 -->
+    {% if user.user_type == 'enterprise' %}
+    
+    <!-- 統計卡片 -->
+    <!-- <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #667eea, #764ba2);">
+                        <i class="bi bi-envelope"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ stats.total_invitations }}</h3>
+                        <small class="text-muted">總邀請數</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #f093fb, #f5576c);">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ stats.total_invitees }}</h3>
+                        <small class="text-muted">受測人員</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #4facfe, #00f2fe);">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ stats.completed_tests }}</h3>
+                        <small class="text-muted">已完成測驗</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #43e97b, #38f9d7);">
+                        <i class="bi bi-coin"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ point_info.current_balance }}</h3>
+                        <small class="text-muted">目前點數</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> -->
+
+    <!-- 快速操作 -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body ">
+                    <a href="{% url 'test_result_list' %}" class="quick-action-btn bg-warning text-dark text-center">
+                        <i class="bi bi-bar-chart fs-4 d-block mb-1"></i>
+                        <small>結果列表</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body ">
+                    <a href="{% url 'invitation_template_list' %}" class="quick-action-btn bg-primary text-white text-center">
+                        <i class="bi bi-plus-circle fs-4 d-block mb-1"></i>
+                        <small>評鑑邀請</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body ">
+                    <a href="{% url 'invitation_list' %}" class="quick-action-btn bg-info text-white text-center">
+                        <i class="bi bi-people fs-4 d-block mb-1"></i>
+                        <small>邀請列表</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body ">
+                    <a href="{% url 'point_history' %}" class="quick-action-btn bg-success text-white text-center">
+                        <i class="bi bi-upload fs-4 d-block mb-1"></i>
+                        <small>交易管理</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4 border-0">
+        <div class="card-header bg-white border-0 pb-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-grid me-2"></i>各測驗項目</h5>
+            {% if project_blocks %}
+            <small class="text-muted">共有 {{ project_blocks|length }} 個測驗項目</small>
+            {% endif %}
+        </div>
+        <div class="card-body pt-3">
+            {% if project_blocks %}
+            <div class="row g-3">
+                {% for project in project_blocks %}
+                <div class="col-xl-4 col-lg-6">
+                    <div class="card project-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title mb-0">{{ project.name }}</h5>
+                                <span class="badge bg-primary-subtle text-primary">總份數：{{ project.total_slots_display }}</span>
+                            </div>
+                            <div class="border-top pt-3 mt-3">
+                                <div class="project-metric">
+                                    <span>待完成</span>
+                                    <strong>{{ project.pending_count }}</strong>
+                                </div>
+                                <div class="project-metric">
+                                    <span>已完成</span>
+                                    <strong>{{ project.completed_count }}</strong>
+                                </div>
+                                <div class="project-metric">
+                                    <span>已使用</span>
+                                    <strong>{{ project.used_slots }}</strong>
+                                </div>
+                                <div class="project-metric">
+                                    <span>剩餘份數</span>
+                                    <strong>{{ project.remaining_slots_display }}</strong>
+                                </div>
+                            </div>
+                            <div class="project-actions d-flex gap-2 pt-3 mt-2 border-top">
+                                <a href="{{ project.stats_url }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-bar-chart"></i> 評鑑結果統計
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-collection fs-1 d-block mb-2"></i>
+                目前尚未指派任何測驗項目。
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 圖表和快速操作 -->
+     
+    <!-- <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>近7天邀請趨勢</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>最近邀請</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_invitations %}
+                        <div class="list-group list-group-flush">
+                            {% for invitation in recent_invitations %}
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ invitation.invitee.name }}</h6>
+                                        <small class="text-muted">
+                                            {% if invitation.test_project %}
+                                                {{ invitation.test_project.name }}
+                                            {% elif invitation.test_template %}
+                                                {{ invitation.test_template.name }}
+                                            {% else %}
+                                                測驗項目
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <span class="badge 
+                                        {% if invitation.status == 'completed' %}
+                                            bg-success
+                                        {% elif invitation.status == 'pending' %}
+                                            bg-warning
+                                        {% else %}
+                                            bg-secondary
+                                        {% endif %}
+                                    ">
+                                        {{ invitation.get_status_display }}
+                                    </span>
+                                </div>
+                                <small class="text-muted">{{ invitation.invited_at|date:"Y/m/d H:i" }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-envelope text-muted" style="font-size: 2rem;"></i>
+                            <p class="text-muted mt-2">暫無邀請記錄</p>
+                            <a href="{% url 'test_templates' %}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-1"></i>發送第一個邀請
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning me-2"></i>快速操作</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{% url 'test_templates' %}" class="quick-action-btn bg-primary text-white text-center">
+                                <i class="bi bi-plus-circle fs-4 d-block mb-1"></i>
+                                <small>發送邀請</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'bulk_invitation' %}" class="quick-action-btn bg-success text-white text-center">
+                                <i class="bi bi-upload fs-4 d-block mb-1"></i>
+                                <small>批量邀請</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'invitee_list' %}" class="quick-action-btn bg-info text-white text-center">
+                                <i class="bi bi-people fs-4 d-block mb-1"></i>
+                                <small>管理受測者</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'statistics_dashboard' %}" class="quick-action-btn bg-warning text-dark text-center">
+                                <i class="bi bi-bar-chart fs-4 d-block mb-1"></i>
+                                <small>統計分析</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> -->
+
+    {% elif user.user_type == 'individual' %}
+    
+    <!-- 個人用戶儀表板 -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #667eea, #764ba2);">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ stats.available_tests }}</h3>
+                        <small class="text-muted">可用測驗</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #f093fb, #f5576c);">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ stats.completed_tests }}</h3>
+                        <small class="text-muted">已完成測驗</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #4facfe, #00f2fe);">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ stats.pending_tests }}</h3>
+                        <small class="text-muted">待完成測驗</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #43e97b, #38f9d7);">
+                        <i class="bi bi-coin"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ point_info.current_balance }}</h3>
+                        <small class="text-muted">目前點數</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 可用測驗項目 -->
+    <div class="card dashboard-card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>可用測驗項目</h5>
+        </div>
+        <div class="card-body">
+            {% if available_projects %}
+                <div class="row">
+                    {% for project in available_projects %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ project.name }}</h6>
+                                <p class="card-text small text-muted">{{ project.description|default:"暫無描述" }}</p>
+                                <a href="{% url 'individual_tests' %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-play-circle me-1"></i>查看測驗
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-clipboard-x text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-2">暫無可用測驗項目</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    
+    <!-- 管理員儀表板 -->
+    <div class="row mb-4">
+        <div class="col-md-2 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-people text-primary" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 mb-0">{{ stats.total_users }}</h4>
+                    <small class="text-muted">總用戶數</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-building text-success" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 mb-0">{{ stats.enterprise_users }}</h4>
+                    <small class="text-muted">企業用戶</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-person text-info" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 mb-0">{{ stats.individual_users }}</h4>
+                    <small class="text-muted">個人用戶</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-clipboard-check text-warning" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 mb-0">{{ stats.total_projects }}</h4>
+                    <small class="text-muted">測驗項目</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-envelope text-danger" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 mb-0">{{ stats.total_invitations }}</h4>
+                    <small class="text-muted">總邀請數</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card dashboard-card border-0 h-100">
+                <div class="card-body text-center">
+                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem;"></i>
+                    <h4 class="mt-2 mb-0">{{ pending_enterprises }}</h4>
+                    <small class="text-muted">待審核企業</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理員快速操作 -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>最近註冊用戶</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_users %}
+                        <div class="list-group list-group-flush">
+                            {% for user_item in recent_users %}
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ user_item.username }}</h6>
+                                        <small class="text-muted">{{ user_item.email }}</small>
+                                    </div>
+                                    <span class="badge 
+                                        {% if user_item.user_type == 'enterprise' %}
+                                            bg-success
+                                        {% else %}
+                                            bg-info
+                                        {% endif %}
+                                    ">
+                                        {{ user_item.get_user_type_display }}
+                                    </span>
+                                </div>
+                                <small class="text-muted">{{ user_item.date_joined|date:"Y/m/d H:i" }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center py-3">暫無新註冊用戶</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-building me-2"></i>活躍企業排行</h5>
+                </div>
+                <div class="card-body">
+                    {% if active_enterprises %}
+                        <div class="list-group list-group-flush">
+                            {% for enterprise in active_enterprises %}
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ enterprise.username }}</h6>
+                                        <small class="text-muted">{{ enterprise.email }}</small>
+                                    </div>
+                                    <span class="badge bg-primary">{{ enterprise.invitation_count }}邀請</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center py-3">暫無活躍企業</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+
+{% if user.user_type == 'enterprise' %}
+<!-- <script>
+// 企業用戶圖表
+document.addEventListener('DOMContentLoaded', function() {
+    const chartData = {{ chart_data|safe }};
+    
+    // 趨勢圖表
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.daily_trend.labels,
+            datasets: [{
+                label: '邀請數',
+                data: chartData.daily_trend.invitations,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.4
+            }, {
+                label: '完成數',
+                data: chartData.daily_trend.completions,
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}); -->
+</script>
+{% endif %}
+{% endblock %}

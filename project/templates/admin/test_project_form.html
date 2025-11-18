@@ -1,0 +1,2453 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if is_edit %}編輯{% else %}新增{% endif %}測驗項目 - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 主要區塊配色設計 */
+.section-basic {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+}
+
+.section-fields {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(240, 147, 251, 0.2);
+}
+
+.section-categories {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(79, 172, 254, 0.2);
+    position: relative;
+}
+.section-categories .section-header {
+    position: sticky;
+    top: 72px;
+    z-index: 35;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(79, 172, 254, 0.2);
+}
+
+.section-traits {
+    background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(250, 208, 196, 0.25);
+    position: relative;
+}
+
+.section-traits .section-header {
+    position: sticky;
+    top: 72px;
+    z-index: 40;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(249, 115, 115, 0.2);
+}
+
+.section-assignment {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(67, 233, 123, 0.2);
+}
+
+.sticky-action-bar {
+    position: sticky;
+    bottom: 1.5rem;
+    z-index: 60;
+    pointer-events: none;
+    margin-top: 2rem;
+}
+
+.sticky-action-bar .action-card {
+    border-radius: 18px;
+    box-shadow: 0 12px 32px rgba(52, 73, 94, 0.25);
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.92);
+    pointer-events: auto;
+}
+
+.sticky-action-bar .action-card .card-body {
+    padding: 1.25rem 1.75rem;
+}
+
+#testProjectForm {
+    padding-bottom: 6rem;
+}
+
+.section-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px 12px 0 0;
+    padding: 1.5rem;
+    border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.section-body {
+    background: rgba(255, 255, 255, 0.98);
+    padding: 2rem;
+    border-radius: 0 0 12px 12px;
+}
+
+.section-title {
+    color: #2d3748;
+    font-weight: 600;
+    font-size: 1.3rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.section-title i {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 1.5rem;
+    margin-right: 0.75rem;
+}
+
+/* 分類項目美化 */
+.category-item {
+    border: none;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #f0f9ff 0%, #f0f9ff 100%);
+    border-left: 5px solid #3b82f6;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.category-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.category-header {
+    background: linear-gradient(135deg, #e0e7ff 0%, #fce7f3 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #6366f1;
+}
+
+.category-number-badge {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.project-traits-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.project-trait-item {
+    border-radius: 12px;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #fff7f7 0%, #fff0f0 100%);
+    border-left: 5px solid #f97373;
+    box-shadow: 0 4px 20px rgba(249, 115, 115, 0.15);
+    transition: all 0.3s ease;
+}
+
+.project-trait-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 26px rgba(249, 115, 115, 0.25);
+}
+
+.project-trait-header {
+    background: linear-gradient(135deg, #ffe5e5 0%, #ffd1d1 100%);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #f87171;
+}
+
+.project-trait-number-badge {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    color: #fff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.highlight-flash {
+    animation: traitPulse 1.4s ease-in-out 1;
+    box-shadow: 0 0 0 4px rgba(249, 115, 115, 0.35), 0 12px 24px rgba(0, 0, 0, 0.12);
+    position: relative;
+}
+
+.sticky-category-trait {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 164px;
+    z-index: 25;
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.2);
+}
+
+@keyframes traitPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.01); }
+    80% { transform: scale(0.99); }
+    100% { transform: scale(1); }
+}
+
+.project-trait-description-preview {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    border: 1px dashed rgba(248, 113, 113, 0.4);
+}
+
+/* 特質項目美化 */
+.trait-item {
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    transition: all 0.3s ease;
+}
+
+.trait-item:hover {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.trait-header {
+    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* 按鈕美化 */
+.btn-add-category {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 25px;
+    padding: 0.75rem 1.5rem;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    transition: all 0.3s ease;
+}
+
+.btn-add-category:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    color: white;
+}
+
+.btn-add-trait {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border: none;
+    border-radius: 20px;
+    padding: 0.5rem 1rem;
+    color: white;
+    font-weight: 500;
+    font-size: 0.85rem;
+    box-shadow: 0 3px 10px rgba(245, 158, 11, 0.3);
+    transition: all 0.3s ease;
+}
+
+.btn-add-trait:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    color: white;
+}
+
+.btn-remove {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: none;
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: white;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 10px rgba(239, 68, 68, 0.3);
+}
+
+.btn-remove:hover {
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+    color: white;
+}
+
+/* 用戶選擇區域美化 */
+.user-selection-container {
+    max-height: 350px;
+    overflow-y: auto;
+    border: 3px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #fafafa 0%, #f4f4f5 100%);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.user-checkbox-item {
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.user-checkbox-item:hover {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-color: #3b82f6;
+    transform: translateX(5px);
+}
+
+.enterprise-section {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 5px solid #f59e0b;
+}
+
+.individual-section {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border-left: 5px solid #10b981;
+}
+
+/* 表單輸入框美化 */
+.form-control:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+}
+
+.form-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+}
+
+/* 進度指示器 */
+.progress-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 3rem;
+    padding: 2rem 1rem;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+}
+
+.progress-step-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 3;
+}
+
+.progress-step.completed .progress-step-circle {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.progress-step.active .progress-step-circle {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    animation: pulse 2s infinite;
+}
+
+.progress-step.pending .progress-step-circle {
+    background: #e2e8f0;
+    color: #94a3b8;
+    border: 3px solid #cbd5e1;
+}
+
+.progress-step-label {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.progress-step.completed .progress-step-label {
+    color: #10b981;
+}
+
+.progress-step.active .progress-step-label {
+    color: #3b82f6;
+}
+
+.progress-step.pending .progress-step-label {
+    color: #94a3b8;
+}
+
+.progress-line {
+    flex: 1;
+    height: 4px;
+    margin: 0 1rem;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.progress-line.completed {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
+.progress-line.pending {
+    background: #e2e8f0;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 25px rgba(59, 130, 246, 0.5);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+    .section-body {
+        padding: 1rem;
+    }
+    
+    .category-item {
+        padding: 1rem;
+    }
+    
+    .user-selection-container {
+        max-height: 250px;
+        padding: 1rem;
+    }
+}
+
+/* 動畫效果 */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.category-item {
+    animation: slideInUp 0.5s ease-out;
+}
+
+.trait-item {
+    animation: slideInUp 0.3s ease-out;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_project_list' %}">測驗項目管理</a></li>
+<li class="breadcrumb-item active">{% if is_edit %}編輯{% else %}新增{% endif %}測驗項目</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 進度指示器 -->
+    <div class="progress-indicator">
+        <div class="progress-step pending" id="step1">
+            <div class="progress-step-circle">
+                <i class="bi bi-info-circle"></i>
+            </div>
+            <div class="progress-step-label">基本資訊</div>
+        </div>
+        
+        <div class="progress-line pending"></div>
+        
+        <div class="progress-step pending" id="step2">
+            <div class="progress-step-circle">
+                <i class="bi bi-sliders"></i>
+            </div>
+            <div class="progress-step-label">欄位設定</div>
+        </div>
+        
+        <div class="progress-line pending"></div>
+        
+        <div class="progress-step pending" id="step3">
+            <div class="progress-step-circle">
+                <i class="bi bi-list-check"></i>
+            </div>
+            <div class="progress-step-label">分類管理</div>
+        </div>
+        
+        <div class="progress-line pending"></div>
+        
+        <div class="progress-step pending" id="step4">
+            <div class="progress-step-circle">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="progress-step-label">用戶指派</div>
+        </div>
+    </div>
+
+    <form method="post" id="testProjectForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <!-- 1. 基本資訊區塊 -->
+        <div class="section-basic">
+            <div class="section-header">
+                <h6 class="section-title">
+                    <i class="bi bi-info-circle"></i>基本資訊
+                </h6>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="name" class="form-label fw-bold">測驗名稱 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg" id="name" name="name" 
+                            value="{% if is_edit %}{{ project.name }}{% endif %}" required
+                            placeholder="輸入測驗項目的完整名稱">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="name_abbreviation" class="form-label fw-bold">測驗名稱縮寫</label>
+                        <input type="text" class="form-control form-control-lg" id="name_abbreviation" name="name_abbreviation"
+                            value="{% if is_edit %}{{ project.name_abbreviation }}{% endif %}"
+                            placeholder="輸入簡短識別名稱，僅供下載檔名使用">
+                        <div class="form-text text-muted">僅供下載檔名使用，例：AI潛能、CIA人才等。</div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="test_link" class="form-label fw-bold">測驗連結 <span class="text-danger">*</span></label>
+                        <input type="url" class="form-control form-control-lg" id="test_link" name="test_link" 
+                            value="{% if is_edit %}{{ project.test_link }}{% endif %}" required
+                            placeholder="https://example.com/test">
+                    </div>
+                    
+                    <!-- 新增：Job Role 系統對應名稱欄位 -->
+                    <div class="col-md-12 mb-3">
+                        <label for="job_role_system_name" class="form-label fw-bold">
+                            <i class="bi bi-gear me-1"></i>Job Role系統對應名稱
+                            <span class="badge bg-info ms-2">爬蟲篩選</span>
+                        </label>
+                        <input type="text" class="form-control form-control-lg" id="job_role_system_name" name="job_role_system_name" 
+                            value="{% if is_edit %}{{ project.job_role_system_name }}{% endif %}"
+                            placeholder="例如：recommended_job_role、job_position、career_match">
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            此欄位用於爬蟲程式識別和篩選Job Role相關資訊，請輸入測驗系統中對應的欄位名稱
+                        </div>
+                    </div>
+
+                    <div class="col-md-12 mb-4">
+                        <label class="form-label fw-bold d-block">雷達圖模式 <span class="text-danger">*</span></label>
+                        <div class="d-flex flex-wrap gap-3">
+                            {% for value, label in radar_mode_choices %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="radar_mode" id="radar_mode_{{ value }}" value="{{ value }}"
+                                       {% if current_radar_mode|default:'role' == value %}checked{% endif %}>
+                                <label class="form-check-label" for="radar_mode_{{ value }}">{{ label }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text text-muted">
+                            Role-based 適用角色型報告（依分類角色加權），Score-based 適用分數型報告（依面向得分呈現）。
+                        </div>
+                    </div>
+
+                    <div class="col-md-12 mb-3 {% if current_radar_mode|default:'role' != 'role' %}d-none{% endif %}" id="mixedRoleOption">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="show_mixed_role" name="show_mixed_role"
+                                   {% if current_show_mixed_role %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="show_mixed_role">
+                                顯示混合型角色建議
+                            </label>
+                        </div>
+                        <div class="form-text text-muted">
+                            勾選後，若系統判斷兩個角色差距接近，將顯示「混合型角色」提示。
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label for="description" class="form-label fw-bold">測驗描述</label>
+                        <textarea class="form-control" id="description" name="description" rows="4"
+                                placeholder="詳細描述此測驗項目的目的、適用對象等資訊">{% if is_edit %}{{ project.description }}{% endif %}</textarea>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="title_name" class="form-label fw-bold">標題名稱</label>
+                        <input type="text" class="form-control" id="title_name" name="title_name" 
+                            value="{% if is_edit %}{{ project.title_name }}{% endif %}"
+                            placeholder="輸入測驗項目的標題名稱">
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="title_name_english" class="form-label fw-bold">標題名稱英文</label>
+                        <input type="text" class="form-control" id="title_name_english" name="title_name_english" 
+                            value="{% if is_edit %}{{ project.title_name_english }}{% endif %}"
+                            placeholder="輸入測驗項目的英文標題名稱">
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label for="introduction" class="form-label fw-bold">簡介</label>
+                        <textarea class="form-control" id="introduction" name="introduction" rows="3"
+                                placeholder="輸入測驗項目的簡介">{% if is_edit %}{{ project.introduction }}{% endif %}</textarea>
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label for="usage_guide" class="form-label fw-bold">使用方式</label>
+                        <textarea class="form-control" id="usage_guide" name="usage_guide" rows="3"
+                                placeholder="輸入測驗項目的使用方式說明">{% if is_edit %}{{ project.usage_guide }}{% endif %}</textarea>
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label for="precautions" class="form-label fw-bold">注意事項</label>
+                        <textarea class="form-control" id="precautions" name="precautions" rows="3"
+                                placeholder="輸入測驗項目的注意事項">{% if is_edit %}{{ project.precautions }}{% endif %}</textarea>
+                    </div>
+                </div>
+                
+                <!-- 頁首資訊區塊 -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <h6 class="text-primary mb-3">
+                            <i class="bi bi-layout-text-window-reverse me-2"></i>頁首資訊
+                        </h6>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="header_logo" class="form-label fw-bold">Logo上傳</label>
+                        <input type="file" class="form-control" id="header_logo" name="header_logo" accept="image/*">
+                        {% if is_edit and project.header_logo %}
+                            <div class="mt-2">
+                                <small class="text-muted">目前檔案：</small>
+                                <a href="{{ project.header_logo.url }}" target="_blank" class="text-decoration-none">
+                                    <i class="bi bi-image me-1"></i>檢視目前Logo
+                                </a>
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            支援JPG、PNG格式，建議尺寸：200x80像素
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="header_text_content" class="form-label fw-bold">頁首文字內容</label>
+                        <textarea class="form-control" id="header_text_content" name="header_text_content" rows="3"
+                                placeholder="輸入頁首要顯示的文字內容">{% if is_edit %}{{ project.header_text_content }}{% endif %}</textarea>
+                    </div>
+                </div>
+                
+                <!-- 頁尾資訊區塊 -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <h6 class="text-secondary mb-3">
+                            <i class="bi bi-layout-text-window me-2"></i>頁尾資訊
+                        </h6>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label for="footer_text_content" class="form-label fw-bold">頁尾文字內容</label>
+                        <textarea class="form-control" id="footer_text_content" name="footer_text_content" rows="3"
+                                placeholder="輸入頁尾要顯示的文字內容">{% if is_edit %}{{ project.footer_text_content }}{% endif %}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 新增：個人分享共同資訊區塊 -->
+        <div class="section-basic" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+            <div class="section-header">
+                <h6 class="section-title">
+                    <i class="bi bi-share"></i>個人分享共同資訊
+                </h6>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="personal_share_title" class="form-label fw-bold">標題名稱</label>
+                        <input type="text" class="form-control form-control-lg" id="personal_share_title" name="personal_share_title" 
+                            value="{% if is_edit %}{{ project.personal_share_title }}{% endif %}"
+                            placeholder="輸入個人分享頁面的標題">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="personal_share_footer_content" class="form-label fw-bold">頁尾內容</label>
+                        <textarea class="form-control" id="personal_share_footer_content" name="personal_share_footer_content" rows="3"
+                                placeholder="輸入個人分享頁面頁尾要顯示的內容">{% if is_edit %}{{ project.personal_share_footer_content }}{% endif %}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 評分和預測欄位區塊 -->
+        <div class="section-fields">
+            <div class="section-header">
+                <h6 class="section-title">
+                    <i class="bi bi-sliders"></i>評分與預測欄位設定
+                </h6>
+            </div>
+            <div class="section-body">
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="card border-0 bg-light mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>評分欄位</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="score_field_chinese" class="form-label fw-bold">中文名稱 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="score_field_chinese" name="score_field_chinese" 
+                                           value="{% if is_edit %}{{ project.score_field_chinese }}{% endif %}" required
+                                           placeholder="例如：總分、能力分數">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="score_field_system" class="form-label fw-bold">系統名稱 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="score_field_system" name="score_field_system" 
+                                           value="{% if is_edit %}{{ project.score_field_system }}{% endif %}" required
+                                           placeholder="例如：total_score、ability_score">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card border-0 bg-light mb-3">
+                            <div class="card-header bg-success text-white">
+                                <h6 class="mb-0"><i class="bi bi-target me-2"></i>預測欄位</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="prediction_field_chinese" class="form-label fw-bold">中文名稱 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="prediction_field_chinese" name="prediction_field_chinese" 
+                                           value="{% if is_edit %}{{ project.prediction_field_chinese }}{% endif %}" required
+                                           placeholder="例如：適合職位、推薦角色">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="prediction_field_system" class="form-label fw-bold">系統名稱 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="prediction_field_system" name="prediction_field_system" 
+                                           value="{% if is_edit %}{{ project.prediction_field_system }}{% endif %}" required
+                                           placeholder="例如：suitable_position、recommended_role">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 特質設定區塊 -->
+        <div class="section-traits">
+            <div class="section-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="section-title mb-0">
+                        <i class="bi bi-stars"></i>特質設定
+                    </h6>
+                    <button type="button" class="btn btn-add-trait" id="addProjectTraitBtn">
+                        <i class="bi bi-plus me-1"></i>新增特質
+                    </button>
+                </div>
+            </div>
+            <div class="section-body">
+                <p class="text-muted mb-4 small">
+                    先選擇此測驗會使用的特質，必要時勾選自訂描述。分類中的特質描述將同步引用此處設定。
+                </p>
+                <div id="projectTraitsContainer" class="project-traits-container"></div>
+                <div id="noProjectTraitsHint" class="alert alert-warning mt-3" role="alert" style="display: none;">
+                    <i class="bi bi-exclamation-triangle me-2"></i>尚未設定任何特質，請先新增以供分類選擇。
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 分類設定區塊 -->
+        <div class="section-categories">
+            <div class="section-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="section-title mb-0">
+                        <i class="bi bi-list-check"></i>分類設定
+                    </h6>
+                    <button type="button" class="btn btn-add-category" id="addCategoryBtn">
+                        <i class="bi bi-plus-circle me-2"></i>新增分類
+                    </button>
+                </div>
+            </div>
+            <div class="section-body">
+                <div id="categoriesContainer">
+                    <!-- 動態分類將在這裡插入 -->
+                </div>
+                <div class="text-center text-muted" id="noCategoriesHint">
+                    <i class="bi bi-folder-plus" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p class="mt-2">點擊上方「新增分類」按鈕開始建立測驗分類</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. 指派設定區塊 -->
+        <div class="section-assignment">
+            <div class="section-header">
+                <h6 class="section-title">
+                    <i class="bi bi-people"></i>用戶指派設定
+                </h6>
+            </div>
+            <div class="section-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label for="assignment_type" class="form-label fw-bold">指派類型</label>
+                        <select class="form-select form-select-lg" id="assignment_type" name="assignment_type">
+                            <option value="">請選擇指派類型</option>
+                            <option value="all_open" {% if is_edit and project.assignment_type == 'all_open' %}selected{% endif %}>🌐 全部開放</option>
+                            <option value="enterprise_only" {% if is_edit and project.assignment_type == 'enterprise_only' %}selected{% endif %}>🏢 僅開放給企業</option>
+                            <option value="individual_only" {% if is_edit and project.assignment_type == 'individual_only' %}selected{% endif %}>👤 僅開放給個人</option>
+                            <option value="specific_assignment" {% if is_edit and project.assignment_type == 'specific_assignment' %}selected{% endif %}>🎯 指定開放</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 企業用戶選擇 -->
+                <div id="enterpriseSelection" style="display: none;">
+                    <div class="enterprise-section">
+                        <h6 class="text-warning mb-3">
+                            <i class="bi bi-building me-2"></i>選擇企業用戶
+                        </h6>
+                        {% if enterprises %}
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="selectAllEnterprises">
+                                <label class="form-check-label fw-bold" for="selectAllEnterprises">
+                                    <i class="bi bi-check-all me-1"></i>全選企業用戶 ({{ enterprises.count }} 家)
+                                </label>
+                            </div>
+                            <div class="user-selection-container">
+                                {% for enterprise in enterprises %}
+                                <div class="user-checkbox-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input enterprise-checkbox" type="checkbox" 
+                                               name="assigned_enterprises" value="{{ enterprise.id }}"
+                                               id="enterprise_{{ enterprise.id }}"
+                                               {% if is_edit and enterprise.id in assigned_enterprise_ids %}checked{% endif %}>
+                                        <label class="form-check-label w-100" for="enterprise_{{ enterprise.id }}">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong class="text-primary">{{ enterprise.enterprise_profile.company_name }}</strong>
+                                                    <div class="small text-muted mt-1">
+                                                        <i class="bi bi-person-badge me-1"></i>{{ enterprise.enterprise_profile.contact_person }}
+                                                        <i class="bi bi-envelope ms-3 me-1"></i>{{ enterprise.email }}
+                                                    </div>
+                                                    <div class="small text-muted">
+                                                        <i class="bi bi-building me-1"></i>統編：{{ enterprise.enterprise_profile.tax_id }}
+                                                    </div>
+                                                </div>
+                                                <span class="badge bg-warning">企業</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                目前沒有已審核通過的企業用戶可供指派
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- 個人用戶選擇 -->
+                <div id="individualSelection" style="display: none;">
+                    <div class="individual-section">
+                        <h6 class="text-success mb-3">
+                            <i class="bi bi-person me-2"></i>選擇個人用戶
+                        </h6>
+                        {% if individuals %}
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="selectAllIndividuals">
+                                <label class="form-check-label fw-bold" for="selectAllIndividuals">
+                                    <i class="bi bi-check-all me-1"></i>全選個人用戶 ({{ individuals.count }} 位)
+                                </label>
+                            </div>
+                            <div class="user-selection-container">
+                                {% for individual in individuals %}
+                                <div class="user-checkbox-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input individual-checkbox" type="checkbox" 
+                                               name="assigned_individuals" value="{{ individual.id }}"
+                                               id="individual_{{ individual.id }}"
+                                               {% if is_edit and individual.id in assigned_individual_ids %}checked{% endif %}>
+                                        <label class="form-check-label w-100" for="individual_{{ individual.id }}">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong class="text-success">{{ individual.individual_profile.real_name }}</strong>
+                                                    <div class="small text-muted mt-1">
+                                                        <i class="bi bi-person-circle me-1"></i>{{ individual.username }}
+                                                        <i class="bi bi-envelope ms-3 me-1"></i>{{ individual.email }}
+                                                    </div>
+                                                </div>
+                                                <span class="badge bg-success">個人</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                目前沒有已驗證的個人用戶可供指派
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 隱藏欄位 -->
+        <input type="hidden" id="project_traits_data" name="project_traits_data">
+        <input type="hidden" id="categories_data" name="categories_data">
+        
+        <!-- 操作按鈕 -->
+        <div class="sticky-action-bar">
+            <div class="card action-card">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-md-between gap-3">
+                        <a href="{% url 'test_project_list' %}" class="btn btn-outline-secondary btn-lg flex-fill flex-md-grow-0">
+                            <i class="bi bi-arrow-left me-2"></i>返回列表
+                        </a>
+                        <div class="d-flex justify-content-end gap-3 flex-fill flex-md-grow-0">
+                            <button type="button" class="btn btn-outline-info btn-lg" id="previewBtn">
+                                <i class="bi bi-eye me-2"></i>預覽設定
+                            </button>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle me-2"></i>
+                                {% if is_edit %}更新測驗項目{% else %}建立測驗項目{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- 測驗特質模板 -->
+<template id="projectTraitTemplate">
+    <div class="project-trait-item" data-project-trait-index="">
+        <div class="project-trait-header d-flex justify-content-between align-items-center">
+            <span class="project-trait-number-badge">特質 <span class="project-trait-number"></span></span>
+            <button type="button" class="btn btn-remove btn-sm" title="刪除此特質">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div class="row g-3 align-items-start">
+            <div class="col-md-6">
+                <label class="form-label small fw-bold">選擇特質 <span class="text-danger">*</span></label>
+                <select class="form-select project-trait-select">
+                    <option value="">請選擇特質</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">中文名稱</label>
+                <input type="text" class="form-control form-control-sm project-trait-chinese-name" readonly placeholder="--">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">系統名稱</label>
+                <input type="text" class="form-control form-control-sm project-trait-system-name" readonly placeholder="--">
+            </div>
+        </div>
+        <div class="mt-3">
+            <label class="form-label small fw-bold">特質描述</label>
+            <div class="project-trait-description-preview mb-2">
+                <span class="text-muted">預設描述：</span>
+                <span class="project-trait-default-description text-dark">尚未選擇特質</span>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input custom-desc-toggle" type="checkbox" role="switch">
+                <label class="form-check-label small">使用自訂描述</label>
+            </div>
+            <textarea class="form-control project-trait-custom-description" rows="4" placeholder="輸入此測驗專屬的特質描述" disabled></textarea>
+            <div class="form-text">分類中相同特質的描述會同步引用此處設定。</div>
+        </div>
+    </div>
+</template>
+
+<!-- 分類模板 -->
+<template id="categoryTemplate">
+    <div class="category-item" data-category-index="">
+        <div class="category-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="category-number-badge">分類 <span class="category-number"></span></span>
+                </div>
+                <button type="button" class="btn btn-remove" onclick="removeCategory(this)" title="刪除此分類">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">分類完整名稱 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control category-name" required
+                    placeholder="輸入分類的完整名稱">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">英文名稱</label>
+                <input type="text" class="form-control category-english-name"
+                    placeholder="輸入分類的英文名稱">
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-12 mb-3">
+                <label class="form-label fw-bold">說明</label>
+                <textarea class="form-control category-description" rows="3"
+                    placeholder="輸入分類的詳細說明"></textarea>
+            </div>
+        </div>
+        
+        <!-- 新增：角色相關欄位 -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <h6 class="text-info mb-3">
+                    <i class="bi bi-person-badge me-2"></i>角色資訊
+                </h6>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">角色名稱</label>
+                <input type="text" class="form-control role-name"
+                    placeholder="輸入角色名稱">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Tag文字</label>
+                <input type="text" class="form-control tag-text"
+                    placeholder="輸入標籤文字">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">分數類型名稱</label>
+                <input type="text" class="form-control score-type-name"
+                    placeholder="輸入分數類型名稱">
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">角色圖片</label>
+                <input type="file" class="form-control role-image" accept="image/*">
+                <div class="form-text">
+                    <i class="bi bi-info-circle me-1"></i>
+                    支援JPG、PNG格式，建議尺寸：300x300像素
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">內容</label>
+                <textarea class="form-control category-content" rows="3"
+                          placeholder="描述此角色的詳細內容"></textarea>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">優勢建議</label>
+                <textarea class="form-control advantage-suggestions" rows="3"
+                          placeholder="描述此角色的優勢建議"></textarea>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label fw-bold">發展方向</label>
+                <textarea class="form-control development-direction" rows="3"
+                          placeholder="描述此角色的發展方向"></textarea>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label fw-bold text-success">優勢分析說明</label>
+                <textarea class="form-control advantage-analysis" rows="4"
+                          placeholder="描述此分類的優勢特點和正面表現"></textarea>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold text-warning">劣勢分析說明</label>
+                <textarea class="form-control disadvantage-analysis" rows="4"
+                          placeholder="描述此分類的劣勢特點和需要改進的地方"></textarea>
+            </div>
+        </div>
+        
+        <!-- 發展建議參數設定 -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <h6 class="text-primary fw-bold mb-3">
+                    <i class="bi bi-lightbulb me-2"></i>發展建議參數設定
+                </h6>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold text-info">參數名稱</label>
+                <input type="text" class="form-control development-parameter-name" 
+                       placeholder="例如：發展推薦、改善建議等">
+                <div class="form-text">此欄位名稱會顯示在測驗結果中作為標題</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold text-info">內容</label>
+                <textarea class="form-control development-parameter-content" rows="3"
+                          placeholder="輸入該參數的具體內容和建議"></textarea>
+                <div class="form-text">此內容會在該分類為最高分時顯示給受測者</div>
+            </div>
+        </div>
+        
+        <!-- 特質區域 -->
+        <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3 sticky-category-trait">
+                <h6 class="mb-0 text-secondary d-flex align-items-center gap-2">
+                    <i class="bi bi-tags"></i><span>特質設定</span>
+                </h6>
+                <button type="button" class="btn btn-add-trait btn-sm" onclick="addTrait(this)">
+                    <i class="bi bi-plus me-1"></i>新增特質
+                </button>
+            </div>
+            <div class="traits-container">
+                <!-- 特質將在這裡插入 -->
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- 特質模板 -->
+<template id="traitTemplate">
+    <div class="trait-item" data-trait-index="">
+        <div class="trait-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <span>特質 <span class="trait-number"></span></span>
+                <button type="button" class="btn btn-outline-light btn-sm" onclick="removeTrait(this)" title="刪除此特質">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="row g-2 align-items-start">
+            <div class="col-md-8 mb-2">
+                <label class="form-label small fw-bold">選擇特質 <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm trait-select">
+                    <option value="">請選擇特質</option>
+                </select>
+                <div class="form-text">選擇後將自動帶出特質資訊</div>
+            </div>
+            <div class="col-md-4 mb-2">
+                <label class="form-label small fw-bold">權重</label>
+                <input type="number" class="form-control form-control-sm trait-weight" step="0.01"
+                       value="1" placeholder="設定此特質的權重">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-2">
+                <label class="form-label small fw-bold">中文特質名稱</label>
+                <input type="text" class="form-control form-control-sm trait-chinese-name" readonly placeholder="--">
+            </div>
+            <div class="col-md-6 mb-2">
+                <label class="form-label small fw-bold">系統對應名稱</label>
+                <input type="text" class="form-control form-control-sm trait-system-name" readonly placeholder="--">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12 mb-2">
+                <label class="form-label small fw-bold">特質描述</label>
+                <textarea class="form-control form-control-sm trait-description" rows="6" readonly
+                          placeholder="選擇特質後會顯示描述"></textarea>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+// 全局變量
+let categoryIndex = 0;
+let categoriesData = {% if is_edit %}{{ categories_json|safe }}{% else %}[]{% endif %};
+let projectTraitsData = {{ project_traits_json|default:"[]"|safe }};
+let availableTraits = {{ available_traits_json|default:"[]"|safe }};
+
+if (!Array.isArray(categoriesData)) {
+    categoriesData = [];
+}
+if (!Array.isArray(projectTraitsData)) {
+    projectTraitsData = [];
+}
+if (!Array.isArray(availableTraits)) {
+    availableTraits = [];
+}
+
+const traitLookup = new Map();
+availableTraits.forEach(trait => {
+    const key = String(trait.id);
+    traitLookup.set(key, trait);
+});
+
+let projectTraitSelectionMap = new Map();
+const SCROLL_OFFSET_DEFAULT = 220;
+const SCROLL_OFFSET_PROJECT_TRAIT = 140;
+const SCROLL_STORAGE_KEY = 'testProjectFormScroll_' + window.location.pathname;
+let pendingScrollPosition = null;
+let scrollRestored = false;
+
+// 頁面載入完成後初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('頁面載入完成，開始初始化');
+
+    const savedScroll = sessionStorage.getItem(SCROLL_STORAGE_KEY);
+    if (savedScroll !== null) {
+        const target = parseInt(savedScroll, 10);
+        if (!Number.isNaN(target)) {
+            pendingScrollPosition = target;
+        }
+        sessionStorage.removeItem(SCROLL_STORAGE_KEY);
+    }
+
+    setTimeout(function() {
+        initializeTinyMCE();
+    }, 1000);
+
+    initializeProjectTraitsSection();
+
+    const addProjectTraitBtn = document.getElementById('addProjectTraitBtn');
+    if (addProjectTraitBtn) {
+        addProjectTraitBtn.addEventListener('click', function() {
+            const newTraitElement = addProjectTrait(null, { focus: true });
+            refreshProjectTraitOptions();
+            if (newTraitElement) {
+                flashHighlight(newTraitElement);
+            }
+        });
+    }
+
+    // Trait options must be ready before loading categories
+    refreshProjectTraitOptions();
+
+    const addCategoryBtn = document.getElementById('addCategoryBtn');
+    if (addCategoryBtn) {
+        addCategoryBtn.addEventListener('click', function() {
+            const newCategoryElement = addCategory(null, { focus: true });
+            if (newCategoryElement) {
+                flashHighlight(newCategoryElement);
+            }
+
+            setTimeout(function() {
+                initializeCategoryTinyMCE(categoryIndex - 1);
+            }, 500);
+        });
+    }
+
+    if (categoriesData.length > 0) {
+        categoriesData.forEach(function(categoryData) {
+            addCategory(categoryData);
+        });
+        updateNoContentHint();
+        scheduleScrollRestore();
+    } else {
+        updateNoContentHint();
+        scheduleScrollRestore();
+    }
+
+    const assignmentTypeSelect = document.getElementById('assignment_type');
+    if (assignmentTypeSelect) {
+        assignmentTypeSelect.addEventListener('change', function() {
+            toggleAssignmentSelection();
+            updateProgressSteps();
+        });
+        toggleAssignmentSelection();
+    }
+
+    const radarModeRadios = document.querySelectorAll('input[name="radar_mode"]');
+    const mixedRoleOption = document.getElementById('mixedRoleOption');
+
+    function updateMixedRoleVisibility() {
+        if (!mixedRoleOption) {
+            return;
+        }
+        const selected = document.querySelector('input[name="radar_mode"]:checked');
+        const isRoleMode = selected && selected.value === 'role';
+        mixedRoleOption.classList.toggle('d-none', !isRoleMode);
+        if (!isRoleMode) {
+            const checkbox = mixedRoleOption.querySelector('#show_mixed_role');
+            if (checkbox) {
+                checkbox.checked = false;
+            }
+        }
+    }
+
+    radarModeRadios.forEach(radio => {
+        radio.addEventListener('change', updateMixedRoleVisibility);
+    });
+    updateMixedRoleVisibility();
+
+    const selectAllEnterprises = document.getElementById('selectAllEnterprises');
+    if (selectAllEnterprises) {
+        selectAllEnterprises.addEventListener('change', function() {
+            document.querySelectorAll('.enterprise-checkbox').forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+
+    const selectAllIndividuals = document.getElementById('selectAllIndividuals');
+    if (selectAllIndividuals) {
+        selectAllIndividuals.addEventListener('change', function() {
+            document.querySelectorAll('.individual-checkbox').forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+
+    document.getElementById('name').addEventListener('input', updateProgressSteps);
+    document.getElementById('test_link').addEventListener('input', updateProgressSteps);
+    document.getElementById('job_role_system_name').addEventListener('input', updateProgressSteps);
+    document.getElementById('description').addEventListener('input', updateProgressSteps);
+    document.getElementById('score_field_chinese').addEventListener('input', updateProgressSteps);
+    document.getElementById('score_field_system').addEventListener('input', updateProgressSteps);
+    document.getElementById('prediction_field_chinese').addEventListener('input', updateProgressSteps);
+    document.getElementById('prediction_field_system').addEventListener('input', updateProgressSteps);
+
+    const testProjectForm = document.getElementById('testProjectForm');
+    if (testProjectForm) {
+        testProjectForm.addEventListener('submit', function() {
+            try {
+                const currentScroll = window.scrollY || window.pageYOffset || 0;
+                sessionStorage.setItem(SCROLL_STORAGE_KEY, String(currentScroll));
+            } catch (error) {
+                console.warn('保存卷軸位置失敗:', error);
+            }
+            collectProjectTraitsData();
+            collectCategoriesData();
+        });
+    }
+
+    const previewBtn = document.getElementById('previewBtn');
+    if (previewBtn) {
+        previewBtn.addEventListener('click', function() {
+            collectProjectTraitsData();
+            collectCategoriesData();
+            showPreviewModal();
+        });
+    }
+
+    setTimeout(updateProgressSteps, 100);
+});
+
+// 更新進度指示器
+function updateProgressSteps() {
+    const steps = document.querySelectorAll('.progress-step');
+    const lines = document.querySelectorAll('.progress-line');
+    
+    // 檢查各步驟完成狀態
+    const step1Complete = document.getElementById('name').value.trim() !== '' && 
+                          document.getElementById('test_link').value.trim() !== '' && 
+                          document.getElementById('job_role_system_name').value.trim() !== '';
+    const step2Complete = document.getElementById('score_field_chinese').value.trim() !== '' && 
+                          document.getElementById('prediction_field_chinese').value.trim() !== '';
+    
+    // 只有當分類有實際內容才算完成（不只是數量）
+    const categoryItems = document.querySelectorAll('.category-item');
+    let step3Complete = false;
+
+    if (categoryItems.length > 0) {
+        // 檢查是否有任何分類填寫了名稱或連結
+        step3Complete = Array.from(categoryItems).some(item => {
+            const name = item.querySelector('.category-name')?.value?.trim();
+            const link = item.querySelector('.category-link')?.value?.trim();
+            return name || link;
+        });
+    }
+    
+    // 步驟4：檢查指派類型是否有選擇（不能是空值）
+    const assignmentTypeValue = document.getElementById('assignment_type').value;
+    const step4Complete = assignmentTypeValue !== '';
+    
+    const completionStates = [step1Complete, step2Complete, step3Complete, step4Complete];
+    
+    console.log('進度檢查:', {
+        step1: step1Complete,
+        step2: step2Complete, 
+        step3: step3Complete,
+        step4: step4Complete,
+        assignmentTypeValue: assignmentTypeValue
+    });
+    
+    // 更新步驟狀態 - 重要：只有前一步完成才能進入下一步
+    steps.forEach((step, index) => {
+        const circle = step.querySelector('.progress-step-circle');
+        const isComplete = completionStates[index];
+        
+        // 修改邏輯：只有前面所有步驟都完成，當前步驟才能是 active
+        const canBeActive = index === 0 || completionStates.slice(0, index).every(state => state);
+        const isActive = !isComplete && canBeActive;
+        
+        step.classList.remove('completed', 'active', 'pending');
+        
+        if (isComplete && canBeActive) {
+            step.classList.add('completed');
+            circle.innerHTML = '<i class="bi bi-check"></i>';
+        } else if (isActive) {
+            step.classList.add('active');
+            // 根據步驟設置不同圖標
+            const icons = ['bi-info-circle', 'bi-sliders', 'bi-list-check', 'bi-people'];
+            circle.innerHTML = `<i class="bi ${icons[index]}"></i>`;
+        } else {
+            step.classList.add('pending');
+            const icons = ['bi-info-circle', 'bi-sliders', 'bi-list-check', 'bi-people'];
+            circle.innerHTML = `<i class="bi ${icons[index]}"></i>`;
+        }
+    });
+    
+    // 更新連接線狀態 - 只有當前步驟和前一步都完成時，線才變綠
+    lines.forEach((line, index) => {
+        line.classList.remove('completed', 'pending');
+        if (completionStates[index] && (index === 0 || completionStates.slice(0, index).every(state => state))) {
+            line.classList.add('completed');
+        } else {
+            line.classList.add('pending');
+        }
+    });
+}
+
+function updateStepStatus(stepElement, isComplete, canActivate) {
+    // 這個函數已經被上面的 updateProgressSteps 取代，可以移除
+}
+
+// 切換指派選擇顯示
+function toggleAssignmentSelection() {
+    const assignmentType = document.getElementById('assignment_type').value;
+    const enterpriseSelection = document.getElementById('enterpriseSelection');
+    const individualSelection = document.getElementById('individualSelection');
+    
+    console.log('指派類型變更為:', assignmentType);
+    
+    // 隱藏所有選擇區域
+    if (enterpriseSelection) enterpriseSelection.style.display = 'none';
+    if (individualSelection) individualSelection.style.display = 'none';
+    
+    if (assignmentType === 'specific_assignment') {
+        // 指定開放時，顯示企業和個人選擇
+        console.log('顯示企業和個人選擇');
+        if (enterpriseSelection) enterpriseSelection.style.display = 'block';
+        if (individualSelection) individualSelection.style.display = 'block';
+    }
+}
+
+// ====== 測驗特質設定相關函數 ======
+function initializeProjectTraitsSection() {
+    const container = document.getElementById('projectTraitsContainer');
+    if (!container) {
+        return;
+    }
+
+    projectTraitsData.sort((a, b) => {
+        const orderA = typeof a.sort_order === 'number' ? a.sort_order : 0;
+        const orderB = typeof b.sort_order === 'number' ? b.sort_order : 0;
+        return orderA - orderB;
+    });
+
+    if (projectTraitsData.length > 0) {
+        projectTraitsData.forEach(data => addProjectTrait(data));
+    } else {
+        updateProjectTraitsHint();
+    }
+}
+
+function updateProjectTraitsHint() {
+    const container = document.getElementById('projectTraitsContainer');
+    const hint = document.getElementById('noProjectTraitsHint');
+    if (!hint) {
+        return;
+    }
+    const hasItems = container && container.children.length > 0;
+    hint.style.display = hasItems ? 'none' : 'block';
+}
+
+function addProjectTrait(traitData = null, options = {}) {
+    const template = document.getElementById('projectTraitTemplate');
+    const container = document.getElementById('projectTraitsContainer');
+    const focusNewItem = Boolean(options.focus);
+
+    if (!template || !container) {
+        console.error('找不到特質設定模板或容器');
+        return;
+    }
+
+    const clone = template.content.cloneNode(true);
+    const traitItem = clone.querySelector('.project-trait-item');
+    const traitNumber = clone.querySelector('.project-trait-number');
+    const currentIndex = container.children.length;
+
+    traitItem.setAttribute('data-project-trait-index', currentIndex);
+    if (traitNumber) {
+        traitNumber.textContent = currentIndex + 1;
+    }
+
+    const select = clone.querySelector('.project-trait-select');
+    const toggle = clone.querySelector('.custom-desc-toggle');
+    const textarea = clone.querySelector('.project-trait-custom-description');
+    const removeBtn = clone.querySelector('.btn-remove');
+
+    const presetTraitId = traitData && traitData.trait_id ? String(traitData.trait_id) : '';
+
+    if (select) {
+        populateProjectTraitSelect(select, presetTraitId);
+        select.addEventListener('change', function() {
+            const selectedValue = this.value;
+            traitItem.dataset.selectedTraitId = String(selectedValue || '');
+            if (toggle) {
+                toggle.checked = false;
+            }
+            if (textarea) {
+                textarea.value = '';
+                textarea.disabled = true;
+            }
+            updateProjectTraitDetails(traitItem, selectedValue);
+            refreshProjectTraitOptions();
+        });
+    }
+
+    if (toggle) {
+        toggle.addEventListener('change', function() {
+            if (textarea) {
+                textarea.disabled = !this.checked;
+            }
+            refreshProjectTraitOptions();
+        });
+    }
+
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            refreshProjectTraitOptions();
+        });
+    }
+
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function() {
+            removeProjectTrait(this);
+        });
+    }
+
+    container.appendChild(clone);
+
+    const appendedItem = container.lastElementChild;
+    const appendedSelect = appendedItem.querySelector('.project-trait-select');
+    const appendedToggle = appendedItem.querySelector('.custom-desc-toggle');
+    const appendedTextarea = appendedItem.querySelector('.project-trait-custom-description');
+
+    if (presetTraitId && appendedSelect) {
+        appendedSelect.value = presetTraitId;
+        appendedItem.dataset.selectedTraitId = presetTraitId;
+    }
+
+    if (appendedToggle && appendedTextarea) {
+        const useCustom = traitData ? Boolean(traitData.use_custom_description) : false;
+        appendedToggle.checked = useCustom;
+        appendedTextarea.disabled = !useCustom;
+        appendedTextarea.value = traitData && traitData.custom_description ? traitData.custom_description : '';
+    }
+
+    updateProjectTraitDetails(appendedItem, presetTraitId);
+    updateProjectTraitNumbers();
+    updateProjectTraitsHint();
+    refreshProjectTraitOptions();
+
+    if (focusNewItem && appendedItem) {
+        scrollIntoViewWithOffset(appendedItem, SCROLL_OFFSET_PROJECT_TRAIT);
+    }
+
+    return appendedItem;
+}
+
+function removeProjectTrait(button) {
+    const traitItem = button.closest('.project-trait-item');
+    if (!traitItem) {
+        return;
+    }
+
+    if (traitItem.dataset.deleting === '1') {
+        return;
+    }
+
+    const traitId = traitItem.dataset.selectedTraitId;
+    let traitName = traitItem.querySelector('.project-trait-chinese-name')?.value?.trim() || '';
+    if (!traitName && traitId) {
+        const lookupData = traitLookup.get(String(traitId));
+        traitName = lookupData?.chinese_name || lookupData?.system_name || traitName;
+    }
+
+    if (traitId) {
+        const relatedItems = Array.from(document.querySelectorAll('#categoriesContainer .trait-item'))
+            .filter(item => {
+                const select = item.querySelector('.trait-select');
+                return select && select.value === String(traitId);
+            });
+
+        if (relatedItems.length > 0) {
+            const firstRelated = relatedItems[0];
+            flashHighlight(firstRelated);
+            scrollIntoViewWithOffset(firstRelated);
+
+            const confirmationName = traitName ? `特質「${traitName}」` : '此特質';
+            const shouldRemove = window.confirm(`${confirmationName}已被使用，確定刪除嗎？`);
+            if (!shouldRemove) {
+                return;
+            }
+
+            traitItem.dataset.deleting = '1';
+
+            const containersToUpdate = new Set();
+            relatedItems.forEach(item => {
+                const container = item.closest('.traits-container');
+                item.remove();
+                if (container) {
+                    containersToUpdate.add(container);
+                }
+            });
+            containersToUpdate.forEach(container => updateTraitNumbers(container));
+        } else {
+            traitItem.dataset.deleting = '1';
+        }
+    } else {
+        traitItem.dataset.deleting = '1';
+    }
+
+    traitItem.remove();
+    updateProjectTraitNumbers();
+    updateProjectTraitsHint();
+    refreshProjectTraitOptions();
+}
+
+function updateProjectTraitNumbers() {
+    const container = document.getElementById('projectTraitsContainer');
+    if (!container) {
+        return;
+    }
+    const items = container.querySelectorAll('.project-trait-item');
+    items.forEach((item, index) => {
+        item.setAttribute('data-project-trait-index', index);
+        const number = item.querySelector('.project-trait-number');
+        if (number) {
+            number.textContent = index + 1;
+        }
+    });
+}
+
+function populateProjectTraitSelect(select, selectedId = '') {
+    if (!select) {
+        return;
+    }
+
+    const usedIds = new Set();
+    document.querySelectorAll('.project-trait-select').forEach(otherSelect => {
+        const value = otherSelect.value;
+        if (value) {
+            usedIds.add(String(value));
+        }
+    });
+
+    if (selectedId) {
+        usedIds.delete(String(selectedId));
+    }
+
+    select.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = availableTraits.length > 0 ? '請選擇特質' : '尚未建立特質';
+    select.appendChild(placeholder);
+
+    if (availableTraits.length === 0) {
+        select.disabled = true;
+        return;
+    }
+
+    availableTraits.forEach(trait => {
+        const option = document.createElement('option');
+        const value = String(trait.id);
+        option.value = value;
+        option.textContent = `${trait.chinese_name} (${trait.system_name})`;
+        if (usedIds.has(value)) {
+            option.disabled = true;
+        }
+        select.appendChild(option);
+    });
+
+    select.disabled = false;
+    if (selectedId) {
+        select.value = String(selectedId);
+    }
+}
+
+function updateProjectTraitDetails(traitItem, traitId) {
+    const chineseInput = traitItem.querySelector('.project-trait-chinese-name');
+    const systemInput = traitItem.querySelector('.project-trait-system-name');
+    const defaultDescription = traitItem.querySelector('.project-trait-default-description');
+    const toggle = traitItem.querySelector('.custom-desc-toggle');
+    const textarea = traitItem.querySelector('.project-trait-custom-description');
+
+    const key = String(traitId || '');
+    const traitData = traitLookup.get(key);
+
+    if (traitData) {
+        if (chineseInput) {
+            chineseInput.value = traitData.chinese_name || '';
+        }
+        if (systemInput) {
+            systemInput.value = traitData.system_name || '';
+        }
+        if (defaultDescription) {
+            defaultDescription.textContent = traitData.description ? traitData.description : '此特質沒有描述';
+        }
+    } else {
+        if (chineseInput) {
+            chineseInput.value = '';
+        }
+        if (systemInput) {
+            systemInput.value = '';
+        }
+        if (defaultDescription) {
+            defaultDescription.textContent = '尚未選擇特質';
+        }
+    }
+
+    if (textarea) {
+        textarea.disabled = !(toggle && toggle.checked);
+    }
+}
+
+function getProjectTraitSelections() {
+    const selections = [];
+    const container = document.getElementById('projectTraitsContainer');
+    if (!container) {
+        return selections;
+    }
+
+    container.querySelectorAll('.project-trait-item').forEach((item, index) => {
+        const select = item.querySelector('.project-trait-select');
+        if (!select || !select.value) {
+            return;
+        }
+
+        const traitId = parseInt(select.value, 10);
+        if (isNaN(traitId)) {
+            return;
+        }
+
+        const baseData = traitLookup.get(String(select.value));
+        const toggle = item.querySelector('.custom-desc-toggle');
+        const textarea = item.querySelector('.project-trait-custom-description');
+
+        const useCustom = toggle ? toggle.checked : false;
+        const customDescription = textarea ? textarea.value : '';
+        const defaultDescription = baseData ? (baseData.description || '') : '';
+        const effectiveDescription = useCustom && customDescription ? customDescription : defaultDescription;
+
+        selections.push({
+            trait_id: traitId,
+            chinese_name: baseData ? baseData.chinese_name : '',
+            system_name: baseData ? baseData.system_name : '',
+            default_description: defaultDescription,
+            use_custom_description: useCustom,
+            custom_description: customDescription,
+            description: effectiveDescription,
+            sort_order: index
+        });
+    });
+
+    return selections;
+}
+
+function flashHighlight(element) {
+    if (!element) {
+        return;
+    }
+    element.classList.add('highlight-flash');
+    setTimeout(() => {
+        element.classList.remove('highlight-flash');
+    }, 1500);
+}
+
+function scrollIntoViewWithOffset(element, offset = SCROLL_OFFSET_DEFAULT) {
+    if (!element) {
+        return;
+    }
+
+    window.requestAnimationFrame(() => {
+        const rect = element.getBoundingClientRect();
+        const absoluteTop = window.pageYOffset + rect.top;
+        window.scrollTo({
+            top: Math.max(absoluteTop - offset, 0),
+            behavior: 'smooth',
+        });
+    });
+}
+
+function refreshProjectTraitOptions() {
+    const selections = getProjectTraitSelections();
+    projectTraitSelectionMap = new Map();
+    selections.forEach(item => {
+        projectTraitSelectionMap.set(String(item.trait_id), item);
+    });
+
+    document.querySelectorAll('.project-trait-select').forEach(select => {
+        const currentValue = select.value;
+        populateProjectTraitSelect(select, currentValue);
+        if (currentValue) {
+            select.value = currentValue;
+        }
+    });
+
+    document.querySelectorAll('.trait-item').forEach(traitItem => {
+        const select = traitItem.querySelector('.trait-select');
+        if (!select) {
+            return;
+        }
+        const currentValue = select.value;
+        populateCategoryTraitSelect(select);
+        if (currentValue && projectTraitSelectionMap.has(String(currentValue))) {
+            select.value = currentValue;
+        } else {
+            select.value = '';
+        }
+        updateTraitDetails(traitItem, select.value);
+    });
+
+    updateProjectTraitsHint();
+}
+
+function collectProjectTraitsData() {
+    const selections = getProjectTraitSelections();
+    const input = document.getElementById('project_traits_data');
+    if (!input) {
+        return selections;
+    }
+    const payload = selections.map(item => ({
+        trait_id: item.trait_id,
+        use_custom_description: item.use_custom_description,
+        custom_description: item.custom_description,
+        sort_order: item.sort_order
+    }));
+    input.value = JSON.stringify(payload);
+    return selections;
+}
+
+// 更新無內容提示
+function updateNoContentHint() {
+    const container = document.getElementById('categoriesContainer');
+    const hint = document.getElementById('noCategoriesHint');
+    const hasCategories = container.children.length > 0;
+    
+    if (hint) {
+        hint.style.display = hasCategories ? 'none' : 'block';
+    }
+}
+
+// 新增分類
+// 新增分類
+function addCategory(categoryData = null, options = {}) {
+    console.log('執行新增分類函數，數據：', categoryData);
+    const focusNewCategory = Boolean(options.focus);
+    
+    const template = document.getElementById('categoryTemplate');
+    if (!template) {
+        console.error('找不到分類模板');
+        return;
+    }
+    
+    const clone = template.content.cloneNode(true);
+    
+    // 設置分類索引
+    const categoryDiv = clone.querySelector('.category-item');
+    categoryDiv.setAttribute('data-category-index', categoryIndex);
+    if (categoryData && typeof categoryData.id !== 'undefined' && categoryData.id !== null) {
+        categoryDiv.setAttribute('data-category-id', categoryData.id);
+    } else {
+        categoryDiv.removeAttribute('data-category-id');
+    }
+    
+    // 更新分類編號
+    clone.querySelector('.category-number').textContent = categoryIndex + 1;
+    
+    // 為 textarea 設置唯一 ID
+    const advantageTextarea = clone.querySelector('.advantage-analysis');
+    const disadvantageTextarea = clone.querySelector('.disadvantage-analysis');
+    
+    if (advantageTextarea) {
+        advantageTextarea.id = 'advantage-' + categoryIndex;
+    }
+    if (disadvantageTextarea) {
+        disadvantageTextarea.id = 'disadvantage-' + categoryIndex;
+    }
+    
+    // 如果有數據，填入表單
+    if (categoryData) {
+        clone.querySelector('.category-name').value = categoryData.name || '';
+        clone.querySelector('.category-english-name').value = categoryData.english_name || '';
+        clone.querySelector('.category-description').value = categoryData.description || '';
+        clone.querySelector('.role-name').value = categoryData.role_name || '';
+        clone.querySelector('.tag-text').value = categoryData.tag_text || '';
+        clone.querySelector('.score-type-name').value = categoryData.score_type_name || '';
+        clone.querySelector('.category-content').value = categoryData.content || '';
+        clone.querySelector('.advantage-suggestions').value = categoryData.advantage_suggestions || '';
+        clone.querySelector('.development-direction').value = categoryData.development_direction || '';
+        clone.querySelector('.development-parameter-name').value = categoryData.development_parameter_name || '';
+        clone.querySelector('.development-parameter-content').value = categoryData.development_parameter_content || '';
+        if (advantageTextarea) advantageTextarea.value = categoryData.advantage_analysis || '';
+        if (disadvantageTextarea) disadvantageTextarea.value = categoryData.disadvantage_analysis || '';
+    }
+    
+    // 插入到容器
+    const container = document.getElementById('categoriesContainer');
+    if (!container) {
+        console.error('找不到分類容器');
+        return;
+    }
+    container.appendChild(clone);
+    
+    // 為新分類的特質預設新增一個
+    const categoryElement = categoryDiv;
+    if (categoryElement) {
+        const traitsContainer = categoryElement.querySelector('.traits-container');
+
+        if (categoryData && categoryData.traits) {
+            categoryData.traits.forEach(function(traitData) {
+                addTrait(traitsContainer, traitData);
+            });
+        } else {
+            addTrait(traitsContainer);
+        }
+
+        const nameInput = categoryElement.querySelector('.category-name');
+        if (nameInput) nameInput.addEventListener('input', updateProgressSteps);
+    }
+    
+    // 增加索引
+    categoryIndex++;
+    
+    // 更新提示顯示和進度
+    updateNoContentHint();
+    updateProgressSteps();
+    scheduleScrollRestore();
+    
+    if (focusNewCategory && categoryElement) {
+        scrollIntoViewWithOffset(categoryElement);
+    }
+    
+    console.log('分類新增完成，當前索引：', categoryIndex);
+    return categoryElement;
+}
+
+// 移除分類
+function removeCategory(button) {
+    if (confirm('確定要刪除此分類嗎？此操作將同時刪除所有相關的特質設定。')) {
+        const categoryItem = button.closest('.category-item');
+        if (categoryItem) {
+            // 添加刪除動畫
+            categoryItem.style.animation = 'slideOutUp 0.3s ease-in';
+            setTimeout(() => {
+                categoryItem.remove();
+                updateCategoryNumbers();
+                updateNoContentHint();
+                updateProgressSteps();
+            }, 300);
+        }
+    }
+}
+
+// 新增特質
+function addTrait(container, traitData = null, options = {}) {
+    console.log('執行新增特質函數，容器：', container, '數據：', traitData);
+
+    let triggeredByButton = false;
+    if (container && container.tagName === 'BUTTON') {
+        triggeredByButton = true;
+        container = container.closest('.category-item').querySelector('.traits-container');
+    }
+
+    if (!container) {
+        console.error('找不到特質容器');
+        return;
+    }
+
+    const template = document.getElementById('traitTemplate');
+    if (!template) {
+        console.error('找不到特質模板');
+        return;
+    }
+
+    const clone = template.content.cloneNode(true);
+    const traitDiv = clone.querySelector('.trait-item');
+    const traitCount = container.children.length;
+
+    traitDiv.setAttribute('data-trait-index', traitCount);
+    if (traitData && typeof traitData.relation_id !== 'undefined' && traitData.relation_id !== null) {
+        traitDiv.setAttribute('data-category-trait-id', traitData.relation_id);
+    } else {
+        traitDiv.removeAttribute('data-category-trait-id');
+    }
+    clone.querySelector('.trait-number').textContent = traitCount + 1;
+
+    const select = traitDiv.querySelector('.trait-select');
+    const weightInput = traitDiv.querySelector('.trait-weight');
+
+    populateCategoryTraitSelect(select);
+
+    if (projectTraitSelectionMap.size === 0 && triggeredByButton) {
+        alert('尚未設定任何特質，請先在「特質設定」區塊新增特質。');
+    }
+
+    if (traitData && traitData.weight !== undefined && weightInput) {
+        weightInput.value = traitData.weight;
+    } else if (weightInput) {
+        weightInput.value = 1;
+    }
+
+    if (select) {
+        select.addEventListener('change', function() {
+            updateTraitDetails(traitDiv, this.value);
+        });
+
+        if (traitData && traitData.trait_id) {
+            select.value = String(traitData.trait_id);
+        }
+
+        updateTraitDetails(traitDiv, select.value);
+    }
+
+    container.appendChild(clone);
+    updateTraitNumbers(container);
+    refreshProjectTraitOptions();
+
+    const appendedItem = container.lastElementChild;
+    const shouldFocus = triggeredByButton || Boolean(options.focus);
+    if (shouldFocus && appendedItem) {
+        scrollIntoViewWithOffset(appendedItem);
+        setTimeout(() => flashHighlight(appendedItem), 60);
+    }
+
+    console.log('特質新增完成');
+    return appendedItem;
+}
+
+function populateCategoryTraitSelect(select) {
+    if (!select) return;
+
+    select.innerHTML = '';
+
+    const selections = Array.from(projectTraitSelectionMap.values()).sort((a, b) => a.sort_order - b.sort_order);
+
+    if (selections.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '請先在特質設定中選擇特質';
+        option.disabled = true;
+        select.appendChild(option);
+        select.disabled = true;
+        return;
+    }
+
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = '請選擇特質';
+    select.appendChild(placeholderOption);
+
+    selections.forEach(function(item) {
+        const option = document.createElement('option');
+        option.value = String(item.trait_id);
+        option.textContent = `${item.chinese_name} (${item.system_name})`;
+        select.appendChild(option);
+    });
+
+    select.disabled = false;
+}
+
+function updateTraitDetails(traitElement, traitId) {
+    if (!traitElement) return;
+
+    const key = String(traitId || '');
+    const selectedData = projectTraitSelectionMap.get(key);
+    const traitData = selectedData || traitLookup.get(key);
+
+    const chineseInput = traitElement.querySelector('.trait-chinese-name');
+    const systemInput = traitElement.querySelector('.trait-system-name');
+    const descriptionInput = traitElement.querySelector('.trait-description');
+
+    if (traitData) {
+        const chineseName = selectedData ? selectedData.chinese_name : (traitData.chinese_name || '');
+        const systemName = selectedData ? selectedData.system_name : (traitData.system_name || '');
+        const description = selectedData ? (selectedData.description || '') : (traitData.description || '');
+        if (chineseInput) chineseInput.value = chineseName;
+        if (systemInput) systemInput.value = systemName;
+        if (descriptionInput) descriptionInput.value = description;
+    } else {
+        if (chineseInput) chineseInput.value = '';
+        if (systemInput) systemInput.value = '';
+        if (descriptionInput) descriptionInput.value = '';
+    }
+}
+
+// 移除特質
+function removeTrait(button) {
+    const traitsContainer = button.closest('.traits-container');
+    const traitCount = traitsContainer.children.length;
+    
+    if (traitCount <= 1) {
+        alert('每個分類至少需要保留一個特質設定！');
+        return;
+    }
+    
+    if (confirm('確定要刪除此特質嗎？')) {
+        const traitItem = button.closest('.trait-item');
+        const container = button.closest('.traits-container');
+        if (traitItem) {
+            // 添加刪除動畫
+            traitItem.style.animation = 'slideOutUp 0.2s ease-in';
+            setTimeout(() => {
+                traitItem.remove();
+                updateTraitNumbers(container);
+            }, 200);
+        }
+    }
+}
+
+// 更新分類編號
+function updateCategoryNumbers() {
+    const categoryItems = document.querySelectorAll('#categoriesContainer .category-item');
+    categoryItems.forEach(function(item, index) {
+        const numberSpan = item.querySelector('.category-number');
+        if (numberSpan) {
+            numberSpan.textContent = index + 1;
+        }
+        item.setAttribute('data-category-index', index);
+    });
+}
+
+// 更新特質編號
+function updateTraitNumbers(container) {
+    if (!container) return;
+    
+    const traitItems = container.querySelectorAll('.trait-item');
+    traitItems.forEach(function(item, index) {
+        const numberSpan = item.querySelector('.trait-number');
+        if (numberSpan) {
+            numberSpan.textContent = index + 1;
+        }
+        item.setAttribute('data-trait-index', index);
+    });
+}
+
+// 收集分類數據
+function collectCategoriesData() {
+    const categories = [];
+    
+    const categoryItems = document.querySelectorAll('#categoriesContainer .category-item');
+    categoryItems.forEach(function(categoryItem, index) {
+        const traits = [];
+        
+        // 收集特質數據
+        const traitItems = categoryItem.querySelectorAll('.trait-item');
+        traitItems.forEach(function(traitItem, traitIndex) {
+            const select = traitItem.querySelector('.trait-select');
+            if (!select) {
+                return;
+            }
+
+            const traitIdValue = select.value;
+            if (!traitIdValue) {
+                return;
+            }
+
+            const parsedId = parseInt(traitIdValue, 10);
+            if (isNaN(parsedId)) {
+                return;
+            }
+
+            let weight = 1;
+            const weightInput = traitItem.querySelector('.trait-weight');
+            if (weightInput) {
+                const parsedWeight = parseFloat(weightInput.value);
+                if (!isNaN(parsedWeight)) {
+                    weight = parsedWeight;
+                }
+            }
+
+            const relationIdAttr = traitItem.getAttribute('data-category-trait-id');
+            const relationId = relationIdAttr ? parseInt(relationIdAttr, 10) : null;
+
+            traits.push({
+                relation_id: !isNaN(relationId) ? relationId : null,
+                trait_id: parsedId,
+                weight: weight,
+                sort_order: traitIndex
+            });
+        });
+        
+        // 收集分類數據
+        const categoryName = categoryItem.querySelector('.category-name').value || '';
+        const categoryEnglishName = categoryItem.querySelector('.category-english-name').value || '';
+        const categoryDescription = categoryItem.querySelector('.category-description').value || '';
+        const roleName = categoryItem.querySelector('.role-name').value || '';
+        const tagText = categoryItem.querySelector('.tag-text').value || '';
+        const scoreTypeName = categoryItem.querySelector('.score-type-name').value || '';
+        const content = categoryItem.querySelector('.category-content').value || '';
+        const advantageSuggestions = categoryItem.querySelector('.advantage-suggestions').value || '';
+        const developmentDirection = categoryItem.querySelector('.development-direction').value || '';
+        
+        // 獲取富文本內容
+        const advantageTextarea = categoryItem.querySelector('.advantage-analysis');
+        const disadvantageTextarea = categoryItem.querySelector('.disadvantage-analysis');
+        
+        let advantageContent = '';
+        let disadvantageContent = '';
+        
+        if (advantageTextarea) {
+            const advantageEditor = tinymce.get(advantageTextarea.id);
+            advantageContent = advantageEditor ? advantageEditor.getContent() : advantageTextarea.value;
+        }
+        
+        if (disadvantageTextarea) {
+            const disadvantageEditor = tinymce.get(disadvantageTextarea.id);
+            disadvantageContent = disadvantageEditor ? disadvantageEditor.getContent() : disadvantageTextarea.value;
+        }
+        
+        // 獲取發展建議參數
+        const developmentParameterName = categoryItem.querySelector('.development-parameter-name').value || '';
+        const developmentParameterContent = categoryItem.querySelector('.development-parameter-content').value || '';
+        
+        // 處理角色圖片上傳 - 設定正確的name屬性
+        const roleImageInput = categoryItem.querySelector('.role-image');
+        if (roleImageInput) {
+            roleImageInput.name = `role_image_${index}`;
+        }
+        
+        if (categoryName.trim()) {  // 只檢查名稱
+            categories.push({
+                id: categoryItem.getAttribute('data-category-id') || null,
+                name: categoryName,
+                english_name: categoryEnglishName,
+                description: categoryDescription,
+                test_link: '',  // 設為空字符串
+                advantage_analysis: advantageContent,
+                disadvantage_analysis: disadvantageContent,
+                development_parameter_name: developmentParameterName,
+                development_parameter_content: developmentParameterContent,
+                // 新增角色相關欄位
+                role_name: roleName,
+                tag_text: tagText,
+                content: content,
+                advantage_suggestions: advantageSuggestions,
+                development_direction: developmentDirection,
+                score_type_name: scoreTypeName,
+                traits: traits
+            });
+        }
+    });
+    
+    // 將數據轉為JSON字符串
+    const categoriesDataInput = document.getElementById('categories_data');
+    if (categoriesDataInput) {
+        categoriesDataInput.value = JSON.stringify(categories);
+    }
+    console.log('收集的分類數據：', categories);
+}
+
+function scheduleScrollRestore() {
+    if (pendingScrollPosition === null || scrollRestored) {
+        return;
+    }
+    window.requestAnimationFrame(function() {
+        window.requestAnimationFrame(function() {
+            window.scrollTo({ top: pendingScrollPosition, behavior: 'auto' });
+            scrollRestored = true;
+        });
+    });
+}
+
+// 顯示預覽模態框
+function showPreviewModal() {
+    const name = document.getElementById('name').value;
+    const description = document.getElementById('description').value;
+    const assignmentType = document.getElementById('assignment_type');
+    const selectedText = assignmentType.options[assignmentType.selectedIndex].text;
+    
+    const categoryCount = document.querySelectorAll('.category-item').length;
+    let traitCount = 0;
+    document.querySelectorAll('.trait-item').forEach(() => traitCount++);
+    
+    let assignmentInfo = selectedText;
+    if (assignmentType.value === 'specific_assignment') {
+        const enterpriseCount = document.querySelectorAll('.enterprise-checkbox:checked').length;
+        const individualCount = document.querySelectorAll('.individual-checkbox:checked').length;
+        assignmentInfo += ` (企業: ${enterpriseCount} 家, 個人: ${individualCount} 位)`;
+    }
+    
+    const previewContent = `
+        <div class="modal fade" id="previewModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-eye me-2"></i>測驗項目預覽
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-primary">基本資訊</h6>
+                                <table class="table table-borderless table-sm">
+                                    <tr><td class="fw-bold">測驗名稱：</td><td>${name || '未填寫'}</td></tr>
+                                    <tr><td class="fw-bold">描述：</td><td>${description || '未填寫'}</td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-success">統計資訊</h6>
+                                <table class="table table-borderless table-sm">
+                                    <tr><td class="fw-bold">分類數量：</td><td>${categoryCount} 個</td></tr>
+                                    <tr><td class="fw-bold">特質總數：</td><td>${traitCount} 個</td></tr>
+                                    <tr><td class="fw-bold">指派方式：</td><td>${assignmentInfo}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 移除現有的模態框
+    const existingModal = document.getElementById('previewModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // 添加新的模態框
+    document.body.insertAdjacentHTML('beforeend', previewContent);
+    
+    // 顯示模態框
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+}
+
+// 添加滑出動畫的CSS
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideOutUp {
+        from {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        to {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+    }
+`;
+document.head.appendChild(style);
+
+// TinyMCE 相關函數
+function initializeTinyMCE() {
+    // 初始化現有的 textarea
+    const existingTextareas = document.querySelectorAll('.advantage-analysis, .disadvantage-analysis');
+    existingTextareas.forEach(function(textarea, index) {
+        if (!textarea.id) {
+            textarea.id = 'tinymce-' + Date.now() + '-' + index;
+        }
+        
+        if (!tinymce.get(textarea.id)) {
+            tinymce.init({
+                target: textarea,
+                height: 200,
+                menubar: false,
+                plugins: [
+                    'advlist', 'autolink', 'lists', 'link', 'charmap',
+                    'searchreplace', 'visualblocks', 'table', 'help'
+                ],
+                toolbar: 'undo redo | bold italic | alignleft aligncenter alignright | bullist numlist | link | removeformat | help',
+                content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px }',
+                setup: function(editor) {
+                    editor.on('change', function() {
+                        updateProgressSteps();
+                    });
+                }
+            });
+        }
+    });
+}
+
+function initializeCategoryTinyMCE(categoryIndex) {
+    const categoryElement = document.querySelector(`[data-category-index="${categoryIndex}"]`);
+    if (categoryElement) {
+        const textareas = categoryElement.querySelectorAll('.advantage-analysis, .disadvantage-analysis');
+        textareas.forEach(function(textarea, index) {
+            if (!textarea.id) {
+                textarea.id = 'category-' + categoryIndex + '-textarea-' + index;
+            }
+            
+            if (!tinymce.get(textarea.id)) {
+                tinymce.init({
+                    target: textarea,
+                    height: 200,
+                    menubar: false,
+                    plugins: [
+                        'advlist', 'autolink', 'lists', 'link', 'charmap',
+                        'searchreplace', 'visualblocks', 'table', 'help'
+                    ],
+                    toolbar: 'undo redo | bold italic | alignleft aligncenter alignright | bullist numlist | link | removeformat | help',
+                    content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 14px }',
+                    setup: function(editor) {
+                        editor.on('change', function() {
+                            updateProgressSteps();
+                        });
+                    }
+                });
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

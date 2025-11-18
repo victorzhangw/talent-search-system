@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}付款 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'point_dashboard' %}">點數管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'point_purchase' %}">購買點數</a></li>
+<li class="breadcrumb-item active">付款</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-credit-card me-2"></i>訂單付款
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 訂單信息 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6>訂單信息</h6>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td>訂單號：</td>
+                                    <td><code>{{ order.order_number }}</code></td>
+                                </tr>
+                                <tr>
+                                    <td>套餐名稱：</td>
+                                    <td>{{ order.package.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td>基礎點數：</td>
+                                    <td><span class="text-primary">{{ order.points }} 點</span></td>
+                                </tr>
+                                {% if order.bonus_points %}
+                                <tr>
+                                    <td>贈送點數：</td>
+                                    <td><span class="text-success">{{ order.bonus_points }} 點</span></td>
+                                </tr>
+                                <tr>
+                                    <td>總點數：</td>
+                                    <td><span class="fw-bold text-info">{{ order.total_points }} 點</span></td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td>訂單金額：</td>
+                                    <td><span class="h5 text-danger">${{ order.amount }}</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>付款方式</h6>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>演示模式</strong><br>
+                                目前系統處於演示模式，點擊「確認付款」將自動完成付款並發放點數。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 付款按鈕 -->
+                    <div class="text-center">
+                        <form method="post" action="{% url 'create_point_order' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="package_id" value="{{ order.package.id }}">
+                            <button type="submit" class="btn btn-success btn-lg me-3">
+                                <i class="bi bi-check-circle me-2"></i>確認付款 ${{ order.amount }}
+                            </button>
+                        </form>
+                        <a href="{% url 'point_purchase' %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-arrow-left me-2"></i>返回選擇
+                        </a>
+                    </div>
+
+                    <!-- 安全提示 -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="bi bi-shield-check me-2"></i>安全保障</h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <small class="text-muted">
+                                                <i class="bi bi-lock me-1"></i>SSL 加密傳輸
+                                            </small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted">
+                                                <i class="bi bi-shield me-1"></i>資料安全保護
+                                            </small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted">
+                                                <i class="bi bi-headset me-1"></i>24/7 客服支援
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

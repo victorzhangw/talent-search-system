@@ -1,0 +1,369 @@
+{# templates/export/export_demo.html #}
+{% extends 'base.html' %}
+
+{% block title %}匯出功能演示{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">匯出功能演示</li>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">匯出功能演示</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">這個頁面演示了系統支持的各種數據匯出功能。</p>
+                
+                <div class="row g-4">
+                    <!-- 用戶數據匯出 -->
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">用戶數據匯出</h6>
+                            </div>
+                            <div class="card-body">
+                                <p>匯出示例用戶數據，包含用戶名、姓名、電子郵件等信息。</p>
+                                <div class="mt-3">
+                                    <div class="btn-group">
+                                        <a href="{% url 'export_data' %}?data_type=user&format=csv" class="btn btn-outline-primary">
+                                            <i class="bi bi-file-earmark-text me-1"></i> CSV
+                                        </a>
+                                        <a href="{% url 'export_data' %}?data_type=user&format=excel" class="btn btn-outline-success">
+                                            <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                                        </a>
+                                        <a href="{% url 'export_data' %}?data_type=user&format=pdf" class="btn btn-outline-danger">
+                                            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 訂單數據匯出 -->
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">訂單數據匯出</h6>
+                            </div>
+                            <div class="card-body">
+                                <p>匯出示例訂單數據，包含訂單編號、客戶、日期、金額等信息。</p>
+                                <div class="mt-3">
+                                    <div class="btn-group">
+                                        <a href="{% url 'export_data' %}?data_type=order&format=csv" class="btn btn-outline-primary">
+                                            <i class="bi bi-file-earmark-text me-1"></i> CSV
+                                        </a>
+                                        <a href="{% url 'export_data' %}?data_type=order&format=excel" class="btn btn-outline-success">
+                                            <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                                        </a>
+                                        <a href="{% url 'export_data' %}?data_type=order&format=pdf" class="btn btn-outline-danger">
+                                            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 自定義表格數據匯出 -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">自定義表格數據匯出</h6>
+                            </div>
+                            <div class="card-body">
+                                <p>這個表格演示了動態生成的數據如何與匯出功能結合使用。</p>
+                                
+                                <!-- 表格控制按鈕 -->
+                                <div class="mb-3 d-flex justify-content-between">
+                                    <div>
+                                        <button id="generateTableBtn" class="btn btn-primary">
+                                            <i class="bi bi-table me-1"></i> 生成示例數據
+                                        </button>
+                                        <button id="clearTableBtn" class="btn btn-outline-secondary ms-2">
+                                            <i class="bi bi-trash me-1"></i> 清空數據
+                                        </button>
+                                    </div>
+                                    <div class="btn-group" id="exportBtnGroup" style="display: none;">
+                                        <button class="btn btn-outline-primary export-table" data-format="csv">
+                                            <i class="bi bi-file-earmark-text me-1"></i> CSV
+                                        </button>
+                                        <button class="btn btn-outline-success export-table" data-format="excel">
+                                            <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                                        </button>
+                                        <button class="btn btn-outline-danger export-table" data-format="pdf">
+                                            <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- 表格 -->
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-hover" id="demoTable">
+                                        <thead>
+                                            <tr>
+                                                <th>用戶ID</th>
+                                                <th>用戶名</th>
+                                                <th>姓名</th>
+                                                <th>電子郵件</th>
+                                                <th>部門</th>
+                                                <th>角色</th>
+                                                <th>狀態</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colspan="7" class="text-center py-4">
+                                                    <div class="text-muted">
+                                                        <i class="bi bi-table mb-3" style="font-size: 2rem;"></i>
+                                                        <p>點擊「生成示例數據」按鈕來填充表格</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 匯出選項模態框 -->
+<div class="modal fade" id="exportOptionsModal" tabindex="-1" aria-labelledby="exportOptionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportOptionsModalLabel">匯出選項</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="exportOptionsForm">
+                    <div class="mb-3">
+                        <label for="exportFilename" class="form-label">檔案名稱</label>
+                        <input type="text" class="form-control" id="exportFilename" placeholder="example_export">
+                        <div class="form-text">不需要包含副檔名，會自動添加</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">選擇要匯出的欄位</label>
+                        <div id="exportFieldsContainer">
+                            <!-- 欄位選項將由JavaScript動態添加 -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmExport">確認匯出</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 生成示例數據
+        const generateTableBtn = document.getElementById('generateTableBtn');
+        const clearTableBtn = document.getElementById('clearTableBtn');
+        const exportBtnGroup = document.getElementById('exportBtnGroup');
+        const tableBody = document.querySelector('#demoTable tbody');
+        const exportButtons = document.querySelectorAll('.export-table');
+        const exportOptionsModal = new bootstrap.Modal(document.getElementById('exportOptionsModal'));
+        const exportFieldsContainer = document.getElementById('exportFieldsContainer');
+        const confirmExportBtn = document.getElementById('confirmExport');
+        
+        // 當前表格數據
+        let tableData = [];
+        // 當前選擇的匯出格式
+        let currentExportFormat = '';
+        
+        // 生成表格數據
+        generateTableBtn.addEventListener('click', function() {
+            // 清空表格
+            tableBody.innerHTML = '';
+            
+            // 生成10條假數據
+            tableData = generateSampleUserData(10);
+            
+            // 填充表格
+            tableData.forEach(user => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${user.name}</td>
+                    <td>${user.email}</td>
+                    <td>${user.department}</td>
+                    <td>${user.role}</td>
+                    <td><span class="badge ${user.status === '啟用' ? 'bg-success' : 'bg-danger'}">${user.status}</span></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            
+            // 顯示匯出按鈕
+            exportBtnGroup.style.display = 'inline-flex';
+        });
+        
+        // 清空表格
+        clearTableBtn.addEventListener('click', function() {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4">
+                        <div class="text-muted">
+                            <i class="bi bi-table mb-3" style="font-size: 2rem;"></i>
+                            <p>點擊「生成示例數據」按鈕來填充表格</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            
+            // 隱藏匯出按鈕
+            exportBtnGroup.style.display = 'none';
+            
+            // 清空數據
+            tableData = [];
+        });
+        
+        // 匯出按鈕點擊事件
+        exportButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const format = this.getAttribute('data-format');
+                currentExportFormat = format;
+                
+                // 填充欄位選項
+                exportFieldsContainer.innerHTML = '';
+                
+                // 表格標題
+                const headers = {
+                    'id': '用戶ID',
+                    'username': '用戶名',
+                    'name': '姓名',
+                    'email': '電子郵件',
+                    'department': '部門',
+                    'role': '角色',
+                    'status': '狀態'
+                };
+                
+                // 添加欄位選項
+                for (const [field, label] of Object.entries(headers)) {
+                    const div = document.createElement('div');
+                    div.className = 'form-check';
+                    div.innerHTML = `
+                        <input class="form-check-input" type="checkbox" value="${field}" id="field_${field}" checked>
+                        <label class="form-check-label" for="field_${field}">
+                            ${label}
+                        </label>
+                    `;
+                    exportFieldsContainer.appendChild(div);
+                }
+                
+                // 顯示選項模態框
+                exportOptionsModal.show();
+            });
+        });
+        
+        // 確認匯出
+        confirmExportBtn.addEventListener('click', function() {
+            // 獲取選擇的欄位
+            const selectedFields = [];
+            document.querySelectorAll('#exportFieldsContainer input:checked').forEach(checkbox => {
+                selectedFields.push(checkbox.value);
+            });
+            
+            if (selectedFields.length === 0) {
+                alert('請至少選擇一個欄位');
+                return;
+            }
+            
+            // 獲取檔案名稱
+            const filename = document.getElementById('exportFilename').value || `user_export_${new Date().toISOString().slice(0, 10)}`;
+            
+            // 過濾數據，只保留選擇的欄位
+            const filteredData = tableData.map(user => {
+                const filteredUser = {};
+                selectedFields.forEach(field => {
+                    filteredUser[field] = user[field];
+                });
+                return filteredUser;
+            });
+            
+            // 生成URL
+            const headers = {};
+            selectedFields.forEach(field => {
+                headers[field] = document.querySelector(`th:nth-child(${getColumnIndex(field) + 1})`).innerText;
+            });
+            
+            // 將數據和標題編碼為URL參數
+            const dataParam = encodeURIComponent(JSON.stringify(filteredData));
+            const headersParam = encodeURIComponent(JSON.stringify(headers));
+            
+            // 構建URL
+            const url = `{% url 'export_custom_data' %}?format=${currentExportFormat}&filename=${filename}&data=${dataParam}&headers=${headersParam}`;
+            
+            // 小型數據可以直接在URL中傳遞，大型數據應該使用POST請求
+            if (url.length > 2000) {
+                alert('數據量過大，請減少選擇的行數或欄位數');
+                return;
+            }
+            
+            // 關閉模態框
+            exportOptionsModal.hide();
+            
+            // 打開下載連結
+            window.open(url, '_blank');
+        });
+        
+        // 獲取欄位在表格中的索引
+        function getColumnIndex(field) {
+            const columnMap = {
+                'id': 0,
+                'username': 1,
+                'name': 2,
+                'email': 3,
+                'department': 4,
+                'role': 5,
+                'status': 6
+            };
+            return columnMap[field] || 0;
+        }
+        
+        // 生成示例用戶數據
+        function generateSampleUserData(count) {
+            const firstNames = ['張', '李', '王', '陳', '林', '黃', '趙', '吳', '劉', '周'];
+            const lastNames = ['小明', '小華', '大力', '雅琪', '思雨', '志豪', '家豪', '美玲', '怡君', '建宏'];
+            const departments = ['人事部', '財務部', '行銷部', '研發部', '業務部', '客服部', '資訊部', '總務部'];
+            const roles = ['管理員', '一般用戶', '訪客', '主管', '副理', '經理', '總監'];
+            
+            const users = [];
+            
+            for (let i = 1; i <= count; i++) {
+                const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+                const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+                const name = firstName + lastName;
+                
+                users.push({
+                    id: i,
+                    username: `user${i}`,
+                    name: name,
+                    email: `${name}@example.com`,
+                    department: departments[Math.floor(Math.random() * departments.length)],
+                    role: roles[Math.floor(Math.random() * roles.length)],
+                    status: Math.random() > 0.2 ? '啟用' : '停用'
+                });
+            }
+            
+            return users;
+        }
+    });
+</script>
+{% endblock %}

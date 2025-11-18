@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI 人才搜索系統</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Microsoft JhengHei", sans-serif;
+        background: #f5f5f5;
+      }
+
+      #app {
+        display: flex;
+        height: 100vh;
+      }
+
+      /* 頂部標題區 */
+      .header {
+        background: white;
+        padding: 20px 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logo {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .header-content h1 {
+        font-size: 24px;
+        color: #2c3e36;
+        margin-bottom: 4px;
+      }
+
+      .header-content p {
+        font-size: 13px;
+        color: #6b7b74;
+      }
+
+      .status-indicator {
+        padding: 10px 24px;
+        background: white;
+        border: 1.5px solid #d0e0d5;
+        border-radius: 8px;
+        color: #5fa897;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .status-dot {
+        display: none;
+      }
+
+      /* 主內容區域 */
+      .main-content {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* 左側聊天區域 */
+      .chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #e8f0eb;
+      }
+
+      /* 聊天消息區域 */
+      .messages {
+        flex: 1;
+        padding: 30px;
+        overflow-y: auto;
+        background: #e8f0eb;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .message {
+        display: flex;
+        gap: 12px;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.user {
+        flex-direction: row-reverse;
+      }
+
+      .message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .message.user .message-avatar {
+        background: linear-gradient(135deg, #89c4ad, #6fa894);
+      }
+
+      .message.system .message-avatar {
+        background: linear-gradient(135deg, #c8e6d8, #a8d4c3);
+      }
+
+      .message-content {
+        max-width: 600px;
+        padding: 16px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.6;
+        word-wrap: break-word;
+        color: #2c3e36;
+      }
+
+      .message.user .message-content {
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+
+      .message.system .message-content {
+        background: white;
+        color: #2c3e36;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      }
+
+      /* 輸入區域 */
+      .input-area {
+        padding: 20px 30px;
+        background: white;
+        border-top: 2px solid #e0ebe5;
+      }
+
+      .input-container {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+        align-items: center;
+      }
+
+      .input-container input {
+        flex: 1;
+        padding: 14px 20px;
+        border: 1.5px solid #d0e0d5;
+        border-radius: 10px;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+        background: #ffffff;
+        font-family: inherit;
+        color: #2c3e36;
+      }
+
+      .input-container input:focus {
+        border-color: #6fa894;
+        box-shadow: 0 0 0 3px rgba(111, 168, 148, 0.1);
+      }
+
+      .input-container button {
+        padding: 14px 28px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+        font-family: inherit;
+      }
+
+      .input-container button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(111, 168, 148, 0.3);
+      }
+
+      .input-container button:active {
+        transform: translateY(0);
+      }
+
+      .input-container button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #adb5bd;
+      }
+
+      /* 建議標籤 */
+      .suggestions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .suggestion-chip {
+        padding: 8px 16px;
+        background: #f0f7f3;
+        border: 1px solid #d0e0d5;
+        border-radius: 20px;
+        font-size: 13px;
+        color: #5fa897;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .suggestion-chip:hover {
+        background: #e8f0eb;
+        border-color: #6fa894;
+      }
+
+      /* 右側結果區域 */
+      .results-area {
+        width: 480px;
+        background: #fafafa;
+        border-left: 2px solid #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.03);
+      }
+
+      .results-header {
+        padding: 30px;
+        background: white;
+        border-bottom: 2px solid #e8e8e8;
+      }
+
+      .results-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #2c3e36;
+        margin-bottom: 8px;
+      }
+
+      .results-count {
+        font-size: 14px;
+        color: #777;
+      }
+
+      .results-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+      }
+
+      .candidate-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 16px;
+        border: 1px solid #e8e8e8;
+        transition: all 0.2s;
+        position: relative;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      }
+
+      .candidate-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .candidate-card.selected {
+        border-color: #6fa894;
+        background: #f8fafb;
+      }
+
+      .candidate-checkbox {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        z-index: 10;
+        accent-color: #6fa894;
+      }
+
+      .candidate-card-content {
+        cursor: pointer;
+        padding-right: 30px;
+      }
+
+      .candidate-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .candidate-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #89c4ad, #6fa894);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 20px;
+      }
+
+      .candidate-info h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #2c3e36;
+        margin-bottom: 4px;
+      }
+
+      .candidate-email {
+        font-size: 13px;
+        color: #777;
+      }
+
+      .match-score {
+        margin-bottom: 12px;
+      }
+
+      .score-bar {
+        width: 100%;
+        height: 8px;
+        background: #e8e8e8;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+
+      .score-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6fa894, #89c4ad);
+        border-radius: 4px;
+        transition: width 0.3s;
+      }
+
+      .score-text {
+        text-align: right;
+        font-size: 20px;
+        font-weight: 600;
+        color: #6fa894;
+        margin-bottom: 12px;
+      }
+
+      .match-reason {
+        font-size: 13px;
+        color: #555;
+        line-height: 1.5;
+        background: #f8fafb;
+        padding: 12px;
+        border-radius: 8px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .match-reason i {
+        color: #6fa894;
+        font-size: 16px;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+
+      /* 空狀態 */
+      .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #6b7280;
+      }
+
+      .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        color: #6fa894;
+        opacity: 0.6;
+        animation: float 3s ease-in-out infinite;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+      }
+
+      .empty-state h3 {
+        font-size: 20px;
+        margin-bottom: 8px;
+        color: #6fa894;
+        font-weight: 600;
+      }
+
+      .empty-state p {
+        font-size: 14px;
+        line-height: 1.8;
+        color: #6c757d;
+      }
+
+      /* 載入動畫 */
+      .typing-indicator {
+        display: flex;
+        gap: 4px;
+      }
+
+      .typing-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #9ca3af;
+        animation: typing 1.4s infinite;
+      }
+
+      .typing-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .typing-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes typing {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+        }
+        30% {
+          transform: translateY(-10px);
+        }
+      }
+
+      /* 響應式設計 */
+      @media (max-width: 1200px) {
+        .results-area {
+          width: 450px;
+        }
+      }
+
+      @media (max-width: 1024px) {
+        #app {
+          flex-direction: column;
+          height: auto;
+          min-height: 90vh;
+        }
+
+        .main-content {
+          flex-direction: column;
+        }
+
+        .results-area {
+          width: 100%;
+          border-left: none;
+          border-top: 1px solid #e5e7eb;
+        }
+
+        .messages {
+          min-height: 400px;
+        }
+
+        .trait-tooltip .tooltip-text {
+          width: 300px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        #app {
+          margin: 10px;
+          border-radius: 16px;
+        }
+
+        .header {
+          padding: 20px;
+        }
+
+        .header-content h1 {
+          font-size: 24px;
+        }
+
+        .messages {
+          padding: 20px;
+        }
+
+        .input-area {
+          padding: 20px;
+        }
+
+        .message-content {
+          max-width: 85%;
+        }
+      }
+
+      /* 自定義滾動條 */
+      .messages::-webkit-scrollbar,
+      .results-content::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .messages::-webkit-scrollbar-track,
+      .results-content::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+
+      .messages::-webkit-scrollbar-thumb,
+      .results-content::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+      }
+
+      .messages::-webkit-scrollbar-thumb:hover,
+      .results-content::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      /* Tooltip 樣式 */
+      .trait-tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+        border-bottom: 1px dashed #6fa894;
+        color: #6fa894;
+        font-weight: 500;
+      }
+
+      .trait-tooltip .tooltip-text {
+        visibility: hidden;
+        width: 350px;
+        max-width: 90vw;
+        background-color: #2c3e36;
+        color: #fff;
+        text-align: left;
+        border-radius: 8px;
+        padding: 12px;
+        position: fixed;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.2s;
+        font-size: 12px;
+        line-height: 1.6;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        white-space: normal;
+        word-wrap: break-word;
+      }
+
+      .trait-tooltip .tooltip-text::after {
+        content: "";
+        position: absolute;
+        border-width: 6px;
+        border-style: solid;
+      }
+
+      .trait-tooltip .tooltip-text.tooltip-bottom::after {
+        top: 100%;
+        left: 20px;
+        border-color: #2c3e36 transparent transparent transparent;
+      }
+
+      .trait-tooltip .tooltip-text.tooltip-top::after {
+        bottom: 100%;
+        left: 20px;
+        border-color: transparent transparent #2c3e36 transparent;
+      }
+
+      .trait-tooltip:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      /* 功能列樣式 */
+      .action-bar {
+        background: white;
+        border-bottom: 2px solid #e8e8e8;
+        padding: 16px 30px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .action-bar-title {
+        font-size: 13px;
+        color: #666;
+        margin-right: auto;
+      }
+
+      .action-btn {
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+        font-weight: 500;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(111, 168, 148, 0.3);
+      }
+
+      .action-btn:active {
+        transform: translateY(0);
+      }
+
+      .action-btn:disabled {
+        background: #adb5bd;
+        cursor: not-allowed;
+      }
+
+      .action-btn i {
+        font-size: 14px;
+      }
+
+      /* 面試問題對話框 */
+      .interview-dialog {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        backdrop-filter: blur(4px);
+      }
+
+      .interview-dialog-content {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      }
+
+      .interview-dialog-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .interview-dialog-header h2 {
+        font-size: 20px;
+        color: #1f2937;
+      }
+
+      .close-btn {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #6b7280;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+
+      .close-btn:hover {
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+
+      .interview-dialog-body {
+        padding: 24px;
+        overflow-y: auto;
+        flex: 1;
+      }
+
+      .interview-messages {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .interview-message {
+        padding: 12px 16px;
+        border-radius: 12px;
+        max-width: 85%;
+        white-space: pre-wrap;
+        line-height: 1.6;
+        font-size: 14px;
+      }
+
+      .interview-message.assistant {
+        background: #f0f7f3;
+        align-self: flex-start;
+        border: 1px solid #d0e0d5;
+        color: #2c3e36;
+        max-width: 100%;
+      }
+
+      .interview-message.user {
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+        align-self: flex-end;
+      }
+
+      /* 面試問題列表樣式 */
+      .interview-question-list {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0;
+      }
+
+      .interview-question-item {
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background: white;
+        border-radius: 6px;
+        border-left: 3px solid #6fa894;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #495057;
+      }
+
+      .interview-question-item i {
+        color: #6fa894;
+        margin-top: 2px;
+        flex-shrink: 0;
+      }
+
+      .interview-section-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin: 16px 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .interview-section-title i {
+        color: #6fa894;
+      }
+
+      .interview-dialog-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .interview-footer-actions {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
+      .download-btn {
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+        font-weight: 500;
+      }
+
+      .download-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(111, 168, 148, 0.3);
+      }
+
+      .download-btn:disabled {
+        background: #adb5bd;
+        cursor: not-allowed;
+      }
+
+      .download-btn i {
+        font-size: 14px;
+      }
+
+      .interview-input {
+        flex: 1;
+        padding: 10px 16px;
+        border: 1.5px solid #d0e0d5;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        font-family: inherit;
+      }
+
+      .interview-input:focus {
+        border-color: #6fa894;
+        box-shadow: 0 0 0 3px rgba(111, 168, 148, 0.1);
+      }
+
+      .send-btn {
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        font-weight: 500;
+      }
+
+      .send-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(111, 168, 148, 0.3);
+      }
+
+      .send-btn:disabled {
+        background: #adb5bd;
+        cursor: not-allowed;
+      }
+
+      .loading-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #6c757d;
+        font-size: 14px;
+        padding: 12px 16px;
+      }
+
+      .loading-dots {
+        display: flex;
+        gap: 4px;
+      }
+
+      .loading-dots span {
+        width: 6px;
+        height: 6px;
+        background: #6fa894;
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out both;
+      }
+
+      .loading-dots span:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+
+      .loading-dots span:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+
+      @keyframes bounce {
+        0%,
+        80%,
+        100% {
+          transform: scale(0);
+        }
+        40% {
+          transform: scale(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 頂部標題 -->
+      <div class="header">
+        <div class="logo-area">
+          <div class="logo">AI</div>
+          <div class="header-content">
+            <h1>AI人才搜索系統</h1>
+            <p>智能人才匹配與分析平台</p>
+          </div>
+        </div>
+        <div class="status-indicator">{{ connectionStatus }}</div>
+      </div>
+
+      <div class="main-content">
+        <!-- 左側聊天區域 -->
+        <div class="chat-area">
+          <div class="messages" ref="messagesContainer">
+            <div
+              v-for="message in messages"
+              :key="message.id"
+              :class="['message', message.type]"
+            >
+              <div class="message-avatar">
+                <i
+                  :class="message.type === 'user' ? 'fas fa-user' : 'fas fa-robot'"
+                ></i>
+              </div>
+              <div class="message-content">{{ message.content }}</div>
+            </div>
+
+            <div v-if="isTyping" class="message system">
+              <div class="message-avatar">
+                <i class="fas fa-robot"></i>
+              </div>
+              <div class="message-content">
+                <div class="typing-indicator">
+                  <div class="typing-dot"></div>
+                  <div class="typing-dot"></div>
+                  <div class="typing-dot"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="input-area">
+            <div class="input-container">
+              <input
+                v-model="userInput"
+                @keyup.enter="sendMessage"
+                placeholder="描述您需要的人才特質或直接提問..."
+                :disabled="isTyping"
+              />
+              <button
+                @click="sendMessage"
+                :disabled="!userInput.trim() || isTyping"
+              >
+                <i class="fas fa-paper-plane"></i> 發送
+              </button>
+            </div>
+            <div class="suggestions" v-if="suggestions.length > 0">
+              <span
+                v-for="(suggestion, index) in suggestions"
+                :key="index"
+                class="suggestion-chip"
+                @click="useSuggestion(suggestion)"
+              >
+                {{ suggestion }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右側結果區域 -->
+        <div class="results-area">
+          <div class="results-header">
+            <div class="results-title">搜索結果</div>
+            <div class="results-count">
+              {{ candidates.length > 0 ? `找到 ${candidates.length} 位候選人` :
+              '等待搜索...' }}
+            </div>
+          </div>
+
+          <!-- 功能列 -->
+          <div class="action-bar" v-if="candidates.length > 0">
+            <div class="action-bar-title">
+              已選擇 {{ selectedCandidates.length }} 位候選人
+            </div>
+            <button
+              class="action-btn"
+              @click="generateInterviewQuestions"
+              :disabled="selectedCandidates.length === 0"
+            >
+              <i class="fas fa-clipboard-question"></i>
+              生成面試問題
+            </button>
+          </div>
+
+          <div class="results-content">
+            <div v-if="candidates.length === 0" class="empty-state">
+              <i class="fas fa-search"></i>
+              <h3>開始搜索</h3>
+              <p>在左側輸入您的需求，<br />我會為您找到合適的人才</p>
+            </div>
+
+            <div
+              v-for="candidate in candidates"
+              :key="candidate.id"
+              class="candidate-card"
+              :class="{ selected: isSelected(candidate.id) }"
+            >
+              <!-- Checkbox -->
+              <input
+                type="checkbox"
+                class="candidate-checkbox"
+                :checked="isSelected(candidate.id)"
+                @click.stop="toggleSelection(candidate)"
+              />
+
+              <!-- 卡片內容 -->
+              <div
+                class="candidate-card-content"
+                @click="viewCandidate(candidate)"
+              >
+                <div class="candidate-header">
+                  <div class="candidate-avatar">
+                    {{ getInitials(candidate.name) }}
+                  </div>
+                  <div class="candidate-info">
+                    <h3>{{ candidate.name }}</h3>
+                    <div class="candidate-email">{{ candidate.email }}</div>
+                  </div>
+                </div>
+                <div class="score-bar">
+                  <div
+                    class="score-fill"
+                    :style="{ width: (candidate.match_score * 100) + '%' }"
+                  ></div>
+                </div>
+                <div class="score-text">
+                  {{ Math.round(candidate.match_score * 100) }}%
+                </div>
+                <div class="match-reason">
+                  <i class="fas fa-lightbulb"></i>
+                  <span
+                    v-html="formatMatchReason(candidate.match_reason)"
+                  ></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 面試問題對話框 -->
+        <div
+          class="interview-dialog"
+          v-if="showInterviewDialog"
+          @click.self="closeInterviewDialog"
+        >
+          <div class="interview-dialog-content">
+            <div class="interview-dialog-header">
+              <h2>
+                <i
+                  class="fas fa-clipboard-question"
+                  style="margin-right: 8px; color: #4f46e5"
+                ></i>
+                面試問題建議
+              </h2>
+              <button class="close-btn" @click="closeInterviewDialog">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="interview-dialog-body">
+              <div class="interview-messages">
+                <div
+                  v-for="(message, index) in interviewMessages"
+                  :key="index"
+                  class="interview-message"
+                  :class="message.role"
+                  v-html="formatInterviewMessage(message.content)"
+                ></div>
+                <div v-if="isGeneratingQuestions" class="loading-indicator">
+                  <div class="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  正在生成面試問題...
+                </div>
+              </div>
+            </div>
+            <div class="interview-dialog-footer">
+              <div class="interview-footer-actions">
+                <button
+                  class="download-btn"
+                  @click="downloadAsExcel"
+                  :disabled="interviewMessages.length === 0"
+                >
+                  <i class="fas fa-file-excel"></i>
+                  下載為 CSV
+                </button>
+              </div>
+              <input
+                v-model="interviewInput"
+                @keyup.enter="sendInterviewMessage"
+                class="interview-input"
+                placeholder="輸入您的修改建議，例如：請增加關於團隊合作的問題..."
+                :disabled="isGeneratingQuestions"
+              />
+              <button
+                class="send-btn"
+                @click="sendInterviewMessage"
+                :disabled="!interviewInput.trim() || isGeneratingQuestions"
+              >
+                <i class="fas fa-paper-plane"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp } = Vue;
+
+      createApp({
+        data() {
+          return {
+            messages: [
+              {
+                id: 1,
+                type: "system",
+                content:
+                  '👋 歡迎使用 AI 人才搜索系統！\n\n您可以用自然語言描述您需要的人才，例如：\n• "列出所有候選人"\n• "找一個溝通能力強的銷售人員"\n• "搜索具有領導力的管理人才"\n\n我會為您找到最匹配的候選人！',
+              },
+            ],
+            userInput: "",
+            isTyping: false,
+            candidates: [],
+            selectedCandidates: [],
+            suggestions: [
+              "善於溝通的銷售人員",
+              "有創造力的設計師",
+              "分析能力強的數據分析師",
+            ],
+            connectionStatus: "已連線",
+            apiBaseUrl: "http://localhost:8000",
+            showInterviewDialog: false,
+            interviewMessages: [],
+            interviewInput: "",
+            isGeneratingQuestions: false,
+            traitDefinitions: {},
+          };
+        },
+        methods: {
+          async sendMessage() {
+            if (!this.userInput.trim() || this.isTyping) return;
+
+            const userMessage = {
+              id: Date.now(),
+              type: "user",
+              content: this.userInput,
+            };
+
+            this.messages.push(userMessage);
+            const query = this.userInput;
+            this.userInput = "";
+            this.isTyping = true;
+
+            this.scrollToBottom();
+
+            try {
+              const response = await axios.post(
+                `${this.apiBaseUrl}/api/search`,
+                {
+                  query: query,
+                  filters: null,
+                }
+              );
+
+              this.isTyping = false;
+
+              const systemMessage = {
+                id: Date.now() + 1,
+                type: "system",
+                content: `${response.data.query_understanding}。找到 ${response.data.total} 位候選人，以下是最匹配的結果。`,
+              };
+
+              this.messages.push(systemMessage);
+              this.candidates = response.data.candidates;
+
+              if (response.data.suggestions) {
+                this.suggestions = response.data.suggestions;
+              }
+
+              this.scrollToBottom();
+            } catch (error) {
+              this.isTyping = false;
+              console.error("搜索錯誤:", error);
+
+              const errorMessage = {
+                id: Date.now() + 1,
+                type: "system",
+                content: "抱歉，搜索時發生錯誤。請確認 API 服務是否正在運行。",
+              };
+              this.messages.push(errorMessage);
+              this.connectionStatus = "連接失敗";
+            }
+          },
+          useSuggestion(suggestion) {
+            this.userInput = suggestion;
+          },
+          viewCandidate(candidate) {
+            alert(
+              `查看候選人詳情：\n\n姓名：${candidate.name}\nEmail：${
+                candidate.email
+              }\n匹配度：${Math.round(candidate.match_score * 100)}%\n\n${
+                candidate.match_reason
+              }`
+            );
+          },
+          getInitials(name) {
+            return name.substring(0, 2).toUpperCase();
+          },
+          scrollToBottom() {
+            this.$nextTick(() => {
+              const container = this.$refs.messagesContainer;
+              container.scrollTop = container.scrollHeight;
+            });
+          },
+          async checkApiConnection() {
+            try {
+              await axios.get(`${this.apiBaseUrl}/health`);
+              this.connectionStatus = "已連線";
+            } catch (error) {
+              this.connectionStatus = "未連線";
+            }
+          },
+          async loadTraitDefinitions() {
+            try {
+              const response = await axios.get(`${this.apiBaseUrl}/api/traits`);
+              const traits = response.data.traits;
+              this.traitDefinitions = {};
+              traits.forEach((trait) => {
+                this.traitDefinitions[trait.chinese_name] = trait.description;
+              });
+            } catch (error) {
+              console.error("載入特質定義失敗:", error);
+            }
+          },
+          toggleSelection(candidate) {
+            const index = this.selectedCandidates.findIndex(
+              (c) => c.id === candidate.id
+            );
+            if (index > -1) {
+              this.selectedCandidates.splice(index, 1);
+            } else {
+              this.selectedCandidates.push(candidate);
+            }
+          },
+          isSelected(candidateId) {
+            return this.selectedCandidates.some((c) => c.id === candidateId);
+          },
+          formatMatchReason(reason) {
+            // 將匹配理由中的特質名稱轉換為帶 tooltip 的格式
+            let formatted = reason;
+
+            // 匹配 "特質名稱(分數)" 的模式
+            const traitPattern = /([^(]+)\((\d+)分\)/g;
+            formatted = formatted.replace(
+              traitPattern,
+              (match, traitName, score) => {
+                const description =
+                  this.traitDefinitions[traitName] || "暫無描述";
+                return `<span class="trait-tooltip" @mouseenter="positionTooltip($event)">${traitName}(${score}分)<span class="tooltip-text"><strong>${traitName}</strong><br/>${description}<br/><br/>分數: ${score}/100</span></span>`;
+              }
+            );
+
+            return formatted;
+          },
+          positionTooltip(event) {
+            const tooltip = event.target.querySelector(".tooltip-text");
+            if (!tooltip) return;
+
+            const rect = event.target.getBoundingClientRect();
+            const tooltipWidth = 350;
+            const tooltipHeight = 140;
+            const margin = 10;
+
+            // 計算初始位置
+            let top = rect.top - tooltipHeight - margin;
+            let left = rect.left;
+
+            // 檢查上方空間
+            if (top < margin) {
+              // 上方空間不足，顯示在下方
+              top = rect.bottom + margin;
+              tooltip.classList.remove("tooltip-bottom");
+              tooltip.classList.add("tooltip-top");
+            } else {
+              // 顯示在上方
+              tooltip.classList.remove("tooltip-top");
+              tooltip.classList.add("tooltip-bottom");
+            }
+
+            // 檢查右側空間
+            if (left + tooltipWidth > window.innerWidth - margin) {
+              left = window.innerWidth - tooltipWidth - margin;
+            }
+
+            // 檢查左側空間
+            if (left < margin) {
+              left = margin;
+            }
+
+            // 應用位置
+            tooltip.style.top = top + "px";
+            tooltip.style.left = left + "px";
+          },
+          async generateInterviewQuestions() {
+            if (this.selectedCandidates.length === 0) {
+              alert("請先選擇至少一位候選人");
+              return;
+            }
+
+            this.showInterviewDialog = true;
+            this.interviewMessages = [];
+            this.isGeneratingQuestions = true;
+
+            try {
+              const response = await axios.post(
+                `${this.apiBaseUrl}/api/generate-interview-questions`,
+                {
+                  candidates: this.selectedCandidates,
+                  conversation_history: [],
+                }
+              );
+
+              this.interviewMessages.push({
+                role: "assistant",
+                content: response.data.questions,
+              });
+            } catch (error) {
+              console.error("生成面試問題失敗:", error);
+              this.interviewMessages.push({
+                role: "assistant",
+                content: "抱歉，生成面試問題時發生錯誤。請稍後再試。",
+              });
+            } finally {
+              this.isGeneratingQuestions = false;
+            }
+          },
+          async sendInterviewMessage() {
+            if (!this.interviewInput.trim() || this.isGeneratingQuestions)
+              return;
+
+            const userMessage = {
+              role: "user",
+              content: this.interviewInput,
+            };
+
+            this.interviewMessages.push(userMessage);
+            this.interviewInput = "";
+            this.isGeneratingQuestions = true;
+
+            try {
+              const response = await axios.post(
+                `${this.apiBaseUrl}/api/generate-interview-questions`,
+                {
+                  candidates: this.selectedCandidates,
+                  conversation_history: this.interviewMessages,
+                }
+              );
+
+              this.interviewMessages.push({
+                role: "assistant",
+                content: response.data.questions,
+              });
+            } catch (error) {
+              console.error("發送消息失敗:", error);
+              this.interviewMessages.push({
+                role: "assistant",
+                content: "抱歉，處理您的請求時發生錯誤。請稍後再試。",
+              });
+            } finally {
+              this.isGeneratingQuestions = false;
+            }
+          },
+          closeInterviewDialog() {
+            this.showInterviewDialog = false;
+            this.interviewMessages = [];
+            this.interviewInput = "";
+          },
+          formatInterviewMessage(content) {
+            // 將面試問題格式化為帶圖標的列表
+            let formatted = content;
+
+            // 檢測並格式化編號列表 (1. 2. 3. 等)
+            const lines = formatted.split("\n");
+            let inList = false;
+            let result = [];
+            let currentSection = "";
+
+            for (let line of lines) {
+              // 檢測章節標題 (包含 "問題"、"建議"、"評估" 等關鍵字)
+              if (
+                line.match(
+                  /^(#+\s*)?(.*(問題|建議|評估|技能|能力|特質|候選人|面試).*)$/
+                )
+              ) {
+                if (inList) {
+                  result.push("</ul>");
+                  inList = false;
+                }
+                const title = line.replace(/^#+\s*/, "");
+                result.push(
+                  `<div class="interview-section-title"><i class="fas fa-chevron-right"></i>${title}</div>`
+                );
+                currentSection = title;
+              }
+              // 檢測編號列表項
+              else if (line.match(/^\d+\.\s+(.+)$/)) {
+                if (!inList) {
+                  result.push('<ul class="interview-question-list">');
+                  inList = true;
+                }
+                const content = line.replace(/^\d+\.\s+/, "");
+                result.push(
+                  `<li class="interview-question-item"><i class="fas fa-circle-question"></i><span>${content}</span></li>`
+                );
+              }
+              // 檢測項目符號列表
+              else if (line.match(/^[•\-\*]\s+(.+)$/)) {
+                if (!inList) {
+                  result.push('<ul class="interview-question-list">');
+                  inList = true;
+                }
+                const content = line.replace(/^[•\-\*]\s+/, "");
+                result.push(
+                  `<li class="interview-question-item"><i class="fas fa-check-circle"></i><span>${content}</span></li>`
+                );
+              }
+              // 普通文本
+              else if (line.trim()) {
+                if (inList) {
+                  result.push("</ul>");
+                  inList = false;
+                }
+                result.push(line);
+              }
+              // 空行
+              else {
+                if (inList) {
+                  result.push("</ul>");
+                  inList = false;
+                }
+                result.push("<br/>");
+              }
+            }
+
+            if (inList) {
+              result.push("</ul>");
+            }
+
+            return result.join("\n");
+          },
+          downloadAsExcel() {
+            if (this.interviewMessages.length === 0) {
+              alert("沒有可下載的內容");
+              return;
+            }
+
+            // 準備 Excel 數據
+            let csvContent = "\uFEFF"; // UTF-8 BOM for Excel
+            csvContent += "面試問題建議\n\n";
+
+            // 添加候選人信息
+            csvContent += "候選人信息\n";
+            this.selectedCandidates.forEach((candidate, index) => {
+              csvContent += `${index + 1},${candidate.name},${
+                candidate.email
+              },匹配度: ${Math.round(candidate.match_score * 100)}%\n`;
+            });
+            csvContent += "\n";
+
+            // 添加面試問題
+            csvContent += "面試問題\n";
+            this.interviewMessages.forEach((message, index) => {
+              if (message.role === "assistant") {
+                // 移除 HTML 標籤並格式化
+                const plainText = message.content
+                  .replace(/<[^>]*>/g, "")
+                  .replace(/\n\n+/g, "\n")
+                  .trim();
+
+                csvContent += `\n${plainText}\n`;
+              }
+            });
+
+            // 創建下載鏈接
+            const blob = new Blob([csvContent], {
+              type: "text/csv;charset=utf-8;",
+            });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+
+            link.setAttribute("href", url);
+            link.setAttribute(
+              "download",
+              `面試問題_${new Date().toISOString().slice(0, 10)}.csv`
+            );
+            link.style.visibility = "hidden";
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          },
+        },
+        mounted() {
+          this.checkApiConnection();
+          this.loadTraitDefinitions();
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

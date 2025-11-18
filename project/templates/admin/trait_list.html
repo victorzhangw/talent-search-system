@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+
+{% block title %}測驗特質管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item active">測驗特質管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">
+            <i class="bi bi-tags me-2"></i>測驗特質管理
+        </h4>
+        <a href="{% url 'trait_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>新增特質
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label for="search" class="col-form-label fw-semibold">搜尋特質</label>
+                </div>
+                <div class="col-md-4 col-sm-6">
+                    <input type="text" id="search" name="search" value="{{ search }}" class="form-control"
+                           placeholder="輸入中文名稱或系統名稱關鍵字">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="bi bi-search me-1"></i>搜尋
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 5%">#</th>
+                        <th style="width: 20%">中文特質名稱</th>
+                        <th style="width: 20%">系統對應名稱</th>
+                        <th>特質描述</th>
+                        <th style="width: 10%" class="text-center">使用次數</th>
+                        <th style="width: 15%">更新時間</th>
+                        <th style="width: 12%" class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if page_obj.object_list %}
+                        {% for trait in page_obj %}
+                        <tr id="trait-{{ trait.id }}" {% if scroll_to == trait.id|stringformat:"s" %}class="table-warning"{% endif %}>
+                            <td>{{ forloop.counter|add:page_offset }}</td>
+                            <td class="fw-semibold">{{ trait.chinese_name }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ trait.system_name }}</span></td>
+                            <td>
+                                {% if trait.description %}
+                                    {% if trait.description|length > 50 %}
+                                        {{ trait.description|slice:":50" }}...
+                                    {% else %}
+                                        {{ trait.description }}
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if trait.usage_count %}
+                                    <button type="button"
+                                            class="btn btn-link p-0 text-decoration-none trait-usage-trigger"
+                                            data-trait-id="{{ trait.id }}"
+                                            data-trait-name="{{ trait.chinese_name }}"
+                                            title="查看綁定的測驗">
+                                        <span class="badge bg-primary">{{ trait.usage_count }}</span>
+                                    </button>
+                                {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ trait.updated_at|date:"Y-m-d H:i" }}</td>
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'trait_edit' trait.id %}{% if current_query %}?return_query={{ current_query|urlencode }}{% endif %}"
+                                       class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1">
+                                        <i class="bi bi-pencil-square"></i><span>編輯</span>
+                                    </a>
+                                    <form action="{% url 'trait_delete' trait.id %}" method="post" class="d-inline" data-no-loading="true">
+                                        {% csrf_token %}
+                                        {% if trait.usage_count %}
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+                                                    data-trait-in-use
+                                                    data-trait-id="{{ trait.id }}"
+                                                    data-trait-name="{{ trait.chinese_name }}"
+                                                    title="特質已被分類使用，請先移除綁定後再刪除">
+                                                <i class="bi bi-trash"></i><span>刪除</span>
+                                            </button>
+                                        {% else %}
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+                                                    data-trait-delete
+                                                    data-trait-name="{{ trait.chinese_name }}">
+                                                <i class="bi bi-trash"></i><span>刪除</span>
+                                            </button>
+                                        {% endif %}
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">
+                                <i class="bi bi-info-circle me-2"></i>目前尚無特質資料
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav aria-label="Trait pagination" class="mt-3">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}">上一頁</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">上一頁</span></li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if num == page_obj.number %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% else %}
+                    <li class="page-item"><a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}">{{ num }}</a></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}">下一頁</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">下一頁</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- Trait usage modal -->
+<div class="modal fade" id="traitUsageModal" tabindex="-1" aria-labelledby="traitUsageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="traitUsageModalLabel">綁定的測驗</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="traitUsageModalBody">
+                <p class="text-muted mb-0">載入中...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Trait in use modal -->
+<div class="modal fade" id="traitInUseModal" tabindex="-1" aria-labelledby="traitInUseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="traitInUseModalLabel">無法刪除特質</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2 fw-semibold" id="traitInUseModalTraitName">此特質已被分類使用。</p>
+                <p class="mb-3 text-muted">請先至相關測驗分類移除綁定後，再嘗試刪除。</p>
+                <div id="traitInUseModalUsageList" class="small"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">了解</button>
+                <a href="#" target="_blank" class="btn btn-outline-primary d-none" id="traitInUseManageLink">查看綁定列表</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ trait_usage_map|json_script:"trait-usage-data" }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const scrollTargetId = "{{ scroll_to|escapejs }}";
+    if (scrollTargetId) {
+        const targetRow = document.getElementById(`trait-${scrollTargetId}`);
+        if (targetRow) {
+            targetRow.classList.add('table-warning');
+            setTimeout(() => {
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 200);
+        }
+        if (window.history && window.history.replaceState) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('scroll_to');
+            const newSearch = url.searchParams.toString();
+            const newUrl = `${url.pathname}${newSearch ? '?' + newSearch : ''}${url.hash}`;
+            window.history.replaceState({}, '', newUrl);
+        }
+    }
+
+    const usageDataEl = document.getElementById('trait-usage-data');
+    let traitUsageMap = {};
+    if (usageDataEl) {
+        try {
+            traitUsageMap = JSON.parse(usageDataEl.textContent);
+        } catch (error) {
+            console.error('解析特質綁定測驗資料失敗:', error);
+        }
+    }
+
+    const usageModalEl = document.getElementById('traitUsageModal');
+    const usageModalTitleEl = document.getElementById('traitUsageModalLabel');
+    const usageModalBodyEl = document.getElementById('traitUsageModalBody');
+    const usageModal = usageModalEl ? new bootstrap.Modal(usageModalEl) : null;
+    const inUseModalEl = document.getElementById('traitInUseModal');
+    const inUseModalTraitNameEl = document.getElementById('traitInUseModalTraitName');
+    const inUseManageLinkEl = document.getElementById('traitInUseManageLink');
+    const inUseModalUsageListEl = document.getElementById('traitInUseModalUsageList');
+    const inUseModal = inUseModalEl ? new bootstrap.Modal(inUseModalEl) : null;
+
+    if (usageModal && usageModalBodyEl && usageModalTitleEl) {
+        document.querySelectorAll('.trait-usage-trigger').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const traitId = String(button.getAttribute('data-trait-id') || '');
+                const traitName = button.getAttribute('data-trait-name') || '特質';
+                const projects = traitUsageMap[traitId] || [];
+
+                usageModalTitleEl.textContent = `${traitName} 綁定的測驗`;
+                usageModalBodyEl.innerHTML = '';
+
+                if (projects.length) {
+                    const list = document.createElement('ul');
+                    list.className = 'mb-0 ps-3';
+                    projects.forEach(function (entry) {
+                        const item = document.createElement('li');
+                        item.className = 'mb-1';
+
+                        if (entry && entry.url) {
+                            const link = document.createElement('a');
+                            link.href = entry.url;
+                            link.textContent = entry.project_name || '未命名測驗';
+                            link.className = 'link-primary text-decoration-none';
+                            link.target = '_blank';
+                            item.appendChild(link);
+                        } else {
+                            item.textContent = entry && entry.project_name ? entry.project_name : '未命名測驗';
+                        }
+
+                        const categoryLabel = document.createElement('span');
+                        categoryLabel.textContent = `（分類：${entry && entry.category_name ? entry.category_name : '未綁定'}）`;
+                        categoryLabel.className = 'ms-1 text-muted';
+                        item.appendChild(categoryLabel);
+
+                        list.appendChild(item);
+                    });
+                    usageModalBodyEl.appendChild(list);
+                } else {
+                    const list = document.createElement('ul');
+                    list.className = 'mb-0 ps-3';
+                    const item = document.createElement('li');
+                    item.className = 'text-muted';
+                    item.textContent = '未綁定';
+                    list.appendChild(item);
+                    usageModalBodyEl.appendChild(list);
+                }
+
+                usageModal.show();
+            });
+        });
+    }
+
+    document.querySelectorAll('[data-trait-delete]').forEach(function (button) {
+        button.addEventListener('click', function (event) {
+            const traitName = button.getAttribute('data-trait-name') || '選定特質';
+            const message = `確定要刪除「${traitName}」特質嗎？`;
+
+            if (!window.confirm(message)) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            if (window.loadingOverlay && typeof window.loadingOverlay.show === 'function') {
+                window.loadingOverlay.show('刪除中...', '正在刪除特質，請稍候');
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-trait-in-use]').forEach(function (button) {
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!inUseModal) {
+                return;
+            }
+
+            const traitName = button.getAttribute('data-trait-name') || '該特質';
+            const traitId = button.getAttribute('data-trait-id') || '';
+            const usageEntries = traitUsageMap && traitId ? traitUsageMap[traitId] || [] : [];
+
+            if (inUseModalTraitNameEl) {
+                inUseModalTraitNameEl.textContent = `「${traitName}」已被分類使用。`;
+            }
+
+            if (inUseManageLinkEl) {
+                if (usageEntries.length && usageEntries[0].url) {
+                    inUseManageLinkEl.href = usageEntries[0].url;
+                    inUseManageLinkEl.classList.remove('d-none');
+                } else {
+                    inUseManageLinkEl.classList.add('d-none');
+                }
+            }
+
+            if (inUseModalUsageListEl) {
+                inUseModalUsageListEl.innerHTML = '';
+
+                if (usageEntries.length) {
+                    const list = document.createElement('ul');
+                    list.className = 'mb-0 ps-3';
+
+                    usageEntries.forEach(function (entry) {
+                        const item = document.createElement('li');
+                        const name = entry && entry.project_name ? entry.project_name : '未命名測驗';
+                        const categoryName = entry && entry.category_name ? entry.category_name : '未綁定';
+
+                        item.className = 'mb-1';
+                        item.textContent = `${name}（分類：${categoryName}）`;
+
+                        if (entry && entry.url) {
+                            const link = document.createElement('a');
+                            link.href = entry.url;
+                            link.textContent = name;
+                            link.className = 'link-primary text-decoration-none me-1';
+                            link.target = '_blank';
+                            item.innerHTML = '';
+                            item.appendChild(link);
+
+                            const label = document.createElement('span');
+                            label.textContent = `（分類：${categoryName}）`;
+                            label.className = 'text-muted';
+                            item.appendChild(label);
+                        }
+
+                        list.appendChild(item);
+                    });
+
+                    inUseModalUsageListEl.appendChild(list);
+                } else {
+                    const emptyMessage = document.createElement('p');
+                    emptyMessage.className = 'mb-0 text-muted';
+                    emptyMessage.textContent = '未找到綁定資訊。';
+                    inUseModalUsageListEl.appendChild(emptyMessage);
+                }
+            }
+
+            inUseModal.show();
+        });
+    });
+});
+</script>
+{% endblock %}

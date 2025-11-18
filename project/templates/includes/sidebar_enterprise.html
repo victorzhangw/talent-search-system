@@ -1,0 +1,94 @@
+<!-- 企業用戶 Sidebar -->
+<div class="py-3">
+    <!-- 基本功能 -->
+    <div class="sidebar-group">
+        <a href="#" class="nav-link collapsed d-flex align-items-center justify-content-between"
+           data-sidebar-collapse="basicFunctions"
+           data-bs-toggle="collapse" data-bs-target="#basicFunctions"
+           aria-expanded="false">
+            <span><i class="bi bi-grid me-2"></i> 基本功能</span>
+            <i class="bi bi-chevron-down"></i>
+        </a>
+        <div class="collapse" id="basicFunctions">
+            <ul class="nav flex-column ms-3">
+                <li class="nav-item">
+                    <a href="{% url 'home' %}" class="nav-link {% if request.path == '/' or 'dashboard' in request.path %}active{% endif %}">
+                        <i class="bi bi-house-door me-2"></i> 首頁
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{% url 'test_result_list' %}" class="nav-link {% if 'test-results' in request.path %}active{% endif %}">
+                        <i class="bi bi-people me-2"></i> 評鑑結果列表
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 邀請管理 -->
+    <div class="sidebar-group">
+        <a href="#" class="nav-link collapsed d-flex align-items-center justify-content-between"
+           data-sidebar-collapse="inviteManagement"
+           data-bs-toggle="collapse" data-bs-target="#inviteManagement"
+           aria-expanded="false">
+            <span><i class="bi bi-envelope-paper me-2"></i> 邀請管理</span>
+            <i class="bi bi-chevron-down"></i>
+        </a>
+        <div class="collapse" id="inviteManagement">
+            <ul class="nav flex-column ms-3">
+                <li class="nav-item">
+                    <a href="{% url 'invitation_list' %}" class="nav-link {% if 'invitations' in request.path %}active{% endif %}">
+                        <i class="bi bi-people me-2"></i> 邀請列表
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{% url 'invitation_template_list' %}" class="nav-link {% if 'templates' in request.path %}active{% endif %}">
+                        <i class="bi bi-envelope-paper me-2"></i> 評鑑邀請
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{% url 'bulk_invitation' %}" class="nav-link {% if 'bulk-invitation' in request.path %}active{% endif %}">
+                        <i class="bi bi-upload me-2"></i> 批量邀請
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 服務與支援 -->
+    <div class="sidebar-group">
+        <a href="#" class="nav-link collapsed d-flex align-items-center justify-content-between"
+           data-sidebar-collapse="serviceSupport"
+           data-bs-toggle="collapse" data-bs-target="#serviceSupport"
+           aria-expanded="false">
+            <span><i class="bi bi-tools me-2"></i> 服務與支援</span>
+            <i class="bi bi-chevron-down"></i>
+        </a>
+        <div class="collapse" id="serviceSupport">
+            <ul class="nav flex-column ms-3">
+                <li class="nav-item">
+                    <a href="{% url 'point_history' %}" class="nav-link {% if 'points/history' in request.path %}active{% endif %}">
+                        <i class="bi bi-cash-stack me-2"></i> 交易管理
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{% url 'faq' %}" class="nav-link {% if 'faq' in request.path %}active{% endif %}">
+                        <i class="bi bi-exclamation-triangle me-2"></i> 常見問題與說明
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 交易管理
+     <div class="sidebar-group">
+        <div class="sidebar-group-title">交易管理</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'point_history' %}" class="nav-link {% if 'points/history' in request.path %}active{% endif %}">
+                    <i class="bi bi-file-text me-2"></i> 交易管理
+                </a>
+            </li>
+        </ul>
+     </div> -->
+</div>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企業審核通過通知</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        .content {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 0 0 10px 10px;
+        }
+        .success-icon {
+            font-size: 48px;
+            color: #28a745;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .company-info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+        }
+        .login-button {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎉 企業審核通過</h1>
+        <p>{{ site_name }}</p>
+    </div>
+    
+    <div class="content">
+        <div class="success-icon">✅</div>
+        
+        <h2>親愛的 {{ enterprise_profile.contact_person }}，您好！</h2>
+        
+        <p><strong>恭喜！您的企業註冊申請已通過審核。</strong></p>
+        
+        <div class="company-info">
+            <h3>企業資訊</h3>
+            <p><strong>公司名稱：</strong>{{ enterprise_profile.company_name }}</p>
+            <p><strong>統一編號：</strong>{{ enterprise_profile.tax_id }}</p>
+            <p><strong>聯絡電話：</strong>{{ enterprise_profile.contact_phone }}</p>
+            <p><strong>審核通過時間：</strong>{{ enterprise_profile.verified_at|date:"Y年m月d日 H:i" }}</p>
+        </div>
+        
+        <p>請以您註冊時填寫的登入信箱 <strong>{{ user.email }}</strong> 登入系統，開始使用各項功能。</p>
+        
+        <div style="text-align: center;">
+            <a href="{{ login_url }}" class="login-button" style="color: white !important;">立即登入系統</a>
+        </div>
+        
+        <h3>🎯 您可以使用的功能包括：</h3>
+        <ul>
+            <li>📝 建立和管理測驗邀請</li>
+            <li>👥 管理受測者資料</li>
+            <li>📊 查看測驗結果和分析報告</li>
+            <li>📄 生成PDF測驗報告</li>
+            <li>📈 企業統計儀表板</li>
+        </ul>
+        
+        <p>如果您在使用過程中遇到任何問題，請隨時聯繫我們的客服團隊。</p>
+        
+        <p>感謝您選擇 {{ site_name }}！</p>
+    </div>
+    
+    <div class="footer">
+            <p>此信件由系統自動發送，請勿直接回覆</p>
+            <p>客服信箱：service@traitty.com</p>
+            <p>&copy; Copyright WePredict/Traitty</p>
+            <p>All rights reserved</p>
+        </div>
+</body>
+</html>

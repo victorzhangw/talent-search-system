@@ -1,0 +1,529 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+{% if is_quick_mode %}快速邀請{% else %}發送測驗邀請{% endif %} - {{ project.name }} - {{ block.super }}
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'invitation_template_list' %}">評鑑邀請</a></li>
+<li class="breadcrumb-item active">
+    {% if is_quick_mode %}快速邀請{% else %}發送邀請{% endif %}
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- 左側：表單區域 -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        {% if is_quick_mode %}
+                            <i class="bi bi-lightning me-2"></i>快速邀請
+                        {% else %}
+                            <i class="bi bi-envelope-plus me-2"></i>發送測驗邀請
+                        {% endif %}
+                    </h4>
+                    <p class="text-muted mb-0 mt-2">測驗項目：{{ project.name }}</p>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        <div class="mb-3">
+                            {% for message in messages %}
+                                {% with message.tags|default:'info' as tag %}
+                                    {% if 'error' in tag %}
+                                        {% with 'danger' as alert_class %}
+                                            <div class="alert alert-{{ alert_class }} alert-dismissible fade show" role="alert">
+                                                {{ message }}
+                                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                            </div>
+                                        {% endwith %}
+                                    {% else %}
+                                        <div class="alert alert-{{ tag }} alert-dismissible fade show" role="alert">
+                                            {{ message }}
+                                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                        </div>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" id="invitationForm">
+                        {% csrf_token %}
+                        
+                        {% if is_quick_mode %}
+                            <!-- 快速邀請模式：新增受測人員 -->
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading">
+                                    <i class="bi bi-info-circle me-2"></i>快速邀請模式
+                                </h6>
+                                <p class="mb-0">新增受測人員資料並立即發送測驗邀請</p>
+                            </div>
+                            
+                            <h5 class="mb-3">受測人員資料</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.name.id_for_label }}" class="form-label">
+                                            {{ form.name.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.name }}
+                                        {% if form.name.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.email.id_for_label }}" class="form-label">
+                                            {{ form.email.label }} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.email }}
+                                        {% if form.email.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.email.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.phone.id_for_label }}" class="form-label">
+                                            {{ form.phone.label }}
+                                        </label>
+                                        {{ form.phone }}
+                                        {% if form.phone.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.phone.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.position.id_for_label }}" class="form-label">
+                                            {{ form.position.label }}
+                                        </label>
+                                        {{ form.position }}
+                                        {% if form.position.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.position.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr class="my-4">
+                            <h5 class="mb-3">邀請設定</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.expires_in_days.id_for_label }}" class="form-label">
+                                            {{ form.expires_in_days.label }}
+                                        </label>
+                                        {{ form.expires_in_days }}
+                                    </div>
+                                    
+                                    <!-- 自訂時間欄位 -->
+                                    <div class="mb-3 custom-date-container" style="display: none;">
+                                        <label for="{{ form.custom_expires_at.id_for_label }}" class="form-label">
+                                            {{ form.custom_expires_at.label }}
+                                        </label>
+                                        {{ form.custom_expires_at }}
+                                        {% if form.custom_expires_at.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.custom_expires_at.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 自訂邀請訊息欄位已隱藏 -->
+                            <div class="mb-3" style="display: none;">
+                                <label for="{{ form.custom_message.id_for_label }}" class="form-label">
+                                    {{ form.custom_message.label }}
+                                </label>
+                                {{ form.custom_message }}
+                                {% if form.custom_message.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.custom_message.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                        {% else %}
+                            <!-- 一般邀請模式：選擇受測人員 -->
+                            <div class="mb-4">
+                                <h5>選擇受測人員</h5>
+                                {% if form.invitees.field.queryset.count == 0 %}
+                                    <div class="alert alert-warning">
+                                        <h6 class="alert-heading">
+                                            <i class="bi bi-exclamation-triangle me-2"></i>尚無受測人員
+                                        </h6>
+                                        <p class="mb-2">您還沒有新增任何受測人員，請先新增受測人員或使用快速邀請功能。</p>
+                                        <div class="btn-group">
+                                            <a href="{% url 'invitee_list' %}" class="btn btn-primary btn-sm">
+                                                <i class="bi bi-people me-1"></i>管理受測人員
+                                            </a>
+                                            <a href="{% url 'quick_invitation' project.id %}" class="btn btn-success btn-sm">
+                                                <i class="bi bi-lightning me-1"></i>快速邀請
+                                            </a>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <!-- 搜尋框 -->
+                                    <div class="mb-3">
+                                        <input type="text" class="form-control" id="searchInvitees" 
+                                               placeholder="搜尋受測人員姓名或email..." onkeyup="filterInvitees()">
+                                    </div>
+                                    
+                                    <!-- 全選控制 -->
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="selectAllInvitees" onchange="toggleSelectAll()">
+                                            <label class="form-check-label" for="selectAllInvitees">
+                                                全選 (<span id="selectedCount">0</span> / {{ form.invitees.field.queryset.count }} 人)
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 受測人員清單 -->
+                                    <div class="row" id="inviteesList">
+                                        {% for invitee in form.invitees.field.queryset %}
+                                            <div class="col-md-6 mb-2 invitee-item" 
+                                                 data-name="{{ invitee.name }}" 
+                                                 data-email="{{ invitee.email }}">
+                                                <div class="card card-body">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="invitees" value="{{ invitee.id }}" 
+                                                               id="invitee_{{ invitee.id }}" 
+                                                               onchange="updateSelectedCount()">
+                                                        <label class="form-check-label d-flex justify-content-between align-items-center" 
+                                                               for="invitee_{{ invitee.id }}">
+                                                            <div>
+                                                                <strong>{{ invitee.name }}</strong>
+                                                                <div class="small text-muted">{{ invitee.email }}</div>
+                                                                {% if invitee.position %}
+                                                                    <div class="small text-info">{{ invitee.position }}</div>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="text-end">
+                                                                <small class="text-muted">
+                                                                    邀請 {{ invitee.invited_count }} 次
+                                                                    {% if invitee.invited_count > 0 %}
+                                                                        <br>完成率 {{ invitee.completion_rate }}%
+                                                                    {% endif %}
+                                                                </small>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    
+                                    {% if form.invitees.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.invitees.errors.0 }}</div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            
+                            {% if form.invitees.field.queryset.count > 0 %}
+                            <hr class="my-4">
+                            
+                            <!-- 邀請設定 -->
+                            <h5 class="mb-3">邀請設定</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.expires_in_days.id_for_label }}" class="form-label">
+                                            {{ form.expires_in_days.label }}
+                                        </label>
+                                        {{ form.expires_in_days }}
+                                    </div>
+                                    
+                                    <!-- 自訂時間欄位 -->
+                                    <div class="mb-3 custom-date-container" style="display: none;">
+                                        <label for="{{ form.custom_expires_at.id_for_label }}" class="form-label">
+                                            {{ form.custom_expires_at.label }}
+                                        </label>
+                                        {{ form.custom_expires_at }}
+                                        {% if form.custom_expires_at.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.custom_expires_at.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 自訂邀請訊息欄位已隱藏 -->
+                            <div class="mb-3" style="display: none;">
+                                <label for="{{ form.custom_message.id_for_label }}" class="form-label">
+                                    {{ form.custom_message.label }}
+                                </label>
+                                {{ form.custom_message }}
+                                {% if form.custom_message.help_text %}
+                                    <div class="form-text">{{ form.custom_message.help_text }}</div>
+                                {% endif %}
+                                {% if form.custom_message.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.custom_message.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="form-check">
+                                {{ form.send_immediately }}
+                                <label class="form-check-label" for="{{ form.send_immediately.id_for_label }}">
+                                    {{ form.send_immediately.label }}
+                                </label>
+                                <div class="form-text">取消勾選將只建立邀請記錄，不發送郵件</div>
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                        
+                        <!-- 提交按鈕 -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'test_templates' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>返回
+                            </a>
+                            
+                            {% if is_quick_mode or form.invitees.field.queryset.count > 0 %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send me-1"></i>
+                                {% if is_quick_mode %}立即邀請{% else %}發送邀請{% endif %}
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右側：測驗項目資訊 -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>測驗項目資訊
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-primary">{{ project.name }}</h6>
+                    <p class="text-muted">{{ project.description|default:"暫無描述" }}</p>
+                    
+                    <div class="small">
+                        <div class="mb-2">
+                            <strong>評分欄位：</strong>{{ project.score_field_chinese }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>預測欄位：</strong>{{ project.prediction_field_chinese }}
+                        </div>
+                        <div class="mb-2">
+                            <strong>建立時間：</strong>{{ project.created_at|date:"Y/m/d" }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if not is_quick_mode and invitee_stats %}
+            <!-- 受測人員統計 -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people me-2"></i>受測人員統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="h4 text-primary mb-0">{{ invitee_stats.total }}</div>
+                            <small class="text-muted">總人數</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h4 text-success mb-0">{{ invitee_stats.no_invitations }}</div>
+                            <small class="text-muted">未邀請過</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="{% url 'invitee_list' %}" class="btn btn-outline-info btn-sm w-100">
+                            <i class="bi bi-people me-1"></i>管理受測人員
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// 自訂時間顯示/隱藏
+function toggleCustomDate() {
+    const expiresSelect = document.querySelector('select[name="expires_in_days"]');
+    const customContainers = document.querySelectorAll('.custom-date-container');
+    
+    if (expiresSelect && customContainers.length > 0) {
+        customContainers.forEach(customContainer => {
+            const customInput = customContainer.querySelector('input');
+            
+            if (expiresSelect.value === 'custom') {
+                customContainer.style.display = 'block';
+                if (customInput) {
+                    customInput.style.display = 'block';
+                    customInput.required = true;
+                }
+            } else {
+                customContainer.style.display = 'none';
+                if (customInput) {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                }
+            }
+        });
+    }
+}
+
+// 受測人員搜尋
+function filterInvitees() {
+    const searchText = document.getElementById('searchInvitees').value.toLowerCase();
+    const inviteeItems = document.querySelectorAll('.invitee-item');
+    
+    inviteeItems.forEach(item => {
+        const name = item.dataset.name.toLowerCase();
+        const email = item.dataset.email.toLowerCase();
+        
+        if (name.includes(searchText) || email.includes(searchText)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// 全選/取消全選
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllInvitees');
+    const inviteeCheckboxes = document.querySelectorAll('input[name="invitees"]');
+    
+    inviteeCheckboxes.forEach(checkbox => {
+        const item = checkbox.closest('.invitee-item');
+        if (item.style.display !== 'none') {
+            checkbox.checked = selectAllCheckbox.checked;
+        }
+    });
+    
+    updateSelectedCount();
+}
+
+// 更新選中計數
+function updateSelectedCount() {
+    const selectedCheckboxes = document.querySelectorAll('input[name="invitees"]:checked');
+    const countElement = document.getElementById('selectedCount');
+    
+    if (countElement) {
+        countElement.textContent = selectedCheckboxes.length;
+    }
+    
+    // 更新全選checkbox狀態
+    const selectAllCheckbox = document.getElementById('selectAllInvitees');
+    const allCheckboxes = document.querySelectorAll('input[name="invitees"]');
+    const visibleCheckboxes = Array.from(allCheckboxes).filter(cb => {
+        const item = cb.closest('.invitee-item');
+        return item.style.display !== 'none';
+    });
+    
+    if (selectAllCheckbox && visibleCheckboxes.length > 0) {
+        const checkedVisibleBoxes = visibleCheckboxes.filter(cb => cb.checked);
+        selectAllCheckbox.checked = checkedVisibleBoxes.length === visibleCheckboxes.length;
+        selectAllCheckbox.indeterminate = checkedVisibleBoxes.length > 0 && checkedVisibleBoxes.length < visibleCheckboxes.length;
+    }
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 綁定checkbox變更事件
+    document.querySelectorAll('input[name="invitees"]').forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCount);
+    });
+    
+    // 初始化選中計數
+    updateSelectedCount();
+    
+    // 初始化自訂時間
+    toggleCustomDate();
+    
+    // 綁定邀請有效期間的change事件
+    const expiresSelect = document.querySelector('select[name="expires_in_days"]');
+    if (expiresSelect) {
+        expiresSelect.addEventListener('change', toggleCustomDate);
+    }
+    
+    // 表單提交時顯示 loading
+    const form = document.getElementById('invitationForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // 基本驗證
+            if (!form.checkValidity()) {
+                return;
+            }
+            
+            // 檢查是否選擇了受測人員（非快速邀請模式）
+            const isQuickMode = document.querySelector('input[name="name"]') !== null;
+            if (!isQuickMode) {
+                const selectedInvitees = document.querySelectorAll('input[name="invitees"]:checked');
+                if (selectedInvitees.length === 0) {
+                    e.preventDefault();
+                    alert('請至少選擇一位受測人員！');
+                    return;
+                }
+            }
+            
+            // 顯示 loading
+            if (window.showLoading) {
+                window.showLoading('正在發送測驗邀請...', '請稍候，系統正在建立邀請並發送郵件');
+            }
+            
+            // 禁用提交按鈕
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>發送中...';
+            }
+            
+            // 🔧 加入超時保護：10秒後檢查頁面狀態
+            setTimeout(() => {
+                if (window.loadingOverlay?.isShowing()) {
+                    // 檢查是否有成功訊息
+                    const hasSuccessMessage = document.querySelector('.alert-success, .messages .alert-success');
+                    if (hasSuccessMessage) {
+                        // 有成功訊息，嘗試跳轉
+                        window.hideLoading();
+                        const projectId = window.location.pathname.match(/test-projects\/(\d+)/);
+                        if (projectId) {
+                            window.location.href = `/enterprise/test-projects/${projectId[1]}/stats/`;
+                        } else {
+                            window.location.reload();
+                        }
+                    } else {
+                        // 沒有成功訊息，可能有錯誤或卡住了
+                        window.hideLoading();
+                        // 恢復按鈕
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="bi bi-send me-1"></i>' + 
+                                                (isQuickMode ? '立即邀請' : '發送邀請');
+                        }
+                        // 檢查是否有錯誤訊息
+                        const hasErrorMessage = document.querySelector('.alert-danger, .messages .alert-danger');
+                        if (!hasErrorMessage) {
+                            alert('提交超時，請重試或檢查網路連線');
+                        }
+                    }
+                }
+            }, 10000); // 10秒超時
+        });
+    }
+});
+</script>
+{% endblock %}

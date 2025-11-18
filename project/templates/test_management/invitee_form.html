@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+{% if is_edit %}編輯受測人員{% else %}新增受測人員{% endif %} - {{ block.super }}
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'invitee_list' %}">受測人員管理</a></li>
+<li class="breadcrumb-item active">
+    {% if is_edit %}編輯 {{ invitee.name }}{% else %}新增受測人員{% endif %}
+</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        {% if is_edit %}
+                            <i class="bi bi-pencil me-2"></i>編輯受測人員
+                        {% else %}
+                            <i class="bi bi-person-plus me-2"></i>新增受測人員
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="inviteeForm" data-loading="true" data-loading-message="正在更新受測人員資料，請稍候..." novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.name.id_for_label }}" class="form-label">
+                                        {{ form.name.label }} <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.name.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.email.id_for_label }}" class="form-label">
+                                        {{ form.email.label }} <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.email }}
+                                    {% if form.email.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.email.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.phone.id_for_label }}" class="form-label">
+                                        {{ form.phone.label }}
+                                    </label>
+                                    {{ form.phone }}
+                                    {% if form.phone.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.phone.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">支援台灣手機和市話格式</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="{{ form.status.id_for_label }}" class="form-label">
+                                        {{ form.status.label }}
+                                    </label>
+                                    {{ form.status }}
+                                    {% if form.status.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.status.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="{{ form.position.id_for_label }}" class="form-label">
+                                        {{ form.position.label }}
+                                    </label>
+                                    {{ form.position }}
+                                    {% if form.position.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.position.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                {{ form.notes.label }}
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.notes.errors.0 }}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <span id="notesCount">{{ form.notes.value|length|default:0 }}</span>/500 字
+                            </div>
+                        </div>
+
+                        {% if is_edit and invitee %}
+                        <!-- 統計資訊 -->
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <h6 class="alert-heading">
+                                        <i class="bi bi-info-circle me-2"></i>統計資訊
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <strong>受邀次數：</strong>{{ invitee.invited_count }} 次
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>完成次數：</strong>{{ invitee.completed_count }} 次
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>完成率：</strong>{{ invitee.completion_rate }}%
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>建立時間：</strong>{{ invitee.created_at|date:"Y/m/d H:i" }}
+                                        </div>
+                                    </div>
+                                    {% if invitee.last_test_date %}
+                                    <div class="mt-2">
+                                        <strong>最後測驗時間：</strong>{{ invitee.last_test_date|date:"Y/m/d H:i" }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'invitee_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>返回列表
+                            </a>
+                            
+                            <div>
+                                {% if is_edit %}
+                                <button type="button" class="btn btn-outline-info me-2" onclick="viewInvitations()">
+                                    <i class="bi bi-envelope-open me-1"></i>查看邀請記錄
+                                </button>
+                                {% endif %}
+                                
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check me-1"></i>
+                                    {% if is_edit %}更新資料{% else %}新增受測人員{% endif %}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 備註字數統計
+    const notesTextarea = document.querySelector('textarea[name="notes"]');
+    const notesCount = document.getElementById('notesCount');
+    
+    if (notesTextarea && notesCount) {
+        notesTextarea.addEventListener('input', function() {
+            notesCount.textContent = this.value.length;
+        });
+    }
+    
+    // 表單驗證
+    const form = document.getElementById('inviteeForm');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        // 禁用提交按鈕
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>處理中...';
+        
+        // 清除之前的錯誤狀態
+        clearFormErrors();
+        
+        // 提交表單
+        this.submit();
+    });
+    
+    // 如果有錯誤，恢復提交按鈕
+    {% if form.errors %}
+    const submitBtn = document.querySelector('button[type="submit"]');
+    submitBtn.disabled = false;
+    {% endif %}
+});
+
+// 清除表單錯誤樣式
+function clearFormErrors() {
+    document.querySelectorAll('.is-invalid').forEach(el => {
+        el.classList.remove('is-invalid');
+    });
+}
+
+// 查看邀請記錄
+function viewInvitations() {
+    {% if is_edit and invitee %}
+    window.location.href = `{% url 'invitation_list' %}?invitee={{ invitee.id }}`;
+    {% endif %}
+}
+
+// 表單變更提醒
+let formChanged = false;
+document.querySelectorAll('input, textarea, select').forEach(element => {
+    element.addEventListener('change', function() {
+        formChanged = true;
+    });
+});
+
+// 頁面離開提醒
+window.addEventListener('beforeunload', function(e) {
+    if (formChanged) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
+// 提交時取消離開提醒
+document.getElementById('inviteeForm').addEventListener('submit', function() {
+    formChanged = false;
+});
+</script>
+{% endblock %}

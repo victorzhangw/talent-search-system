@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}出貨單管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">出貨單列表</h5>
+            <button class="btn btn-primary">
+                <i class="bi bi-plus"></i> 新增出貨單
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>出貨單號</th>
+                            <th>客戶名稱</th>
+                            <th>出貨日期</th>
+                            <th>送貨地址</th>
+                            <th>狀態</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>S-2024001</td>
+                            <td>測試公司</td>
+                            <td>2024-02-24</td>
+                            <td>台北市信義區...</td>
+                            <td><span class="badge bg-warning">配送中</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-info">查看</button>
+                                <button class="btn btn-sm btn-success">完成</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 表格中的"查看"按鈕點擊事件
+    document.querySelectorAll('.btn-info').forEach(btn => {
+        btn.addEventListener('click', () => {
+            showLoading();
+            // 模擬數據載入
+            setTimeout(() => {
+                hideLoading();
+            }, 1000);
+        });
+    });
+
+    // 表格中的"編輯"按鈕點擊事件
+    document.querySelectorAll('.btn-warning').forEach(btn => {
+        btn.addEventListener('click', () => {
+            showLoading();
+            // 模擬數據載入
+            setTimeout(() => {
+                hideLoading();
+            }, 1000);
+        });
+    });
+
+    // "新增"按鈕點擊事件
+    document.querySelector('.btn-primary').addEventListener('click', () => {
+        showLoading();
+        // 模擬數據載入
+        setTimeout(() => {
+            hideLoading();
+        }, 1000);
+    });
+</script>
+{% endblock %}

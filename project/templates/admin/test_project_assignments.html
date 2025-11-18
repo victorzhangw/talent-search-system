@@ -1,0 +1,336 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ project.name }} - 企業指派管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_project_list' %}">測驗項目管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_project_detail' project.id %}">{{ project.name }}</a></li>
+<li class="breadcrumb-item active">企業指派管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-people me-2"></i>企業指派管理</h2>
+            <p class="text-muted mb-0">測驗項目：<strong>{{ project.name }}</strong></p>
+        </div>
+        <a href="{% url 'test_project_detail' project.id %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-2"></i>返回項目詳情
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- 新增指派 -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>新增企業指派
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if available_enterprises %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="add_assignment">
+                        
+                        <div class="mb-3">
+                            <label for="enterprise_ids" class="form-label">選擇企業</label>
+                            <select class="form-select" id="enterprise_ids" name="enterprise_ids" multiple size="8" required>
+                                {% for enterprise in available_enterprises %}
+                                <option value="{{ enterprise.id }}">
+                                    {{ enterprise.enterprise_profile.company_name }}
+                                    ({{ enterprise.enterprise_profile.contact_person }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">按住 Ctrl 或 Command 可多選。</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="assigned_quota" class="form-label">可用份數</label>
+                            <input type="number" class="form-control form-control-lg" id="assigned_quota" name="assigned_quota" min="0" value="0">
+                            <div class="form-text">輸入 0 表示不限份數。</div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-check-circle me-2"></i>指派所選企業
+                        </button>
+                    </form>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-building-check fs-3"></i>
+                        <p class="mt-2">所有企業都已指派此測驗項目</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 指派統計 -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-bar-chart me-2"></i>指派統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="bg-success text-white rounded p-3 mb-2">
+                                <i class="bi bi-building-check fs-4"></i>
+                                <div class="h4 mt-2">{{ assigned_enterprises.count }}</div>
+                            </div>
+                            <small class="text-muted">已指派企業</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-info text-white rounded p-3 mb-2">
+                                <i class="bi bi-building fs-4"></i>
+                                <div class="h4 mt-2">{{ available_enterprises.count }}</div>
+                            </div>
+                            <small class="text-muted">可指派企業</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 已指派企業列表 -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-building-check me-2"></i>已指派企業 ({{ assigned_enterprises.count }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if assigned_enterprises %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>公司資訊</th>
+                                    <th>聯絡人</th>
+                                    <th>聯絡方式</th>
+                                    <th>指派時間</th>
+                                    <th>份數設定</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for assignment in assigned_enterprises %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong>{{ assignment.enterprise_user.enterprise_profile.company_name }}</strong>
+                                            <br><small class="text-muted">統編：{{ assignment.enterprise_user.enterprise_profile.tax_id }}</small>
+                                        </div>
+                                    </td>
+                                    <td>{{ assignment.enterprise_user.enterprise_profile.contact_person }}</td>
+                                    <td>
+                                        <div>
+                                            <i class="bi bi-telephone me-1"></i>{{ assignment.enterprise_user.enterprise_profile.contact_phone }}
+                                            <br><i class="bi bi-envelope me-1"></i>{{ assignment.enterprise_user.email }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            {{ assignment.assigned_at|date:"Y/m/d" }}
+                                            <br><small class="text-muted">{{ assignment.assigned_at|date:"H:i" }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-2">
+                                            <div>
+                                                <span class="badge bg-primary-subtle text-primary">已使用 {{ assignment.used_quota }} 份</span>
+                                                <span class="badge bg-info-subtle text-info ms-1">
+                                                    {% if assignment.is_unlimited %}不限{% else %}剩餘 {{ assignment.remaining_quota }} 份{% endif %}
+                                                </span>
+                                            </div>
+                                            <form method="post" class="d-flex align-items-center gap-2 flex-wrap">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="update_quota">
+                                                <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+                                                <div class="input-group input-group-sm" style="max-width: 160px;">
+                                                    <span class="input-group-text">份數</span>
+                                                    <input type="number" class="form-control" name="assigned_quota" min="0" value="{{ assignment.assigned_quota }}">
+                                                </div>
+                                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-save me-1"></i>更新
+                                                </button>
+                                            </form>
+                                            <small class="text-muted">輸入 0 表示不限份數。</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if assignment.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {{ assignment.is_active|yesno:'有效,無效' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% with company=assignment.enterprise_user.enterprise_profile.company_name project_name=project.name %}
+                                        <div class="btn-group" role="group">
+                                            <!-- 切換狀態 -->
+                                            <form method="post" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="toggle_assignment">
+                                                <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+                                                <button type="submit"
+                                                        class="btn btn-sm {% if assignment.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                                                        title="{% if assignment.is_active %}暫停{% else %}恢復{% endif %}"
+                                                        data-action="{% if assignment.is_active %}pause{% else %}resume{% endif %}"
+                                                        data-company="{{ company|escape }}"
+                                                        data-project="{{ project_name|escape }}"
+                                                        onclick="return confirmAssignmentToggle(this);">
+                                                    <i class="bi {% if assignment.is_active %}bi-pause{% else %}bi-play{% endif %}"></i>
+                                                </button>
+                                            </form>
+                                            
+                                            <!-- 移除指派 -->
+                                            <form method="post" class="d-inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="remove_assignment">
+                                                <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                        title="移除指派"
+                                                        data-company="{{ company|escape }}"
+                                                        data-project="{{ project_name|escape }}"
+                                                        onclick="return confirmAssignmentRemove(this);">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% endwith %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-building-x fs-1"></i>
+                        <p class="mt-3">尚未指派給任何企業</p>
+                        <p class="text-muted">請在左側選擇企業進行指派</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 批量操作 -->
+            {% if assigned_enterprises %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-gear me-2"></i>批量操作
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <form method="post" id="batchForm">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="batch_operation">
+                                <div class="input-group">
+                                    <select class="form-select" name="batch_action" required>
+                                        <option value="">選擇批量操作...</option>
+                                        <option value="activate_all">啟用所有指派</option>
+                                        <option value="deactivate_all">停用所有指派</option>
+                                        <option value="remove_all">移除所有指派</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-warning"
+                                            onclick="return confirm('確定要執行此批量操作嗎？')">
+                                        <i class="bi bi-lightning me-1"></i>執行
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-info w-100" onclick="exportAssignments()">
+                                <i class="bi bi-download me-2"></i>匯出指派清單
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmAssignmentToggle(button) {
+    const action = button.dataset.action;
+    const company = button.dataset.company || '';
+    const project = button.dataset.project || '';
+    let message;
+
+    if (action === 'pause') {
+        message = `確定要暫停企業「${company}」對「${project}」的測驗使用權嗎？\n暫停後企業將無法發送新的測驗邀請，但既有的邀請與結果仍會保留。`;
+    } else {
+        message = `確定要恢復企業「${company}」對「${project}」的測驗使用權嗎？`;
+    }
+
+    return window.confirm(message);
+}
+
+function confirmAssignmentRemove(button) {
+    const company = button.dataset.company || '';
+    const project = button.dataset.project || '';
+    const message = `確定要刪除企業「${company}」的測驗指派嗎？\n此操作會一併移除相關測驗邀請與結果，且無法復原。`;
+    return window.confirm(message);
+}
+
+// 匯出指派清單
+function exportAssignments() {
+    const assignments = [
+        {% for assignment in assigned_enterprises %}
+        {
+            company_name: "{{ assignment.enterprise_user.enterprise_profile.company_name|escapejs }}",
+            tax_id: "{{ assignment.enterprise_user.enterprise_profile.tax_id }}",
+            contact_person: "{{ assignment.enterprise_user.enterprise_profile.contact_person|escapejs }}",
+            contact_phone: "{{ assignment.enterprise_user.enterprise_profile.contact_phone }}",
+            email: "{{ assignment.enterprise_user.email }}",
+            assigned_at: "{{ assignment.assigned_at|date:'Y-m-d H:i:s' }}",
+            is_active: {{ assignment.is_active|yesno:'true,false' }}
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    // 轉換為 CSV 格式
+    const csvContent = "data:text/csv;charset=utf-8," + 
+        "公司名稱,統一編號,聯絡人,聯絡電話,電子郵件,指派時間,狀態\n" +
+        assignments.map(row => [
+            row.company_name,
+            row.tax_id,
+            row.contact_person,
+            row.contact_phone,
+            row.email,
+            row.assigned_at,
+            row.is_active ? '有效' : '無效'
+        ].join(",")).join("\n");
+    
+    // 下載檔案
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "{{ project.name|slugify }}_assignments.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// 即時搜尋企業
+$(document).ready(function() {
+    $('#enterprise_id').select2({
+        placeholder: "請選擇企業...",
+        allowClear: true,
+        width: '100%'
+    });
+});
+</script>
+{% endblock %}

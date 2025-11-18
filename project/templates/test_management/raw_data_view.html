@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爬蟲原始數據 - {{ result.test_invitation.invitee.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .json-container {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', Monaco, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .json-key {
+            color: #63b3ed;
+        }
+        .json-string {
+            color: #68d391;
+        }
+        .json-number {
+            color: #fbb6ce;
+        }
+        .json-boolean {
+            color: #f6ad55;
+        }
+        .json-null {
+            color: #a0aec0;
+        }
+        .header-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        .section-container {
+            position: relative;
+            margin-bottom: 30px;
+        }
+        .section-title {
+            background-color: #495057;
+            color: white;
+            padding: 10px 15px;
+            margin: 0;
+            font-weight: bold;
+            border-radius: 8px 8px 0 0;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- 頁面標題 -->
+        <div class="header-info">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4 class="mb-1">
+                        <i class="bi bi-database me-2"></i>爬蟲原始數據查看
+                    </h4>
+                    <p class="mb-2 opacity-75">
+                        受測者：{{ result.test_invitation.invitee.name }} | 測驗項目：{{ result.test_project.name }}
+                    </p>
+                    <small class="opacity-75">
+                        爬取時間：{{ result.crawled_at|date:"Y-m-d H:i:s" }} | 狀態：{{ result.get_crawl_status_display }}
+                    </small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button onclick="window.close()" class="btn btn-light">
+                        <i class="bi bi-x-circle me-1"></i>關閉視窗
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 基本資訊 -->
+        <div class="section-container">
+            <h5 class="section-title">
+                <i class="bi bi-info-circle me-2"></i>基本資訊
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyToClipboard('basic-info')">
+                <i class="bi bi-clipboard me-1"></i>複製
+            </button>
+            <div class="json-container" id="basic-info">
+                <pre id="basic-info-content">{{ basic_info_json|safe }}</pre>
+            </div>
+        </div>
+
+        <!-- 原始爬蟲數據 -->
+        {% if raw_data_json %}
+        <div class="section-container">
+            <h5 class="section-title">
+                <i class="bi bi-code-square me-2"></i>原始爬蟲數據
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyToClipboard('raw-data')">
+                <i class="bi bi-clipboard me-1"></i>複製
+            </button>
+            <div class="json-container" id="raw-data">
+                <pre id="raw-data-content">{{ raw_data_json|safe }}</pre>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 分類結果 -->
+        {% if category_results_json %}
+        <div class="section-container">
+            <h5 class="section-title">
+                <i class="bi bi-bar-chart me-2"></i>分類結果
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyToClipboard('category-results')">
+                <i class="bi bi-clipboard me-1"></i>複製
+            </button>
+            <div class="json-container" id="category-results">
+                <pre id="category-results-content">{{ category_results_json|safe }}</pre>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 特質結果 -->
+        {% if trait_results_json %}
+        <div class="section-container">
+            <h5 class="section-title">
+                <i class="bi bi-star me-2"></i>特質結果
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary copy-btn" onclick="copyToClipboard('trait-results')">
+                <i class="bi bi-clipboard me-1"></i>複製
+            </button>
+            <div class="json-container" id="trait-results">
+                <pre id="trait-results-content">{{ trait_results_json|safe }}</pre>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 頁腳 -->
+        <div class="text-center py-4">
+            <small class="text-muted">
+                此頁面僅供管理員查看爬蟲原始數據，請妥善保護數據安全
+            </small>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // JSON 語法高亮函數
+        function syntaxHighlight(json) {
+            if (typeof json != "string") {
+                json = JSON.stringify(json, undefined, 2);
+            }
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                var cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        // 初始化JSON數據顯示
+        document.addEventListener('DOMContentLoaded', function() {
+            // 為所有JSON內容添加語法高亮
+            const jsonElements = document.querySelectorAll('pre[id$="-content"]');
+            jsonElements.forEach(element => {
+                if (element.textContent) {
+                    try {
+                        // 嘗試解析JSON並重新格式化，如果失敗則保持原樣
+                        const parsed = JSON.parse(element.textContent);
+                        element.innerHTML = syntaxHighlight(parsed);
+                    } catch (e) {
+                        // 如果已經是格式化的JSON字符串，直接應用語法高亮
+                        element.innerHTML = syntaxHighlight(element.textContent);
+                    }
+                }
+            });
+        });
+
+        // 複製到剪貼板功能
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent || element.innerText;
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(function() {
+                    showToast('已複製到剪貼板', 'success');
+                }).catch(function(err) {
+                    console.error('複製失敗: ', err);
+                    fallbackCopyTextToClipboard(text);
+                });
+            } else {
+                fallbackCopyTextToClipboard(text);
+            }
+        }
+
+        // 備用複製方法
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.top = '0';
+            textArea.style.left = '0';
+            textArea.style.width = '2em';
+            textArea.style.height = '2em';
+            textArea.style.padding = '0';
+            textArea.style.border = 'none';
+            textArea.style.outline = 'none';
+            textArea.style.boxShadow = 'none';
+            textArea.style.background = 'transparent';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showToast('已複製到剪貼板', 'success');
+                } else {
+                    showToast('複製失敗', 'danger');
+                }
+            } catch (err) {
+                console.error('複製失敗: ', err);
+                showToast('複製失敗', 'danger');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        // 顯示提示訊息
+        function showToast(message, type) {
+            // 創建 toast 元素
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type} position-fixed`;
+            toast.style.top = '20px';
+            toast.style.right = '20px';
+            toast.style.zIndex = '9999';
+            toast.style.minWidth = '200px';
+            toast.innerHTML = `
+                <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // 3秒後自動移除
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

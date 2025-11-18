@@ -1,0 +1,1168 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}測驗結果詳情 - UPDATED VERSION - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_result_list' %}">測驗結果管理</a></li>
+<li class="breadcrumb-item active">測驗結果詳情</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .result-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .radar-chart-container {
+        position: relative;
+        height: 600px;
+        width: 100%;
+        margin: 20px auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    #categoryRadarChart {
+        max-width: 100%;
+        max-height: 600px;
+    }
+    
+    .category-score-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        border-radius: 15px;
+        color: white;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .trait-table {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    
+    .trait-table-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        font-weight: bold;
+    }
+    
+    .trait-score-bar {
+        height: 20px;
+        background: linear-gradient(to right, #28a745, #ffc107, #dc3545);
+        border-radius: 10px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .trait-score-fill {
+        height: 100%;
+        background: linear-gradient(to right, #007bff, #28a745);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+    
+    .trait-score-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    }
+    
+    .info-card {
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .info-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    
+    .score-display {
+        font-size: 3rem;
+        font-weight: bold;
+        text-align: center;
+        padding: 2rem;
+        background: linear-gradient(45deg, #28a745, #20c997);
+        color: white;
+        border-radius: 15px;
+        margin: 1rem 0;
+    }
+    
+    .category-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-left: 4px solid #007bff;
+    }
+    
+    .trait-badge {
+        background: linear-gradient(45deg, #6f42c1, #e83e8c);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        margin: 0.2rem;
+        display: inline-block;
+        font-size: 0.9rem;
+    }
+    
+    .raw-data-container {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .status-indicator {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+    
+    .status-completed { background-color: #28a745; }
+    .status-failed { background-color: #dc3545; }
+    .status-crawling { background-color: #ffc107; animation: pulse 1.5s infinite; }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-left: 2rem;
+        margin-bottom: 1rem;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: 0.5rem;
+        top: 0.5rem;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #007bff;
+    }
+    
+    .timeline-item::after {
+        content: '';
+        position: absolute;
+        left: 0.75rem;
+        top: 1.25rem;
+        width: 2px;
+        height: calc(100% - 0.5rem);
+        background: #e9ecef;
+    }
+    
+    .timeline-item:last-child::after {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 結果標題區域 -->
+    <div class="result-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-1">
+                    <i class="bi bi-person-circle me-2"></i>{{ result.test_invitation.invitee.name }}
+                    <span style="color: red; font-size: 12px;">[TEMPLATE UPDATED]</span>
+                </h2>
+                <p class="mb-2 opacity-75">
+                    <i class="bi bi-envelope me-2"></i>{{ result.test_invitation.invitee.email }}
+                </p>
+                <h5 class="mb-0">
+                    <i class="bi bi-clipboard-check me-2"></i>{{ result.test_project.name }}
+                </h5>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group">
+                    {% if result.crawl_status == 'completed' %}
+                        <a href="{% url 'generate_test_result_pdf' result.id %}" class="btn btn-light" target="_blank" onclick="return window.handlePdfGeneration ? window.handlePdfGeneration(this) : (console.error('handlePdfGeneration 未定義'), false);">
+                            <i class="bi bi-file-pdf me-1"></i>生成報告
+                        </a>
+                        <a href="{% url 'generate_test_result_pdf' result.id %}" class="btn btn-outline-info btn-sm" target="_blank" title="直接下載（備用）" onclick="window.addDebugMessage ? window.addDebugMessage('🔄 備用按鈕被點擊: ' + this.href) : console.log('addDebugMessage 未定義'); console.log('備用按鈕被點擊:', this.href);">
+                            <i class="bi bi-download"></i>
+                        </a>
+                        {% if result.id %}
+                        <a href="{% url 'export_test_result' result.id %}" class="btn btn-outline-light">
+                            <i class="bi bi-download me-1"></i>匯出數據
+                        </a>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="return window.testFunction ? window.testFunction() : console.error('testFunction 未定義');">
+                            🧪 測試
+                        </button>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 左側：基本資訊和狀態 -->
+        <div class="col-lg-4">
+            <!-- 爬取狀態 -->
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>受測狀態
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        {% if result.crawl_status == 'completed' %}
+                            <span class="status-indicator status-completed"></span>
+                            <span class="badge bg-success">測驗完成</span>
+                        {% elif result.crawl_status == 'failed' %}
+                            <span class="status-indicator status-failed"></span>
+                            <span class="badge bg-danger">取得失敗</span>
+                        {% elif result.crawl_status == 'crawling' %}
+                            <span class="status-indicator status-crawling"></span>
+                            <span class="badge bg-warning">取得中</span>
+                        {% else %}
+                            <span class="status-indicator bg-secondary"></span>
+                            <span class="badge bg-secondary">待取得</span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- 時間軸 -->
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <strong>邀請發送</strong>
+                            <div class="text-muted small">{{ result.test_invitation.invited_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                        {% if result.test_invitation.started_at %}
+                        <div class="timeline-item">
+                            <strong>開始測驗</strong>
+                            <div class="text-muted small">{{ result.test_invitation.started_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                        {% endif %}
+                        {% if result.test_invitation.completed_at %}
+                        <div class="timeline-item">
+                            <strong>完成測驗</strong>
+                            <div class="text-muted small">{{ result.test_invitation.completed_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                        {% endif %}
+                        {% if result.crawled_at %}
+                        <div class="timeline-item">
+                            <strong>結果取得</strong>
+                            <div class="text-muted small">{{ result.crawled_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 受測人員資訊 -->
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-person me-2"></i>受測人員資訊
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless table-sm">
+                        <tr>
+                            <td class="fw-bold text-muted">姓名：</td>
+                            <td>{{ result.test_invitation.invitee.name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-muted">Email：</td>
+                            <td>{{ result.test_invitation.invitee.email }}</td>
+                        </tr>
+                        {% if result.test_invitation.invitee.company %}
+                        <tr>
+                            <td class="fw-bold text-muted">公司：</td>
+                            <td>{{ result.test_invitation.invitee.company }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if result.test_invitation.invitee.position %}
+                        <tr>
+                            <td class="fw-bold text-muted">職位：</td>
+                            <td>{{ result.test_invitation.invitee.position }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="fw-bold text-muted">測驗項目：</td>
+                            <td>{{ result.test_project.name }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右側：測驗結果 -->
+        <div class="col-lg-8">
+            {% if result.crawl_status == 'completed' %}
+                <!-- 評分結果 -->
+                {% if result.score_value %}
+                <div class="card info-card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-graph-up me-2"></i>{{ result.test_project.score_field_chinese|default:"評分結果" }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="score-display">
+                            {{ result.score_value }}
+                            {% if result.test_project.score_unit %}
+                                <small class="opacity-75">{{ result.test_project.score_unit }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 預測結果 -->
+                {% if result.prediction_value %}
+                <div class="card info-card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-lightbulb me-2"></i>{{ result.test_project.prediction_field_chinese|default:"預測結果" }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            {{ result.prediction_value }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 分類結果 -->
+                {% if result.category_results %}
+                <div class="card info-card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-tags me-2"></i>分類結果
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for category, value in result.category_results.items %}
+                        <div class="category-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>{{ category }}</strong>
+                                <span class="badge bg-primary">{{ value }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 特質結果 -->
+                {% if result.trait_results %}
+                <div class="card info-card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-puzzle me-2"></i>特質分析
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% for trait, value in result.trait_results.items %}
+                            <span class="trait-badge">{{ trait }}: {{ value }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 分類雷達圖 -->
+                <div class="card info-card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-diagram-3 me-2"></i>分類能力雷達圖
+                            {% if category_scores %}
+                            <span class="badge bg-success">有數據</span>
+                            {% else %}
+                            <span class="badge bg-warning">無數據</span>
+                            {% endif %}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% if category_scores %}
+                        <div class="radar-chart-container">
+                            <canvas id="categoryRadarChart" width="600" height="600"></canvas>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <p>暫無測驗結果數據可顯示雷達圖</p>
+                        </div>
+                        {% endif %}
+                        
+                        <script>
+                            {% if category_scores %}
+                            
+                            // 動態載入並創建圖表
+                            function loadAndCreateChart() {
+                                const script = document.createElement('script');
+                                script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                                script.onload = function() {
+                                    const canvas = document.getElementById('categoryRadarChart');
+                                    if (canvas) {
+                                        const chart = new Chart(canvas, {
+                                            type: 'radar',
+                                            data: {
+                                                labels: {{ category_labels|safe }},
+                                                datasets: [{
+                                                    label: '分類能力評估',
+                                                    data: {{ category_values|safe }},
+                                                    borderColor: '#4285f4',
+                                                    backgroundColor: 'rgba(66, 133, 244, 0.2)',
+                                                    borderWidth: 2,
+                                                    pointBackgroundColor: '#4285f4',
+                                                    pointBorderColor: '#fff',
+                                                    pointRadius: 4,
+                                                    fill: true
+                                                }]
+                                            },
+                                            options: {
+                                                responsive: true,
+                                                maintainAspectRatio: false,
+                                                plugins: {
+                                                    legend: { display: false },
+                                                    tooltip: {
+                                                        callbacks: {
+                                                            label: function(context) {
+                                                                return context.parsed.r.toFixed(1);
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                scales: {
+                                                    r: {
+                                                        beginAtZero: true,
+                                                        max: 100,
+                                                        ticks: { 
+                                                            stepSize: 20,
+                                                            display: true,
+                                                            backdropColor: 'rgba(255, 255, 255, 0.8)',
+                                                            backdropPadding: 2,
+                                                            callback: function(value, index, values) {
+                                                                if (value === 20 || value === 40 || value === 60 || value === 80 || value === 100) {
+                                                                    return value;
+                                                                }
+                                                                return '';
+                                                            },
+                                                            font: {
+                                                                size: 12,
+                                                                weight: 'bold'
+                                                            },
+                                                            color: '#666'
+                                                        },
+                                                        pointLabels: {
+                                                            font: {
+                                                                size: 16,
+                                                                weight: 'bold'
+                                                            },
+                                                            color: '#333',
+                                                            callback: function(label, index) {
+                                                                const values = {{ category_values|safe }};
+                                                                return label + ' (' + values[index].toFixed(1) + ')';
+                                                            }
+                                                        },
+                                                        grid: {
+                                                            color: 'rgba(0, 0, 0, 0.1)'
+                                                        },
+                                                        angleLines: {
+                                                            color: 'rgba(0, 0, 0, 0.1)'
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        });
+                                    }
+                                };
+                                document.head.appendChild(script);
+                            }
+                            
+                            // 立即執行
+                            loadAndCreateChart();
+                            {% endif %}
+                        </script>
+                    </div>
+                </div>
+
+                <!-- 測驗結果 -->
+                <div class="card info-card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clipboard-data me-2"></i>測驗結果
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <!-- Vehicles 主要指標 -->
+                        {% if result.raw_data.vehicles %}
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="text-center p-3 border rounded">
+                                    <h3 class="text-primary mb-1">{{ result.raw_data.vehicles }}</h3>
+                                    <h6 class="text-muted mb-1">Vehicles</h6>
+                                    <small class="text-success">{{ result.raw_data.vehicles_percentage }}%</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-center p-3 border rounded">
+                                    <h5 class="text-info mb-1">{{ result.raw_data.composite_index }}</h5>
+                                    <h6 class="text-muted mb-1">Composite Index</h6>
+                                    <small class="text-muted">{{ result.raw_data.vehicles_percentage }}% 相對應等級</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 分類特質詳細分析 -->
+                        {% if category_traits %}
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="mb-3">分類特質詳細分析</h6>
+                                {% for category_name, traits in category_traits.items %}
+                                <div class="trait-table">
+                                    <div class="trait-table-header">
+                                        {{ category_name }}
+                                        {% if category_scores %}
+                                        <span class="float-end">平均分數: {{ category_scores|get_item:category_name|floatformat:1 }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-striped mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 30%;">特質名稱</th>
+                                                    <th style="width: 15%;">分數</th>
+                                                    <th style="width: 55%;">分數視覺化</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for trait in traits %}
+                                                <tr>
+                                                    <td><strong>{{ trait.name }}</strong></td>
+                                                    <td>
+                                                        <span class="badge {% if trait.score >= 80 %}bg-success{% elif trait.score >= 60 %}bg-info{% elif trait.score >= 40 %}bg-warning{% else %}bg-danger{% endif %}">
+                                                            {{ trait.score|floatformat:1 }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="trait-score-bar">
+                                                            <div class="trait-score-fill" style="width: {{ trait.score }}%;"></div>
+                                                            <div class="trait-score-text">{{ trait.score|floatformat:1 }}%</div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- 測驗詳細資訊 -->
+                        {% if result.raw_data.details %}
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="alert alert-light">
+                                    <h6><i class="bi bi-info-circle me-2"></i>測驗資訊</h6>
+                                    <div class="row">
+                                        {% if result.raw_data.details.test_completion_time %}
+                                        <div class="col-md-4">
+                                            <strong>完成時間：</strong>{{ result.raw_data.details.test_completion_time }}
+                                        </div>
+                                        {% endif %}
+                                        {% if result.raw_data.details.test_date %}
+                                        <div class="col-md-4">
+                                            <strong>測驗日期：</strong>{{ result.raw_data.details.test_date|date:"Y-m-d H:i" }}
+                                        </div>
+                                        {% endif %}
+                                        {% if result.raw_data.details.overall_assessment %}
+                                        <div class="col-md-4">
+                                            <strong>整體評估：</strong>{{ result.raw_data.details.overall_assessment }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% if result.raw_data.details.recommendations %}
+                                    <div class="mt-3">
+                                        <strong>建議：</strong>{{ result.raw_data.details.recommendations }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 原始數據（摺疊顯示） -->
+                <div class="card info-card">
+                    <div class="card-header">
+                        <button class="btn btn-link text-decoration-none p-0 w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#rawDataCollapse">
+                            <i class="bi bi-code me-2"></i>原始數據 <i class="bi bi-chevron-down float-end"></i>
+                        </button>
+                    </div>
+                    <div class="collapse" id="rawDataCollapse">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-end mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyRawData()">
+                                    <i class="bi bi-clipboard me-1"></i>複製
+                                </button>
+                            </div>
+                            <div class="raw-data-container">
+                                <pre id="rawDataContent">{{ result.raw_data|pprint }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <!-- 爬取失敗或未完成狀態 -->
+                <div class="card info-card">
+                    <div class="card-body text-center py-5">
+                        {% if result.crawl_status == 'failed' %}
+                            <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+                            <h5 class="mt-3 text-danger">爬取失敗</h5>
+                            <p class="text-muted">測驗結果爬取過程中發生錯誤，請稍後重試。</p>
+                            <button type="button" class="btn btn-warning" onclick="retryCrawling()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>重新爬取
+                            </button>
+                        {% elif result.crawl_status == 'crawling' %}
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">爬取中...</span>
+                            </div>
+                            <h5 class="mt-3">正在爬取測驗結果</h5>
+                            <p class="text-muted">請稍後，這可能需要幾分鐘時間。</p>
+                        {% else %}
+                            <i class="bi bi-hourglass-split text-warning" style="font-size: 4rem;"></i>
+                            <h5 class="mt-3 text-warning">待爬取</h5>
+                            <p class="text-muted">測驗結果尚未開始爬取。</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('🚀 JavaScript 開始載入...');
+
+// 全域函數定義
+function addDebugMessage(message) {
+    console.log('[調試] ' + message);
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;top:10px;right:10px;background:black;color:lime;padding:10px;z-index:9999;font-family:monospace;border:1px solid lime;max-width:300px;';
+    container.textContent = '[' + new Date().toLocaleTimeString() + '] ' + message;
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), 5000);
+}
+
+function handlePdfGeneration(link) {
+    console.log('PDF 按鈕被點擊:', link.href);
+    addDebugMessage('PDF 按鈕被點擊');
+    window.open(link.href, '_blank');
+    return false;
+}
+
+function testFunction() {
+    console.log('測試函數被調用');
+    alert('測試函數正常工作！');
+    return false;
+}
+
+// 註冊到全域
+window.addDebugMessage = addDebugMessage;
+window.handlePdfGeneration = handlePdfGeneration;
+window.testFunction = testFunction;
+
+console.log('✅ 所有函數已註冊:', {
+    addDebugMessage: typeof window.addDebugMessage,
+    handlePdfGeneration: typeof window.handlePdfGeneration,
+    testFunction: typeof window.testFunction
+});
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM 載入完成');
+    // 調試訊息已禁用
+});
+</script>
+{% endblock %}
+    let debugContainer = document.getElementById('debugContainer');
+    if (!debugContainer) {
+        debugContainer = document.createElement('div');
+        debugContainer.id = 'debugContainer';
+        debugContainer.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 350px;
+            max-height: 250px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.9);
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 9999;
+            font-family: 'Courier New', monospace;
+            border: 2px solid #00ff00;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        `;
+        document.body.appendChild(debugContainer);
+        
+        // 添加標題
+        const title = document.createElement('div');
+        title.textContent = '🔍 PDF 生成調試資訊';
+        title.style.cssText = 'font-weight: bold; border-bottom: 1px solid #00ff00; padding-bottom: 5px; margin-bottom: 10px; color: #ffff00;';
+        debugContainer.appendChild(title);
+        
+        // 添加關閉按鈕
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕';
+        closeBtn.style.cssText = 'position: absolute; top: 5px; right: 8px; background: none; border: none; color: #ff6b6b; font-size: 18px; cursor: pointer; font-weight: bold;';
+        closeBtn.onclick = () => debugContainer.remove();
+        debugContainer.appendChild(closeBtn);
+    }
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const debugLine = document.createElement('div');
+    debugLine.textContent = `[${timestamp}] ${message}`;
+    debugLine.style.cssText = 'margin-bottom: 3px; padding: 2px 0; border-left: 3px solid #00ff00; padding-left: 8px;';
+    debugContainer.appendChild(debugLine);
+    
+    // 滾動到底部
+    debugContainer.scrollTop = debugContainer.scrollHeight;
+    
+    // 同時輸出到控制台
+    console.log(`[PDF 調試] ${message}`);
+}
+// 立即註冊到全域
+window.addDebugMessage = addDebugMessage;
+console.log('✅ addDebugMessage 已定義並註冊');
+
+// 處理 PDF 生成（主要函數）
+function handlePdfGeneration(link) {
+    console.log('=== PDF 生成按鈕被點擊 ===');
+    console.log('連結網址:', link.href);
+    console.log('目前時間:', new Date().toISOString());
+    
+    // 添加持久化調試資訊到頁面
+    addDebugMessage('PDF 生成按鈕被點擊: ' + link.href);
+    
+    // 顯示載入提示
+    const originalText = link.innerHTML;
+    link.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>生成中...';
+    link.classList.add('disabled');
+    
+    // 使用 fetch 來測試連結是否可存取
+    addDebugMessage('開始測試 PDF 連結...');
+    
+    fetch(link.href, {
+        method: 'HEAD',
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        addDebugMessage('PDF 連結回應: ' + response.status + ' ' + response.statusText);
+        console.log('PDF 連結測試回應:', response.status, response.statusText);
+        
+        if (response.ok) {
+            // 連結正常，嘗試打開新視窗
+            addDebugMessage('連結正常，正在開啟新視窗...');
+            const newWindow = window.open(link.href, '_blank');
+            
+            if (newWindow) {
+                addDebugMessage('✅ 新視窗已成功開啟');
+                console.log('PDF 新視窗已成功開啟');
+                showToast('報告正在生成中，請查看新開啟的分頁', 'success');
+            } else {
+                addDebugMessage('❌ 彈出視窗被瀏覽器阻擋');
+                console.log('彈出視窗被瀏覽器阻擋');
+                showToast('彈出視窗被阻擋，請允許彈出視窗或點擊備用按鈕', 'warning');
+                // 嘗試直接導航到該頁面
+                addDebugMessage('嘗試直接跳轉頁面...');
+                window.location.href = link.href;
+            }
+        } else {
+            addDebugMessage('❌ 連結回應錯誤: HTTP ' + response.status);
+            console.error('PDF 連結錯誤:', response.status);
+            showToast('生成報告失敗: HTTP ' + response.status, 'danger');
+        }
+    })
+    .catch(error => {
+        addDebugMessage('❌ 網路連線錯誤: ' + error.message);
+        console.error('PDF 連結測試失敗:', error);
+        showToast('網路連線錯誤，請重試', 'danger');
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        setTimeout(() => {
+            link.innerHTML = originalText;
+            link.classList.remove('disabled');
+        }, 3000);
+    });
+    
+    // 阻止默認事件
+    return false;
+}
+// 立即註冊到全域
+window.handlePdfGeneration = handlePdfGeneration;
+console.log('✅ handlePdfGeneration 已定義並註冊');
+
+// 複製原始數據
+function copyRawData() {
+    const rawDataContent = document.getElementById('rawDataContent');
+    const text = rawDataContent.textContent;
+    
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('原始數據已複製到剪貼板', 'success');
+    }, function(err) {
+        console.error('複製失敗: ', err);
+        showToast('複製失敗', 'danger');
+    });
+}
+// 立即註冊到全域
+window.copyRawData = copyRawData;
+
+// 生成報告功能已移至 PDF 生成連結
+
+// 重新爬取
+function retryCrawling() {
+    if (confirm('確定要重新爬取此測驗結果嗎？')) {
+        showLoading();
+        
+        fetch(`/enterprise/invitations/{{ result.test_invitation.id }}/crawl/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            
+            if (data.success) {
+                showToast('重新爬取已開始', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showToast(`重新爬取失敗：${data.error}`, 'danger');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Error:', error);
+            showToast('重新爬取過程中發生錯誤', 'danger');
+        });
+    }
+}
+// 立即註冊到全域
+window.retryCrawling = retryCrawling;
+
+// 獲取CSRF Token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Toast 通知
+function showToast(message, type = 'info') {
+    // 創建 toast 容器（如果不存在）
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
+    }
+    
+    const toastId = 'toast_' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = `toast show`;
+    toast.setAttribute('role', 'alert');
+    
+    const bgColor = type === 'success' ? 'bg-success' : 
+                   type === 'danger' ? 'bg-danger' : 
+                   type === 'warning' ? 'bg-warning' : 'bg-info';
+    
+    toast.innerHTML = `
+        <div class="toast-header ${bgColor} text-white">
+            <strong class="me-auto">${type === 'success' ? '✅ 成功' : type === 'danger' ? '❌ 錯誤' : type === 'warning' ? '⚠️ 警告' : 'ℹ️ 提示'}</strong>
+            <button type="button" class="btn-close btn-close-white" onclick="document.getElementById('${toastId}').remove()"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // 自動關閉
+    setTimeout(() => {
+        if (document.getElementById(toastId)) {
+            document.getElementById(toastId).remove();
+        }
+    }, 8000);
+    
+    // 添加到調試信息
+    addDebugMessage('Toast 顯示: ' + message);
+}
+
+// 調試信息 - 無條件輸出
+console.log('=== Template Debug Info ===');
+console.log('jQuery available:', typeof $ !== 'undefined');
+console.log('Document ready state:', document.readyState);
+
+// 安全地检查和输出调试信息
+try {
+    console.log('category_scores exists:', {% if category_scores %}true{% else %}false{% endif %});
+    console.log('category_scores length:', {{ category_scores|length }});
+    
+    {% if category_scores %}
+    console.log('category_scores:', {{ category_scores|safe }});
+    console.log('category_labels:', {{ category_labels|safe }});
+    console.log('category_values:', {{ category_values|safe }});
+    console.log('category_scores keys:', Object.keys({{ category_scores|safe }}));
+    console.log('category_scores values:', Object.values({{ category_scores|safe }}));
+    {% else %}
+    console.log('category_scores is empty or undefined');
+    {% endif %}
+} catch (error) {
+    console.error('Error in template debug info:', error);
+}
+
+// 動態載入 Chart.js 並創建雷達圖
+{% if category_scores %}
+console.log('Category scores condition met - starting chart initialization');
+
+// 确保安全的数据传递
+var categoryLabels = {{ category_labels|safe }};
+var categoryValues = {{ category_values|safe }};
+
+console.log('Chart data variables:', categoryLabels, categoryValues);
+
+function loadChartAndCreateRadar() {
+    console.log('Loading Chart.js dynamically...');
+    
+    // 检查Chart.js是否已经加载
+    if (typeof Chart !== 'undefined') {
+        console.log('Chart.js already loaded');
+        createRadarChart();
+        return;
+    }
+    
+    // 動態載入 Chart.js
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    script.onload = function() {
+        console.log('Chart.js loaded successfully, version:', Chart.version);
+        createRadarChart();
+    };
+    script.onerror = function() {
+        console.error('Failed to load Chart.js');
+    };
+    document.head.appendChild(script);
+}
+
+function createRadarChart() {
+    console.log('Creating radar chart...');
+    console.log('Chart.js available:', typeof Chart !== 'undefined');
+    
+    const categoryRadarChart = document.getElementById('categoryRadarChart');
+    if (!categoryRadarChart) {
+        console.error('categoryRadarChart canvas element not found');
+        return;
+    }
+    
+    console.log('Canvas element found');
+    console.log('Using data:', categoryLabels, categoryValues);
+    
+    try {
+        const chart = new Chart(categoryRadarChart, {
+            type: 'radar',
+            data: {
+                labels: categoryLabels,
+                datasets: [{
+                    label: '分類能力評估',
+                    data: categoryValues,
+                    borderColor: '#4285f4',
+                    backgroundColor: 'rgba(66, 133, 244, 0.2)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#4285f4',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.parsed.r.toFixed(1);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            stepSize: 20,
+                            display: true,
+                            backdropColor: 'rgba(255, 255, 255, 0.8)',
+                            backdropPadding: 2,
+                            callback: function(value, index, values) {
+                                if (value === 20 || value === 40 || value === 60 || value === 80 || value === 100) {
+                                    return value;
+                                }
+                                return '';
+                            },
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            },
+                            color: '#666'
+                        },
+                        pointLabels: {
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            color: '#333',
+                            callback: function(label, index) {
+                                const value = categoryValues[index];
+                                return label + ' (' + value.toFixed(1) + ')';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        angleLines: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        console.log('Radar chart created successfully:', chart);
+    } catch (error) {
+        console.error('Error creating radar chart:', error);
+        console.error('Error details:', error.stack);
+    }
+}
+
+// 多种方式确保函数执行
+function initializeChart() {
+    console.log('Initializing chart...');
+    loadChartAndCreateRadar();
+}
+
+// 当页面载入完成时启动
+if (typeof $ !== 'undefined') {
+    $(document).ready(function() {
+        console.log('jQuery ready, initializing chart');
+        initializeChart();
+    });
+} else {
+    // 如果没有jQuery，使用原生方法
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded, initializing chart');
+        initializeChart();
+    });
+}
+
+// 作为备用，延迟执行
+setTimeout(function() {
+    console.log('Backup initialization after 1 second');
+    initializeChart();
+}, 1000);
+
+{% else %}
+console.log('No category_scores data - chart initialization skipped');
+{% endif %}
+
+// 确保在页面完全加载后再次尝试
+window.addEventListener('load', function() {
+    console.log('Window loaded, final chart initialization attempt');
+    {% if category_scores %}
+    if (!document.querySelector('#categoryRadarChart canvas')) {
+        console.log('Chart not found, retrying...');
+        setTimeout(initializeChart, 500);
+    }
+    {% endif %}
+});
+
+// 自動重新整理（如果正在爬取中）
+{% if result.crawl_status == 'crawling' %}
+setInterval(function() {
+    window.location.reload();
+}, 30000); // 30秒重新整理一次
+{% endif %}
+
+// ===== 初始化和測試 =====
+console.log('✅ 所有 PDF 生成函數已註冊到全局範圍');
+console.log('🔍 測試函數可用性:');
+console.log('  - handlePdfGeneration:', typeof window.handlePdfGeneration);
+console.log('  - addDebugMessage:', typeof window.addDebugMessage);
+console.log('  - copyRawData:', typeof window.copyRawData);
+console.log('  - retryCrawling:', typeof window.retryCrawling);
+
+// DOM 載入完成後的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM 載入完成，開始初始化 ===');
+    // 調試訊息已禁用
+    console.log('頁面網址:', window.location.href);
+    console.log('目前時間:', new Date().toISOString());
+    console.log('畫布元素是否存在:', !!document.getElementById('categoryRadarChart'));
+    console.log('警告元素數量:', document.querySelectorAll('.alert').length);
+});
+</script>
+{% endblock %}

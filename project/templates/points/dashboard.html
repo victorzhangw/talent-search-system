@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}點數管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">點數管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 點數總覽卡片 -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0">{{ balance_summary.current_balance }}</div>
+                            <div class="small">目前餘額</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0">{{ balance_summary.total_earned }}</div>
+                            <div class="small">累計獲得</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-arrow-up-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0">{{ balance_summary.total_consumed }}</div>
+                            <div class="small">累計消費</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-arrow-down-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h5 mb-0">{{ balance_summary.recent_consumed }}</div>
+                            <div class="small">近30天消費</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-graph-down"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if unlimited_mode %}
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>無限制模式</strong> 目前系統處於無限制模式，您可以無限使用所有功能，點數僅作記錄用途。
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- 點數消費標準 -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-list-check me-2"></i>點數消費標準
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for action, cost in point_costs.items %}
+                        {% if cost > 0 %}
+                        <div class="col-md-6 mb-3">
+                            <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                <span class="fw-medium">
+                                    {% if action == 'test_invite' %}企業邀請測驗
+                                    {% elif action == 'test_execution' %}個人執行測驗
+                                    {% elif action == 'test_creation' %}建立測驗
+                                    {% elif action == 'report_generation' %}生成報告
+                                    {% elif action == 'data_export' %}資料匯出
+                                    {% elif action == 'advanced_analysis' %}進階分析
+                                    {% elif action == 'bulk_invite' %}批量邀請
+                                    {% elif action == 'custom_template' %}自定義模板
+                                    {% else %}{{ action }}{% endif %}
+                                </span>
+                                <span class="badge bg-primary">{{ cost }} 點</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% comment %}如果沒有需要扣點的項目，顯示說明{% endcomment %}
+                        {% if not point_costs or not point_costs.values|join:""|add:"0" %}
+                        <div class="col-12">
+                            <div class="alert alert-info text-center">
+                                <i class="bi bi-info-circle me-2"></i>
+                                目前大部分功能都免費使用，僅測驗相關功能需要消費點數。
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 最近交易記錄 -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-clock-history me-2"></i>最近交易記錄
+                    </h5>
+                    <a href="{% url 'point_history' %}" class="btn btn-sm btn-outline-primary">
+                        查看全部
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if recent_transactions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>時間</th>
+                                    <th>類型</th>
+                                    <th>描述</th>
+                                    <th class="text-end">點數變化</th>
+                                    <th class="text-end">餘額</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in recent_transactions %}
+                                <tr>
+                                    <td>{{ transaction.created_at|date:"m/d H:i" }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if transaction.transaction_type == 'purchase' %}bg-success
+                                            {% elif transaction.transaction_type == 'consumption' %}bg-danger
+                                            {% elif transaction.transaction_type == 'gift' %}bg-info
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ transaction.get_transaction_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ transaction.description|truncatechars:50 }}</td>
+                                    <td class="text-end">
+                                        <span class="{% if transaction.amount > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {% if transaction.amount > 0 %}+{% endif %}{{ transaction.amount }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">{{ transaction.balance_after }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mt-2">暫無交易記錄</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 側邊欄 -->
+        <div class="col-lg-4">
+            <!-- 快速操作 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-lightning me-2"></i>快速操作
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'point_purchase' %}" class="btn btn-primary">
+                            <i class="bi bi-cart-plus me-2"></i>購買點數
+                        </a>
+                        <a href="{% url 'point_history' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-list-ul me-2"></i>交易記錄
+                        </a>
+                        <a href="{% url 'point_orders' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-receipt me-2"></i>訂單查詢
+                        </a>
+                        {% if user.is_staff %}
+                        <a href="{% url 'admin_point_management' %}" class="btn btn-outline-warning">
+                            <i class="bi bi-gear me-2"></i>管理後台
+                        </a>
+                        {% endif %}
+                        {% if debug %}
+                        <a href="{% url 'test_point_functions' %}" class="btn btn-outline-info">
+                            <i class="bi bi-bug me-2"></i>測試功能
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 消費統計 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-bar-chart me-2"></i>近30天統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>總消費：</span>
+                            <strong>{{ consumption_stats.total_consumed }} 點</strong>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>交易次數：</span>
+                            <strong>{{ consumption_stats.transaction_count }} 次</strong>
+                        </div>
+                    </div>
+                    
+                    {% if consumption_stats.action_stats %}
+                    <hr>
+                    <h6>使用分析：</h6>
+                    {% for action, stats in consumption_stats.action_stats.items %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <small>{{ action }}：</small>
+                        <small><strong>{{ stats.total }} 點 ({{ stats.count }}次)</strong></small>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // 定期更新餘額（每30秒）
+    setInterval(function() {
+        $.ajax({
+            url: '{% url "api_point_balance" %}',
+            method: 'GET',
+            success: function(data) {
+                if (data.status === 'success') {
+                    // 更新頁面上的餘額顯示
+                    $('.current-balance').text(data.data.current_balance);
+                }
+            }
+        });
+    }, 30000);
+});
+</script>
+{% endblock %}

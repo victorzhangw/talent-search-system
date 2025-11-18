@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}批量邀請 - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9fa;
+}
+
+.upload-area.dragover {
+    border-color: #0d6efd;
+    background-color: #e7f3ff;
+}
+
+.file-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 10px;
+}
+
+.template-preview {
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<!-- <li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li> -->
+<li class="breadcrumb-item"><a href="{% url 'invitation_list' %}">邀請列表</a></li>
+<li class="breadcrumb-item active">批量邀請</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-upload me-2"></i>批量邀請</h2>
+                <a href="{% url 'invitation_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>返回列表
+                </a>
+            </div>
+
+            <!-- 使用說明 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>使用說明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h6>CSV格式要求：</h6>
+                            <ul class="mb-0">
+                                <li>檔案格式：.csv</li>
+                                <li>編碼：UTF-8</li>
+                                <li>必要欄位：name（姓名）、email（電子郵件）</li>
+                                <li>可選欄位：phone（電話）、position（職位）、company（公司）</li>
+                                <li>最多處理：500筆資料</li>
+                            </ul>
+                        </div>
+                        <!-- <div class="col-md-6">
+                            <h6>點數說明：</h6>
+                            <ul class="mb-0">
+                                <li>每邀請一人消費1點數</li>
+                                <li>取消邀請可退還點數（測驗未開始）</li>
+                                <li>處理前會檢查點數是否足夠</li>
+                                <li>目前餘額：<span class="badge bg-info">{{ user.get_current_balance }} 點</span></li>
+                            </ul>
+                        </div> -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 批量邀請表單 -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">批量邀請設定</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="bulkInvitationForm">
+                        {% csrf_token %}
+                        
+                        <!-- 基本設定 -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="{{ form.test_project.id_for_label }}" class="form-label">
+                                    <i class="bi bi-clipboard-check me-1"></i>{{ form.test_project.label }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.test_project }}
+                                {% if form.test_project.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.test_project.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.expires_in_days.id_for_label }}" class="form-label">
+                                    <i class="bi bi-calendar-event me-1"></i>{{ form.expires_in_days.label }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.expires_in_days }}
+                                {% if form.expires_in_days.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.expires_in_days.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- CSV檔案上傳 -->
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="bi bi-file-earmark-spreadsheet me-1"></i>{{ form.csv_file.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            
+                            <div class="upload-area" id="uploadArea">
+                                <i class="bi bi-cloud-upload fs-1 text-muted mb-3"></i>
+                                <h5>拖曳CSV檔案到此處或點擊選擇</h5>
+                                <p class="text-muted">支援UTF-8編碼的CSV檔案，最大5MB</p>
+                                {{ form.csv_file }}
+                            </div>
+                            
+                            <div id="fileInfo" class="file-info" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-file-earmark-spreadsheet text-success me-2"></i>
+                                        <span id="fileName"></span>
+                                        <span class="text-muted ms-2">(<span id="fileSize"></span>)</span>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearFile()">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {% if form.csv_file.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.csv_file.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- CSV範本下載 -->
+                        <div class="mb-4">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-download me-2"></i>下載CSV範本
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-3">如果您是第一次使用批量邀請，建議先下載範本檔案：</p>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <a href="{% url 'download_csv_template' %}?type=basic" 
+                                               class="btn btn-outline-info w-100">
+                                                <i class="bi bi-file-earmark-spreadsheet me-2"></i>基本範本
+                                                <div class="small">（姓名、Email）</div>
+                                            </a>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <a href="{% url 'download_csv_template' %}?type=complete" 
+                                               class="btn btn-outline-info w-100">
+                                                <i class="bi bi-file-earmark-spreadsheet me-2"></i>完整範本
+                                                <div class="small">（包含職位、電話等）</div>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 自訂邀請訊息 -->
+                        <!-- <div class="mb-4">
+                            <label for="{{ form.custom_message.id_for_label }}" class="form-label">
+                                <i class="bi bi-chat-text me-1"></i>{{ form.custom_message.label }}
+                            </label>
+                            {{ form.custom_message }}
+                            {% if form.custom_message.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.custom_message.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div> -->
+
+                        <!-- 處理選項 -->
+                        <div class="mb-4">
+                            <h6>處理選項</h6>
+                            <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-check">
+                                    {{ form.send_immediately }}
+                                    <label class="form-check-label" for="{{ form.send_immediately.id_for_label }}">
+                                        <i class="bi bi-send me-1"></i>{{ form.send_immediately.label }}
+                                    </label>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按鈕 -->
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary me-2" onclick="window.history.back()">
+                                <i class="bi bi-arrow-left me-1"></i>取消
+                            </button>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="bi bi-upload me-1"></i>開始批量邀請
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('{{ form.csv_file.id_for_label }}');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const submitBtn = document.getElementById('submitBtn');
+    const form = document.getElementById('bulkInvitationForm');
+
+    // 拖曳功能
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFileChange();
+        }
+    });
+
+    // 點擊上傳區域
+    uploadArea.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    // 檔案選擇
+    fileInput.addEventListener('change', handleFileChange);
+
+    function handleFileChange() {
+        const file = fileInput.files[0];
+        if (file) {
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.style.display = 'block';
+            
+            // 驗證檔案格式
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showAlert('danger', '請選擇CSV格式的檔案');
+                clearFile();
+                return;
+            }
+            
+            // 驗證檔案大小
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert('danger', '檔案大小不能超過5MB');
+                clearFile();
+                return;
+            }
+        } else {
+            fileInfo.style.display = 'none';
+        }
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // 清除檔案
+    window.clearFile = function() {
+        fileInput.value = '';
+        fileInfo.style.display = 'none';
+    };
+
+    // 表單提交
+    form.addEventListener('submit', function(e) {
+        if (!fileInput.files[0]) {
+            e.preventDefault();
+            showAlert('danger', '請選擇CSV檔案');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>處理中...';
+        
+        window.showLoading('正在處理批量邀請...', '請稍候，系統正在解析CSV檔案並發送邀請');
+    });
+
+    // 顯示提示訊息
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}

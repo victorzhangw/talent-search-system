@@ -1,0 +1,167 @@
+{
+  "_comment": "意圖定義配置範例 - 複製此文件為 intent_definitions.json 並修改",
+
+  "intents": {
+    "list_all": {
+      "name": "列出所有候選人",
+      "description": "查看資料庫中的所有候選人",
+      "examples": [
+        "列出所有候選人",
+        "顯示資料庫中的所有人",
+        "目前有哪些人可以挑選？",
+        "查看所有用戶"
+      ],
+      "entities": [],
+      "enabled": true
+    },
+
+    "list_traits": {
+      "name": "列出可用特質",
+      "description": "查看系統中可以搜索的特質列表",
+      "examples": [
+        "有哪些特質可以搜索？",
+        "系統支援哪些能力評估？",
+        "列出所有特質"
+      ],
+      "entities": [],
+      "enabled": true
+    },
+
+    "search": {
+      "name": "搜索人才",
+      "description": "根據特質要求搜索符合條件的候選人",
+      "examples": [
+        "找一個善於溝通的人",
+        "需要領導能力強的候選人",
+        "推薦幾個優秀的人才",
+        "尋找創意思考能力好的設計師"
+      ],
+      "entities": ["traits"],
+      "enabled": true
+    },
+
+    "interview": {
+      "name": "生成面試綱要",
+      "description": "為指定候選人生成個性化的面試綱要",
+      "examples": [
+        "為張三設計面試綱要",
+        "為李四準備面試問題",
+        "如何評估王五？"
+      ],
+      "entities": ["candidate_name"],
+      "enabled": true
+    },
+
+    "statistics": {
+      "name": "統計分析",
+      "description": "查看資料庫的統計資訊",
+      "examples": [
+        "有多少人完成了測評？",
+        "資料庫中有多少候選人？",
+        "特質分佈情況"
+      ],
+      "entities": ["trait_name"],
+      "enabled": true
+    },
+
+    "compare": {
+      "name": "比較候選人",
+      "description": "比較多個候選人的特質和能力",
+      "examples": [
+        "比較張三和李四",
+        "誰更適合產品經理職位？",
+        "對比這兩個候選人"
+      ],
+      "entities": ["candidate_names"],
+      "enabled": true
+    },
+
+    "advice": {
+      "name": "建議諮詢",
+      "description": "提供人才管理相關的建議和諮詢",
+      "examples": [
+        "如何組建一個高效團隊？",
+        "產品經理需要什麼特質？",
+        "如何評估候選人的領導能力？"
+      ],
+      "entities": ["topic"],
+      "enabled": true
+    },
+
+    "_comment_new_intent": "添加新意圖的範例",
+    "export": {
+      "name": "匯出資料",
+      "description": "匯出候選人資料或測評報告",
+      "examples": ["匯出所有候選人資料", "下載測評報告", "導出 Excel 檔案"],
+      "entities": ["export_format", "export_scope"],
+      "enabled": false,
+      "_comment": "新功能，暫時停用"
+    }
+  },
+
+  "entities": {
+    "candidate_name": {
+      "type": "string",
+      "description": "單個候選人姓名",
+      "examples": ["張三", "李四", "王五"]
+    },
+
+    "candidate_names": {
+      "type": "array",
+      "description": "多個候選人姓名",
+      "examples": [
+        ["張三", "李四"],
+        ["王五", "趙六"]
+      ]
+    },
+
+    "traits": {
+      "type": "array",
+      "description": "特質名稱列表",
+      "examples": [
+        ["溝通", "領導"],
+        ["創意", "分析"]
+      ]
+    },
+
+    "trait_name": {
+      "type": "string",
+      "description": "單個特質名稱",
+      "examples": ["領導能力", "溝通協調", "創造性思考"]
+    },
+
+    "topic": {
+      "type": "string",
+      "description": "諮詢主題",
+      "examples": ["團隊建設", "人才招聘", "績效評估"]
+    },
+
+    "_comment_new_entity": "新實體範例",
+    "export_format": {
+      "type": "string",
+      "description": "匯出格式",
+      "examples": ["Excel", "CSV", "PDF"]
+    },
+
+    "export_scope": {
+      "type": "string",
+      "description": "匯出範圍",
+      "examples": ["所有候選人", "已測評", "高分候選人"]
+    }
+  },
+
+  "settings": {
+    "_comment": "LLM 設定",
+    "llm_temperature": 0.3,
+    "_comment_temperature": "較低的值產生更一致的結果，較高的值產生更多樣化的結果",
+
+    "llm_max_tokens": 500,
+    "_comment_max_tokens": "限制 LLM 回應的長度",
+
+    "default_intent": "search",
+    "_comment_default_intent": "當意圖識別失敗時使用的預設意圖",
+
+    "min_confidence": 0.5,
+    "_comment_min_confidence": "最低信心度閾值，低於此值將使用預設意圖"
+  }
+}

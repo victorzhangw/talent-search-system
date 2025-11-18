@@ -1,0 +1,186 @@
+{% extends 'auth/auth_base.html' %}
+{% load static %}
+
+{% block title %}個人用戶註冊 - 人才測驗分析平台{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="auth-card">
+            <div class="auth-header">
+                <img src="{% static 'img/auth_logo.png' %}" alt="Traitty 特質評鑑" class="auth-logo">
+                <h3><i class="bi bi-person-plus me-2"></i>個人用戶註冊</h3>
+            </div>
+            
+            <div class="auth-body">
+                <!-- 顯示錯誤訊息 -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.username.id_for_label }}" class="form-label">{{ form.username.label }}</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                            <div class="text-danger">{{ form.username.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.real_name.id_for_label }}" class="form-label">{{ form.real_name.label }}</label>
+                        {{ form.real_name }}
+                        {% if form.real_name.errors %}
+                            <div class="text-danger">{{ form.real_name.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.email.id_for_label }}" class="form-label">{{ form.email.label }}</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <div class="text-danger">{{ form.email.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.phone.id_for_label }}" class="form-label">{{ form.phone.label }}</label>
+                        {{ form.phone }}
+                        {% if form.phone.errors %}
+                            <div class="text-danger">{{ form.phone.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.password1.id_for_label }}" class="form-label">{{ form.password1.label }}</label>
+                        {{ form.password1 }}
+                        {% if form.password1.errors %}
+                            <div class="text-danger">{{ form.password1.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.password2.id_for_label }}" class="form-label">{{ form.password2.label }}</label>
+                        {{ form.password2 }}
+                        {% if form.password2.errors %}
+                            <div class="text-danger">{{ form.password2.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- 密碼安全要求說明區塊 -->
+                    <div class="alert alert-light border mb-3" style="background-color: #f8d7da;">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-shield-check text-primary me-2 mt-1"></i>
+                            <div>
+                                <small class="text-muted">
+                                    <strong>密碼安全要求：</strong>請確保密碼符合以下條件
+                                </small>
+                                <div class="row mt-1 small text-muted">
+                                    <div class="col-md-4">
+                                        <div><i class="bi bi-circle text-muted me-1" id="length-check"></i>至少8個字符</div>
+                                        <div><i class="bi bi-circle text-muted me-1" id="uppercase-check"></i>包含大寫字母</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div><i class="bi bi-circle text-muted me-1" id="lowercase-check"></i>包含小寫字母</div>
+                                        <div><i class="bi bi-circle text-muted me-1" id="number-check"></i>包含數字</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div><i class="bi bi-circle text-muted me-1" id="special-check"></i>包含特殊符號</div>
+                                        <div><i class="bi bi-circle text-muted me-1" id="similarity-check"></i>不與帳號相似</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 mb-3">
+                        <i class="bi bi-check-circle me-2"></i>註冊
+                    </button>
+                </form>
+                
+                <div class="auth-links">
+                    <a href="{% url 'register_choice' %}">返回選擇頁面</a>
+                    <span class="mx-2">|</span>
+                    <a href="{% url 'login' %}">已有帳號？登入</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordInput = document.getElementById('id_password1');
+    const usernameInput = document.getElementById('id_username');
+    
+    if (passwordInput) {
+        passwordInput.addEventListener('input', function() {
+            checkPasswordStrength(this.value, usernameInput.value);
+        });
+    }
+    
+    if (usernameInput) {
+        usernameInput.addEventListener('input', function() {
+            if (passwordInput.value) {
+                checkPasswordStrength(passwordInput.value, this.value);
+            }
+        });
+    }
+    
+    function checkPasswordStrength(password, username) {
+        // 檢查各項條件
+        const checks = {
+            'length-check': password.length >= 8,
+            'uppercase-check': /[A-Z]/.test(password),
+            'lowercase-check': /[a-z]/.test(password),
+            'number-check': /\d/.test(password),
+            'special-check': /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+            'similarity-check': !checkSimilarity(password, username)
+        };
+        
+        // 更新每個檢查項目的狀態
+        Object.keys(checks).forEach(checkId => {
+            const element = document.getElementById(checkId);
+            if (element) {
+                if (checks[checkId]) {
+                    element.className = 'bi bi-check-circle-fill text-success me-1';
+                } else {
+                    element.className = 'bi bi-x-circle text-danger me-1';
+                }
+            }
+        });
+    }
+    
+    function checkSimilarity(password, username) {
+        if (!password || !username) return false;
+        
+        const lowerPassword = password.toLowerCase();
+        const lowerUsername = username.toLowerCase();
+        
+        // 檢查密碼是否包含用戶名
+        if (lowerPassword.includes(lowerUsername) || lowerUsername.includes(lowerPassword)) {
+            return true;
+        }
+        
+        // 檢查相似度（簡單版本）
+        let similarChars = 0;
+        const minLength = Math.min(password.length, username.length);
+        
+        for (let i = 0; i < minLength; i++) {
+            if (lowerPassword[i] === lowerUsername[i]) {
+                similarChars++;
+            }
+        }
+        
+        return similarChars > minLength * 0.7; // 如果70%以上字符相同則認為過於相似
+    }
+});
+</script>
+
+{% endblock %}

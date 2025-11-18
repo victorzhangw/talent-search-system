@@ -1,0 +1,141 @@
+{# templates/file_manager/file_update.html #}
+{% extends 'base.html' %}
+
+{% block title %}編輯檔案{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'file_list' %}">檔案管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'file_detail' file.id %}">檔案詳情</a></li>
+<li class="breadcrumb-item active">編輯檔案</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 col-md-10 mx-auto">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">編輯檔案資訊</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="updateForm" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- 檔案預覽 -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                {% if 'word' in file.file_type %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #4472C4;"></i>
+                                {% elif 'excel' in file.file_type %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #70AD47;"></i>
+                                {% elif 'pdf' in file.file_type %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #FF0000;"></i>
+                                {% elif 'powerpoint' in file.file_type %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #ED7D31;"></i>
+                                {% elif 'text' in file.file_type %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #7F7F7F;"></i>
+                                {% elif 'zip' in file.file_type %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #F1C40F;"></i>
+                                {% elif 'image' in file.file_type %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #3498DB;"></i>
+                                {% else %}
+                                <i class="bi {{ file.icon_class }}" style="font-size: 3rem; color: #5D6D7E;"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <h6>目前檔案</h6>
+                                <p class="mb-0 text-muted">{{ file.formatted_size }} | 上傳於 {{ file.created_at|date:"Y-m-d H:i" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 檔案名稱 -->
+                    <div class="mb-3">
+                        <label for="filename" class="form-label">檔案名稱</label>
+                        <input type="text" class="form-control" id="filename" name="filename" value="{{ file.filename }}" required>
+                        <div class="invalid-feedback">請輸入檔案名稱</div>
+                        <div class="form-text">如果更改檔案名稱，請確保保留副檔名</div>
+                    </div>
+                    
+                    <!-- 檔案描述 -->
+                    <div class="mb-4">
+                        <label for="description" class="form-label">檔案描述</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ file.description }}</textarea>
+                    </div>
+                    
+                    <!-- 按鈕區域 -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'file_detail' file.id %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> 返回詳情
+                        </a>
+                        <div>
+                            <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                <i class="bi bi-trash me-1"></i> 刪除
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i> 儲存變更
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除確認模態框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">確認刪除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                您確定要刪除檔案 <span class="fw-bold">{{ file.filename }}</span> 嗎？此操作無法復原。
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form method="POST" action="{% url 'delete_file' file.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">確認刪除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const updateForm = document.getElementById('updateForm');
+        
+        // 表單驗證
+        updateForm.addEventListener('submit', function(e) {
+            if (!this.checkValidity()) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            this.classList.add('was-validated');
+        });
+        
+        // 檔案名稱驗證 - 確保副檔名不變
+        const filenameInput = document.getElementById('filename');
+        const originalExtension = filenameInput.value.split('.').pop();
+        
+        filenameInput.addEventListener('blur', function() {
+            const newFilename = filenameInput.value;
+            const newExtension = newFilename.split('.').pop();
+            
+            if (newExtension !== originalExtension) {
+                filenameInput.setCustomValidity(`請保留原始副檔名 (.${originalExtension})`);
+            } else {
+                filenameInput.setCustomValidity('');
+            }
+        });
+    });
+</script>
+{% endblock %}

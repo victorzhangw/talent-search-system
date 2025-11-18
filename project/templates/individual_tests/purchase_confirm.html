@@ -1,0 +1,368 @@
+{# templates/individual_tests/purchase_confirm.html #}
+{% extends 'base.html' %}
+
+{% block title %}測驗購買確認{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'individual_tests' %}">我的測驗</a></li>
+<li class="breadcrumb-item active">購買確認</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .confirm-card {
+        border: none;
+        border-radius: 1rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .confirm-header {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .confirm-body {
+        padding: 2rem;
+    }
+    
+    .test-info-section {
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .test-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #2d3436;
+        margin-bottom: 1rem;
+    }
+    
+    .test-description {
+        color: #636e72;
+        line-height: 1.6;
+        margin-bottom: 1rem;
+    }
+    
+    .points-section {
+        background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+        color: white;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .points-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .points-row:last-child {
+        margin-bottom: 0;
+        border-top: 1px solid rgba(255,255,255,0.2);
+        padding-top: 1rem;
+        margin-top: 1rem;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .points-label {
+        font-size: 0.95rem;
+    }
+    
+    .points-value {
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .btn-confirm {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border: none;
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s;
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    
+    .btn-confirm:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+        color: white;
+    }
+    
+    .btn-cancel {
+        background: transparent;
+        border: 2px solid #6c757d;
+        color: #6c757d;
+        padding: 1rem 2rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s;
+        width: 100%;
+    }
+    
+    .btn-cancel:hover {
+        background: #6c757d;
+        color: white;
+        transform: translateY(-2px);
+    }
+    
+    .warning-notice {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 2rem;
+        color: #856404;
+    }
+    
+    .warning-notice i {
+        color: #f39c12;
+        margin-right: 0.5rem;
+    }
+    
+    .test-details {
+        margin-bottom: 1.5rem;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        font-weight: 500;
+        color: #495057;
+    }
+    
+    .detail-value {
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card confirm-card">
+                <div class="confirm-header">
+                    <h3 class="mb-0">
+                        <i class="bi bi-check-circle me-2"></i>
+                        測驗購買確認
+                    </h3>
+                    <p class="mb-0 mt-2">請確認您的測驗購買資訊</p>
+                </div>
+                
+                <div class="confirm-body">
+                    <!-- 測驗資訊 -->
+                    <div class="test-info-section">
+                        <h4 class="test-title">
+                            <i class="bi bi-clipboard-data me-2"></i>
+                            {{ project.name }}
+                        </h4>
+                        
+                        {% if project.description %}
+                        <div class="test-description">
+                            {{ project.description }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="test-details">
+                            {% if project.introduction %}
+                            <div class="detail-item">
+                                <span class="detail-label">測驗簡介：</span>
+                                <span class="detail-value">{{ project.introduction|truncatewords:10 }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if project.usage_guide %}
+                            <div class="detail-item">
+                                <span class="detail-label">使用指南：</span>
+                                <span class="detail-value">{{ project.usage_guide|truncatewords:10 }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">建立時間：</span>
+                                <span class="detail-value">{{ project.created_at|date:"Y-m-d H:i" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 點數扣除資訊 -->
+                    <div class="points-section">
+                        <h5 class="mb-3">
+                            <i class="bi bi-coin me-2"></i>
+                            點數扣除資訊
+                        </h5>
+                        
+                        <div class="points-row">
+                            <span class="points-label">目前點數：</span>
+                            <span class="points-value">{{ current_points }} 點</span>
+                        </div>
+                        
+                        <div class="points-row">
+                            <span class="points-label">本次扣除：</span>
+                            <span class="points-value">{{ test_cost }} 點</span>
+                        </div>
+                        
+                        <div class="points-row">
+                            <span class="points-label">扣除後剩餘：</span>
+                            <span class="points-value">{{ remaining_points }} 點</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 注意事項 -->
+                    <div class="warning-notice">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>注意事項：</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>購買後將立即扣除點數，無法退款</li>
+                            <li>點擊確認後將跳轉至測驗平台</li>
+                            <li>請確保在良好的網路環境下進行測驗</li>
+                            {% if project.precautions %}
+                            <li>{{ project.precautions|truncatewords:20 }}</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    
+                    <!-- 操作按鈕 -->
+                    <form method="post" action="{% url 'test_purchase_process' project.id %}" id="purchaseForm">
+                        {% csrf_token %}
+                        <button type="button" class="btn btn-confirm" data-bs-toggle="modal" data-bs-target="#confirmModal">
+                            <i class="bi bi-credit-card me-2"></i>
+                            確認購買並開始測驗
+                        </button>
+                    </form>
+                    
+                    <a href="{% url 'individual_tests' %}" class="btn btn-cancel">
+                        <i class="bi bi-arrow-left me-2"></i>
+                        取消返回
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 確認購買模態框 -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+                <h5 class="modal-title d-flex align-items-center" id="confirmModalLabel">
+                    <i class="bi bi-question-circle-fill me-2 fs-4"></i>
+                    購買確認
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-4">
+                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                </div>
+                <h5 class="mb-3 text-dark">確定要購買此測驗嗎？</h5>
+                <p class="text-muted mb-4">
+                    購買後將立即扣除 <strong class="text-danger">{{ test_cost }} 點數</strong>，
+                    此操作無法撤銷。
+                </p>
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>提醒：</strong>點擊確認後會自動跳轉至測驗平台開始測驗
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pb-4">
+                <button type="button" class="btn btn-outline-secondary px-4 me-3" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>取消
+                </button>
+                <button type="button" class="btn px-4" id="confirmPurchase"
+                        style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                               border: none; color: white; font-weight: 600;">
+                    <i class="bi bi-check-circle me-2"></i>確定購買
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 確認購買按鈕點擊處理
+document.getElementById('confirmPurchase').addEventListener('click', function() {
+    // 關閉模態框
+    const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+    modal.hide();
+    
+    // 更新按鈕狀態
+    const mainBtn = document.querySelector('.btn-confirm');
+    mainBtn.disabled = true;
+    mainBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>處理中...';
+    
+    // 提交表單
+    document.getElementById('purchaseForm').submit();
+});
+
+// 模態框顯示時的動畫效果
+document.getElementById('confirmModal').addEventListener('shown.bs.modal', function () {
+    // 添加彈跳動畫
+    const icon = this.querySelector('.bi-exclamation-triangle');
+    icon.style.animation = 'bounce 1s ease-in-out';
+});
+
+// 添加 CSS 動畫
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+            transform: translateY(0);
+        }
+        40% {
+            transform: translateY(-10px);
+        }
+        60% {
+            transform: translateY(-5px);
+        }
+    }
+    
+    .modal-content {
+        border-radius: 1rem;
+    }
+    
+    .modal-header {
+        border-radius: 1rem 1rem 0 0;
+    }
+    
+    #confirmPurchase:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .btn-outline-secondary:hover {
+        transform: translateY(-2px);
+        transition: all 0.3s ease;
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

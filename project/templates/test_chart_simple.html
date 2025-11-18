@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chart.js 雷達圖測試</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chart.js 雷達圖測試</h1>
+        
+        <div class="debug-info">
+            <h3>測試資訊</h3>
+            <p>這是一個簡單的 Chart.js 雷達圖測試頁面</p>
+            <p>如果你能看到這個頁面，但看不到雷達圖，那麼問題可能在於 Chart.js 載入或配置</p>
+        </div>
+        
+        <div id="status-container">
+            <div class="status" id="loading-status">正在載入 Chart.js...</div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="radarChart"></canvas>
+        </div>
+        
+        <div class="debug-info">
+            <h3>測試數據</h3>
+            <p>工作態度與執行力: 72.5</p>
+            <p>心理韌性與正向思維: 70.0</p>
+            <p>人際關係與道德操守: 73.5</p>
+        </div>
+    </div>
+    
+    <script>
+        console.log('=== Chart.js 雷達圖測試開始 ===');
+        
+        // 狀態更新函數
+        function updateStatus(message, type = 'info') {
+            const statusContainer = document.getElementById('status-container');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+            statusContainer.appendChild(statusDiv);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        // 動態載入 Chart.js
+        function loadChartJS() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+                script.onload = function() {
+                    updateStatus('Chart.js 載入成功 - 版本: ' + Chart.version, 'success');
+                    resolve();
+                };
+                script.onerror = function() {
+                    updateStatus('Chart.js 載入失敗', 'error');
+                    reject(new Error('Chart.js 載入失敗'));
+                };
+                document.head.appendChild(script);
+            });
+        }
+        
+        // 創建雷達圖
+        function createRadarChart() {
+            const canvas = document.getElementById('radarChart');
+            if (!canvas) {
+                updateStatus('找不到 canvas 元素', 'error');
+                return;
+            }
+            
+            updateStatus('Canvas 元素找到，開始創建雷達圖...', 'info');
+            
+            const testData = {
+                labels: [
+                    '工作態度與執行力',
+                    '心理韌性與正向思維', 
+                    '人際關係與道德操守'
+                ],
+                datasets: [{
+                    label: '分類能力評估',
+                    data: [72.5, 70.0, 73.5],
+                    borderColor: '#4285f4',
+                    backgroundColor: 'rgba(66, 133, 244, 0.2)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#4285f4',
+                    pointBorderColor: '#fff',
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    fill: true
+                }]
+            };
+            
+            try {
+                const chart = new Chart(canvas, {
+                    type: 'radar',
+                    data: testData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '分類能力雷達圖'
+                            },
+                            legend: {
+                                display: true,
+                                position: 'bottom'
+                            }
+                        },
+                        scales: {
+                            r: {
+                                beginAtZero: true,
+                                max: 100,
+                                min: 0,
+                                ticks: {
+                                    stepSize: 20,
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                },
+                                pointLabels: {
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                updateStatus('✅ 雷達圖創建成功！', 'success');
+                console.log('雷達圖創建成功:', chart);
+                
+            } catch (error) {
+                updateStatus('❌ 雷達圖創建失敗: ' + error.message, 'error');
+                console.error('創建雷達圖時發生錯誤:', error);
+            }
+        }
+        
+        // 主要執行流程
+        async function initChart() {
+            try {
+                await loadChartJS();
+                createRadarChart();
+            } catch (error) {
+                updateStatus('初始化失敗: ' + error.message, 'error');
+            }
+        }
+        
+        // 頁面載入後開始
+        window.addEventListener('load', function() {
+            console.log('頁面載入完成，開始初始化雷達圖...');
+            initChart();
+        });
+    </script>
+</body>
+</html>

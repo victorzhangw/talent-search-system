@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}企業審核管理{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item active">企業審核</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-building-check me-2"></i>企業審核管理</h2>
+        <div class="badge bg-warning fs-6">
+            待審核：{{ pending_count }} 家企業
+        </div>
+    </div>
+
+    <!-- 待審核企業 -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-white">
+            <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>待審核企業</h5>
+        </div>
+        <div class="card-body">
+            {% if pending_enterprises %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>公司名稱</th>
+                                <th>統一編號</th>
+                                <th>聯絡人</th>
+                                <th>聯絡電話</th>
+                                <th>註冊時間</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in pending_enterprises %}
+                            <tr>
+                                <td>
+                                    <strong>{{ user.enterprise_profile.company_name }}</strong>
+                                </td>
+                                <td>{{ user.enterprise_profile.tax_id }}</td>
+                                <td>
+                                    {{ user.enterprise_profile.contact_person }}<br>
+                                    <small class="text-muted">{{ user.email }}</small>
+                                </td>
+                                <td>{{ user.enterprise_profile.contact_phone }}</td>
+                                <td>{{ user.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="{% url 'enterprise_detail' user.id %}" class="btn btn-info btn-sm">
+                                            <i class="bi bi-eye"></i> 詳細
+                                        </a>
+                                        <button type="button" class="btn btn-success btn-sm" 
+                                                onclick="approveEnterprise({{ user.id }}, '{{ user.enterprise_profile.company_name }}')">
+                                            <i class="bi bi-check-circle"></i> 核准
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm" 
+                                                onclick="showRejectModal({{ user.id }}, '{{ user.enterprise_profile.company_name }}')">
+                                            <i class="bi bi-x-circle"></i> 拒絕
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3">目前沒有待審核的企業</h5>
+                    <p class="text-muted">所有企業申請都已處理完成</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 已審核企業 -->
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="bi bi-check-square me-2"></i>已審核企業</h5>
+        </div>
+        <div class="card-body">
+            {% if reviewed_enterprises %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>公司名稱</th>
+                                <th>統一編號</th>
+                                <th>聯絡人</th>
+                                <th>審核狀態</th>
+                                <th>審核時間</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in reviewed_enterprises %}
+                            <tr>
+                                <td>{{ user.enterprise_profile.company_name }}</td>
+                                <td>{{ user.enterprise_profile.tax_id }}</td>
+                                <td>
+                                    {{ user.enterprise_profile.contact_person }}<br>
+                                    <small class="text-muted">{{ user.email }}</small>
+                                </td>
+                                <td>
+                                    {% if user.enterprise_profile.verification_status == 'approved' %}
+                                        <span class="badge bg-success">已核准</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">已拒絕</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.enterprise_profile.verified_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'enterprise_detail' user.id %}" class="btn btn-info btn-sm">
+                                        <i class="bi bi-eye"></i> 詳細
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted">尚無已審核的企業</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 拒絕理由 Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">拒絕企業申請</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="rejectForm" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p>您即將拒絕企業：<strong id="rejectCompanyName"></strong></p>
+                    <div class="mb-3">
+                        <label for="rejection_reason" class="form-label">拒絕理由</label>
+                        <textarea class="form-control" id="rejection_reason" name="rejection_reason" 
+                                  rows="3" placeholder="請輸入拒絕理由..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-danger">確認拒絕</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function approveEnterprise(userId, companyName) {
+    if (confirm(`確定要核准企業「${companyName}」嗎？`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/management/enterprise/${userId}/approve/`;
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function showRejectModal(userId, companyName) {
+    document.getElementById('rejectCompanyName').textContent = companyName;
+    document.getElementById('rejectForm').action = `/management/enterprise/${userId}/reject/`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('rejectModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

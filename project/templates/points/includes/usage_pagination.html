@@ -1,0 +1,29 @@
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="Usage pagination">
+    <ul class="pagination justify-content-center mb-0">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?project={{ filters.project }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&purchase_page={{ purchase_page_obj.number }}&usage_page={{ page_obj.previous_page_number }}&name={{ filters.name|default:'' }}&email={{ filters.email|default:'' }}">上一頁</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">上一頁</span></li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% else %}
+                <li class="page-item"><a class="page-link" href="?project={{ filters.project }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&purchase_page={{ purchase_page_obj.number }}&usage_page={{ num }}&name={{ filters.name|default:'' }}&email={{ filters.email|default:'' }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?project={{ filters.project }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&purchase_page={{ purchase_page_obj.number }}&usage_page={{ page_obj.next_page_number }}&name={{ filters.name|default:'' }}&email={{ filters.email|default:'' }}">下一頁</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">下一頁</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}

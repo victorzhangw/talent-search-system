@@ -1,0 +1,488 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}報價單管理{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">報價單</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">報價單列表</h5>
+                <div class="d-flex gap-2">
+                    <!-- 匯出按鈕 -->
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-download"></i> 匯出
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'export_quotes' %}?format=csv">CSV</a></li>
+                            <li><a class="dropdown-item" href="{% url 'export_quotes' %}?format=excel">Excel</a></li>
+                            <li><a class="dropdown-item" href="{% url 'export_quotes' %}?format=pdf">PDF</a></li>
+                        </ul>
+                    </div>
+                    
+                    <!-- 欄位顯示設定 -->
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-gear"></i> 欄位設定
+                        </button>
+                        <ul class="dropdown-menu column-toggle">
+                            {% for column in columns %}
+                            <li>
+                                <label class="dropdown-item">
+                                    <input type="checkbox" checked data-column="{{ column.key }}"> {{ column.title }}
+                                </label>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- 新增按鈕 -->
+                    {% if can_add %}
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addQuoteModal">
+                        <i class="bi bi-plus"></i> 新增
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 篩選區 -->
+            {% if filters %}
+            <div class="card-body border-bottom">
+                <form id="filterForm" class="row g-3">
+                    {% for filter in filters %}
+                    <div class="col-md-3">
+                        <label class="form-label">{{ filter.label }}</label>
+                        {% if filter.type == 'select' %}
+                        <select class="form-select" name="{{ filter.name }}">
+                            <option value="">全部</option>
+                            {% for option in filter.options %}
+                            <option value="{{ option.value }}">{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% elif filter.type == 'date' %}
+                        <input type="date" class="form-control" name="{{ filter.name }}">
+                        {% else %}
+                        <input type="text" class="form-control" name="{{ filter.name }}" placeholder="搜尋...">
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search me-1"></i> 搜尋
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">重置</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+            <!-- 表格區 -->
+            <div class="table-responsive">
+                <table class="table table-hover" id="quoteTable">
+                    <thead>
+                        <tr>
+                            <th>
+                                <input type="checkbox" id="selectAll" class="form-check-input">
+                            </th>
+                            {% for column in columns %}
+                            <th data-column="{{ column.key }}" {% if column.sortable %}class="sortable"{% endif %}>
+                                {{ column.title }}
+                                {% if column.sortable %}
+                                <i class="bi bi-arrow-down-up"></i>
+                                {% endif %}
+                            </th>
+                            {% endfor %}
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for quote in quotes %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input quote-checkbox" value="{{ quote.id }}">
+                            </td>
+                            {% for column in columns %}
+                            <td data-column="{{ column.key }}">{{ quote|get_item:column.key }}</td>
+                            {% endfor %}
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-info view-quote" data-id="{{ quote.id }}">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    {% if can_edit %}
+                                    <button class="btn btn-sm btn-warning edit-quote" data-id="{{ quote.id }}">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% if can_delete %}
+                                    <button class="btn btn-sm btn-danger delete-quote" data-id="{{ quote.id }}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ columns|length|add:2 }}" class="text-center py-4">
+                                <div class="text-muted">
+                                    <i class="bi bi-file-text mb-3" style="font-size: 2rem;"></i>
+                                    <p>暫無報價單數據</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分頁區 -->
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <div>
+                    顯示 {{ page_start }} 至 {{ page_end }} 筆，共 {{ total_items }} 筆
+                </div>
+                <nav>
+                    <ul class="pagination mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">上一頁</span>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_range %}
+                            {% if num == page_obj.number %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">下一頁</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 查看報價單模態框 -->
+<div class="modal fade" id="viewQuoteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">報價單詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- 將由JavaScript動態填充 -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">載入中...</span>
+                    </div>
+                    <p class="mt-2">載入報價單詳情...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增報價單模態框 -->
+<div class="modal fade" id="addQuoteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">新增報價單</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addQuoteForm">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">客戶名稱</label>
+                            <input type="text" class="form-control" name="customer" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">報價日期</label>
+                            <input type="date" class="form-control" name="date" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">報價金額</label>
+                            <input type="number" class="form-control" name="amount" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">狀態</label>
+                            <select class="form-select" name="status" required>
+                                <option value="draft">草稿</option>
+                                <option value="submitted">已提交</option>
+                                <option value="approved">已核准</option>
+                                <option value="rejected">已拒絕</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="saveQuoteBtn">儲存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 編輯報價單模態框 -->
+<div class="modal fade" id="editQuoteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">編輯報價單</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editQuoteForm">
+                    <input type="hidden" name="quote_id" id="edit_quote_id">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">客戶名稱</label>
+                            <input type="text" class="form-control" name="customer" id="edit_customer" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">報價日期</label>
+                            <input type="date" class="form-control" name="date" id="edit_date" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">報價金額</label>
+                            <input type="number" class="form-control" name="amount" id="edit_amount" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">狀態</label>
+                            <select class="form-select" name="status" id="edit_status" required>
+                                <option value="draft">草稿</option>
+                                <option value="submitted">已提交</option>
+                                <option value="approved">已核准</option>
+                                <option value="rejected">已拒絕</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="updateQuoteBtn">更新</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除確認模態框 -->
+<div class="modal fade" id="deleteQuoteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">確認刪除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要刪除此報價單嗎？此操作無法復原。</p>
+                <input type="hidden" id="delete_quote_id">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">確認刪除</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 欄位顯示切換
+        document.querySelectorAll('.column-toggle input').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const column = this.dataset.column;
+                const isVisible = this.checked;
+                
+                document.querySelectorAll(`[data-column="${column}"]`).forEach(cell => {
+                    cell.style.display = isVisible ? '' : 'none';
+                });
+            });
+        });
+        
+        // 全選/取消全選
+        const selectAll = document.getElementById('selectAll');
+        if (selectAll) {
+            selectAll.addEventListener('change', function() {
+                document.querySelectorAll('.quote-checkbox').forEach(checkbox => {
+                    checkbox.checked = this.checked;
+                });
+            });
+        }
+        
+        // 查看報價單
+        document.querySelectorAll('.view-quote').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const quoteId = this.dataset.id;
+                const modal = new bootstrap.Modal(document.getElementById('viewQuoteModal'));
+                modal.show();
+                
+                // 實際應用中，這裡應該發送AJAX請求獲取報價單詳情
+                // 現在只是模擬
+                setTimeout(() => {
+                    const modalBody = document.querySelector('#viewQuoteModal .modal-body');
+                    // 找到對應的報價單數據
+                    const quoteRow = this.closest('tr');
+                    const customer = quoteRow.querySelector('[data-column="customer"]').textContent;
+                    const date = quoteRow.querySelector('[data-column="date"]').textContent;
+                    const amount = quoteRow.querySelector('[data-column="amount"]').textContent;
+                    const status = quoteRow.querySelector('[data-column="status"]').textContent;
+                    
+                    // 更新模態框內容
+                    modalBody.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>報價單編號:</strong> ${quoteId}</p>
+                                <p><strong>客戶名稱:</strong> ${customer}</p>
+                                <p><strong>報價日期:</strong> ${date}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>報價金額:</strong> ${amount}</p>
+                                <p><strong>狀態:</strong> <span class="badge bg-primary">${status}</span></p>
+                            </div>
+                        </div>
+                        <hr>
+                        <h6>報價內容</h6>
+                        <p>這裡顯示報價單詳細內容...</p>
+                    `;
+                }, 500);
+            });
+        });
+        
+        // 編輯報價單
+        document.querySelectorAll('.edit-quote').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const quoteId = this.dataset.id;
+                const quoteRow = this.closest('tr');
+                const customer = quoteRow.querySelector('[data-column="customer"]').textContent;
+                const date = quoteRow.querySelector('[data-column="date"]').textContent;
+                const amount = quoteRow.querySelector('[data-column="amount"]').textContent;
+                const status = quoteRow.querySelector('[data-column="status"]').textContent;
+                
+                // 填充表單
+                document.getElementById('edit_quote_id').value = quoteId;
+                document.getElementById('edit_customer').value = customer;
+                document.getElementById('edit_date').value = date;
+                document.getElementById('edit_amount').value = amount.replace(/[^0-9]/g, '');
+                
+                // 設置狀態下拉框
+                const statusSelect = document.getElementById('edit_status');
+                for (let i = 0; i < statusSelect.options.length; i++) {
+                    if (statusSelect.options[i].text === status) {
+                        statusSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+                
+                // 顯示模態框
+                const modal = new bootstrap.Modal(document.getElementById('editQuoteModal'));
+                modal.show();
+            });
+        });
+        
+        // 更新報價單
+        document.getElementById('updateQuoteBtn').addEventListener('click', function() {
+            // 實際應用中，這裡應該發送AJAX請求更新報價單
+            // 現在只是模擬
+            showToast('報價單已更新', 'success');
+            
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editQuoteModal'));
+            modal.hide();
+            
+            // 實際應用中應該重新載入數據
+        });
+        
+        // 刪除報價單
+        document.querySelectorAll('.delete-quote').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const quoteId = this.dataset.id;
+                document.getElementById('delete_quote_id').value = quoteId;
+                
+                // 顯示確認模態框
+                const modal = new bootstrap.Modal(document.getElementById('deleteQuoteModal'));
+                modal.show();
+            });
+        });
+        
+        // 確認刪除報價單
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+            const quoteId = document.getElementById('delete_quote_id').value;
+            
+            // 實際應用中，這裡應該發送AJAX請求刪除報價單
+            // 現在只是模擬
+            showToast('報價單已刪除', 'success');
+            
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteQuoteModal'));
+            modal.hide();
+            
+            // 實際應用中應該重新載入數據
+        });
+        
+        // 新增報價單
+        document.getElementById('saveQuoteBtn').addEventListener('click', function() {
+            // 實際應用中，這裡應該發送AJAX請求新增報價單
+            // 現在只是模擬
+            showToast('新報價單已建立', 'success');
+            
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addQuoteModal'));
+            modal.hide();
+            
+            // 實際應用中應該重新載入數據
+        });
+        
+        // 篩選表單提交
+        const filterForm = document.getElementById('filterForm');
+        if (filterForm) {
+            filterForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // 實際應用中，這裡應該發送請求過濾數據
+                // 現在只是模擬
+                showToast('篩選條件已應用', 'info');
+            });
+        }
+    });
+</script>
+{% endblock %}

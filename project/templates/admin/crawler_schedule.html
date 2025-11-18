@@ -1,0 +1,459 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}排程管理{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'crawler_dashboard' %}">爬蟲管理</a></li>
+<li class="breadcrumb-item active">排程管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="crawler-schedule">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>📅 排程管理</h1>
+        <div>
+            <button type="button" class="btn btn-primary me-2" onclick="showCreateModal()">
+                ➕ 新增排程
+            </button>
+            <a href="{% url 'crawler_dashboard' %}" class="btn btn-outline-secondary">
+                ⬅️ 返回儀表板
+            </a>
+        </div>
+    </div>
+    
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">📊 總排程任務</h5>
+                    <h2 class="text-primary">{{ total_tasks }}</h2>
+                    <p class="card-text">已設定的排程任務</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">✅ 啟用中</h5>
+                    <h2 class="text-success">{{ enabled_tasks }}</h2>
+                    <p class="card-text">正在運行的任務</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">⏸️ 已停用</h5>
+                    <h2 class="text-warning">{{ disabled_tasks }}</h2>
+                    <p class="card-text">暫停的任務</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 排程任務列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">🕒 排程任務列表</h5>
+        </div>
+        <div class="card-body">
+            {% if crawler_tasks %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>任務名稱</th>
+                            <th>任務類型</th>
+                            <th>排程設定</th>
+                            <th>狀態</th>
+                            <th>最後執行</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in crawler_tasks %}
+                        <tr>
+                            <td>
+                                <strong>{{ task.name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ task.description|default:"" }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">
+                                    {% if 'crawl_all_pending' in task.task %}
+                                        🕷️ 批量爬取
+                                    {% elif 'cleanup' in task.task %}
+                                        🧹 日誌清理
+                                    {% else %}
+                                        📋 其他任務
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if task.crontab %}
+                                    <div class="schedule-info">
+                                        <code>
+                                            {{ task.crontab.minute }} {{ task.crontab.hour }} 
+                                            {{ task.crontab.day_of_month }} {{ task.crontab.month_of_year }} 
+                                            {{ task.crontab.day_of_week }}
+                                        </code>
+                                        <br>
+                                        <small class="text-muted">
+                                            {% if task.crontab.minute == "0" and task.crontab.hour == "*/2" %}
+                                                每2小時執行
+                                            {% elif task.crontab.minute == "30" and task.crontab.hour == "2" %}
+                                                每日凌晨2:30
+                                            {% else %}
+                                                自定義排程
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">無排程</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if task.enabled %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {% if task.enabled %}
+                                        ✅ 啟用中
+                                    {% else %}
+                                        ⏸️ 已停用
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if task.last_run_at %}
+                                    {{ task.last_run_at|date:"Y-m-d H:i" }}
+                                    <br>
+                                    <small class="text-muted">
+                                        {% if task.total_run_count %}
+                                            執行 {{ task.total_run_count }} 次
+                                        {% endif %}
+                                    </small>
+                                {% else %}
+                                    <span class="text-muted">從未執行</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" 
+                                            class="btn btn-outline-{% if task.enabled %}warning{% else %}success{% endif %}"
+                                            onclick="toggleTask({{ task.id }}, {{ task.enabled|yesno:'true,false' }})">
+                                        {% if task.enabled %}
+                                            ⏸️ 停用
+                                        {% else %}
+                                            ▶️ 啟用
+                                        {% endif %}
+                                    </button>
+                                    <button type="button" 
+                                            class="btn btn-outline-primary"
+                                            onclick="editSchedule({{ task.id }}, '{{ task.name }}', '{{ task.crontab.minute|default:"*" }}', '{{ task.crontab.hour|default:"*" }}', '{{ task.crontab.day_of_month|default:"*" }}', '{{ task.crontab.month_of_year|default:"*" }}', '{{ task.crontab.day_of_week|default:"*" }}')">
+                                        ⚙️ 編輯
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="mb-3">
+                    <i class="bi bi-calendar-x" style="font-size: 3rem; color: #6c757d;"></i>
+                </div>
+                <h4 class="text-muted">暫無排程任務</h4>
+                <p class="text-muted">請先設定 Celery Beat 排程任務。</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 新增排程 Modal -->
+<div class="modal fade" id="createScheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">新增排程任務</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createScheduleForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_schedule">
+                    
+                    <div class="mb-3">
+                        <label for="newTaskName" class="form-label">任務名稱</label>
+                        <input type="text" class="form-control" id="newTaskName" name="task_name" required>
+                        <div class="form-text">例如：每日備份任務</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="taskType" class="form-label">任務類型</label>
+                        <select class="form-select" id="taskType" name="task_type" required>
+                            <option value="">請選擇任務類型</option>
+                            <option value="core.tasks.crawl_all_pending_results">🕷️ 批量爬取測驗結果</option>
+                            <option value="core.tasks.cleanup_old_crawl_logs">🧹 清理舊日誌</option>
+                            <option value="core.tasks.manual_crawl">📋 手動爬取</option>
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="newMinute" class="form-label">分鐘 (0-59)</label>
+                                <input type="text" class="form-control" id="newMinute" name="minute" placeholder="*" required>
+                                <div class="form-text">* 表示任意值</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="newHour" class="form-label">小時 (0-23)</label>
+                                <input type="text" class="form-control" id="newHour" name="hour" placeholder="*" required>
+                                <div class="form-text">*/2 表示每2小時</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="newDayOfMonth" class="form-label">日期 (1-31)</label>
+                                <input type="text" class="form-control" id="newDayOfMonth" name="day_of_month" placeholder="*" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="newMonthOfYear" class="form-label">月份 (1-12)</label>
+                                <input type="text" class="form-control" id="newMonthOfYear" name="month_of_year" placeholder="*" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="newDayOfWeek" class="form-label">星期 (0-6, 0=星期日)</label>
+                        <input type="text" class="form-control" id="newDayOfWeek" name="day_of_week" placeholder="*" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="taskDescription" class="form-label">任務描述 (可選)</label>
+                        <textarea class="form-control" id="taskDescription" name="description" rows="2" placeholder="描述這個任務的用途..."></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>常用設定範例：</strong>
+                        <ul class="mb-0">
+                            <li><code>0 */2 * * *</code> - 每2小時執行一次</li>
+                            <li><code>30 2 * * *</code> - 每日凌晨2:30執行</li>
+                            <li><code>0 9 * * 1-5</code> - 週一到週五早上9點執行</li>
+                            <li><code>0 0 1 * *</code> - 每月1號午夜執行</li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="createSchedule()">建立排程</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 編輯排程 Modal -->
+<div class="modal fade" id="editScheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">編輯排程設定</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="taskId" name="task_id">
+                    <input type="hidden" name="action" value="update_schedule">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">任務名稱</label>
+                        <input type="text" class="form-control" id="taskName" readonly>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="minute" class="form-label">分鐘 (0-59)</label>
+                                <input type="text" class="form-control" id="minute" name="minute" placeholder="*">
+                                <div class="form-text">* 表示任意值</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hour" class="form-label">小時 (0-23)</label>
+                                <input type="text" class="form-control" id="hour" name="hour" placeholder="*">
+                                <div class="form-text">*/2 表示每2小時</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="day_of_month" class="form-label">日期 (1-31)</label>
+                                <input type="text" class="form-control" id="day_of_month" name="day_of_month" placeholder="*">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="month_of_year" class="form-label">月份 (1-12)</label>
+                                <input type="text" class="form-control" id="month_of_year" name="month_of_year" placeholder="*">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="day_of_week" class="form-label">星期 (0-6, 0=星期日)</label>
+                        <input type="text" class="form-control" id="day_of_week" name="day_of_week" placeholder="*">
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>常用設定範例：</strong>
+                        <ul class="mb-0">
+                            <li><code>0 */2 * * *</code> - 每2小時執行一次</li>
+                            <li><code>30 2 * * *</code> - 每日凌晨2:30執行</li>
+                            <li><code>0 9 * * 1-5</code> - 週一到週五早上9點執行</li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveSchedule()">儲存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTask(taskId, currentEnabled) {
+    const action = currentEnabled ? '停用' : '啟用';
+    
+    if (confirm(`確定要${action}此任務嗎？`)) {
+        fetch('{% url "crawler_schedule" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=toggle&task_id=${taskId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('操作失敗：' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('發生錯誤：' + error);
+        });
+    }
+}
+
+function editSchedule(taskId, taskName, minute, hour, dayOfMonth, monthOfYear, dayOfWeek) {
+    document.getElementById('taskId').value = taskId;
+    document.getElementById('taskName').value = taskName;
+    document.getElementById('minute').value = minute === '*' ? '' : minute;
+    document.getElementById('hour').value = hour === '*' ? '' : hour;
+    document.getElementById('day_of_month').value = dayOfMonth === '*' ? '' : dayOfMonth;
+    document.getElementById('month_of_year').value = monthOfYear === '*' ? '' : monthOfYear;
+    document.getElementById('day_of_week').value = dayOfWeek === '*' ? '' : dayOfWeek;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editScheduleModal'));
+    modal.show();
+}
+
+function showCreateModal() {
+    // 清空表單
+    document.getElementById('createScheduleForm').reset();
+    
+    const modal = new bootstrap.Modal(document.getElementById('createScheduleModal'));
+    modal.show();
+}
+
+function createSchedule() {
+    const form = document.getElementById('createScheduleForm');
+    const formData = new FormData(form);
+    
+    // 驗證必填欄位
+    const requiredFields = ['task_name', 'task_type', 'minute', 'hour', 'day_of_month', 'month_of_year', 'day_of_week'];
+    let isValid = true;
+    
+    for (let field of requiredFields) {
+        const value = formData.get(field);
+        if (!value || value.trim() === '') {
+            isValid = false;
+            break;
+        }
+    }
+    
+    if (!isValid) {
+        alert('請填寫所有必填欄位！');
+        return;
+    }
+    
+    fetch('{% url "crawler_schedule" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('建立失敗：' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('發生錯誤：' + error);
+    });
+}
+
+function saveSchedule() {
+    const form = document.getElementById('scheduleForm');
+    const formData = new FormData(form);
+    
+    fetch('{% url "crawler_schedule" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('儲存失敗：' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('發生錯誤：' + error);
+    });
+}
+</script>
+{% endblock %}

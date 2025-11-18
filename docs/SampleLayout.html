@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI人才搜索系統</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Microsoft JhengHei", sans-serif;
+        background: #f5f5f5;
+      }
+
+      .container {
+        display: flex;
+        height: 100vh;
+      }
+
+      /* 左側對話區 */
+      .chat-section {
+        flex: 1;
+        background: #e8f0eb;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        background: white;
+        padding: 20px 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      .logo-area {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .logo {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .title-area h1 {
+        font-size: 24px;
+        color: #2c3e36;
+        margin-bottom: 4px;
+      }
+
+      .title-area p {
+        font-size: 13px;
+        color: #6b7b74;
+      }
+
+      .connect-btn {
+        padding: 10px 24px;
+        background: white;
+        border: 1.5px solid #d0e0d5;
+        border-radius: 8px;
+        color: #5fa897;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .connect-btn:hover {
+        background: #f0f7f3;
+        border-color: #5fa897;
+      }
+
+      /* 對話內容區 */
+      .chat-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 30px;
+      }
+
+      .message {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 12px;
+      }
+
+      .avatar {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #c8e6d8, #a8d4c3);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .user-avatar {
+        background: linear-gradient(135deg, #89c4ad, #6fa894);
+      }
+
+      .message-content {
+        background: white;
+        padding: 16px 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        max-width: 600px;
+        line-height: 1.6;
+        color: #2c3e36;
+      }
+
+      .user-message {
+        flex-direction: row-reverse;
+      }
+
+      .user-message .message-content {
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+      }
+
+      .highlight {
+        font-weight: 600;
+        color: #5fa897;
+      }
+
+      .user-message .highlight {
+        color: #e8f8f2;
+      }
+
+      /* 輸入區 */
+      .input-area {
+        padding: 20px 30px;
+        background: white;
+        border-top: 2px solid #e0ebe5;
+      }
+
+      .input-wrapper {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .input-box {
+        flex: 1;
+        padding: 14px 20px;
+        border: 1.5px solid #d0e0d5;
+        border-radius: 10px;
+        font-size: 14px;
+        transition: all 0.2s;
+      }
+
+      .input-box:focus {
+        outline: none;
+        border-color: #6fa894;
+        box-shadow: 0 0 0 3px rgba(111, 168, 148, 0.1);
+      }
+
+      .send-btn {
+        padding: 14px 28px;
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        border: none;
+        border-radius: 10px;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .send-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(111, 168, 148, 0.3);
+      }
+
+      .suggestions {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+
+      .suggestion-chip {
+        padding: 8px 16px;
+        background: #f0f7f3;
+        border: 1px solid #d0e0d5;
+        border-radius: 20px;
+        font-size: 13px;
+        color: #5fa897;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .suggestion-chip:hover {
+        background: #e8f0eb;
+        border-color: #6fa894;
+      }
+
+      /* 右側結果區 */
+      .results-section {
+        width: 480px;
+        background: #fafafa;
+        border-left: 2px solid #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -2px 0 8px rgba(0, 0, 0, 0.03);
+      }
+
+      .results-header {
+        padding: 30px;
+        background: white;
+        border-bottom: 2px solid #e8e8e8;
+      }
+
+      .results-header h2 {
+        font-size: 20px;
+        color: #2c3e36;
+        margin-bottom: 8px;
+      }
+
+      .results-count {
+        font-size: 14px;
+        color: #777;
+      }
+
+      .filter-info {
+        margin-top: 16px;
+        padding: 12px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #666;
+      }
+
+      .generate-btn {
+        margin-top: 16px;
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .generate-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(111, 168, 148, 0.3);
+      }
+
+      /* 候選人列表 */
+      .candidates-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+      }
+
+      .candidate-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e8e8e8;
+        transition: all 0.2s;
+        position: relative;
+      }
+
+      .candidate-card:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .candidate-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .candidate-avatar {
+        width: 56px;
+        height: 56px;
+        background: linear-gradient(135deg, #89c4ad, #6fa894);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      .candidate-info h3 {
+        font-size: 18px;
+        color: #2c3e36;
+        margin-bottom: 4px;
+      }
+
+      .candidate-email {
+        font-size: 13px;
+        color: #777;
+      }
+
+      .checkbox {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        width: 22px;
+        height: 22px;
+        border: 2px solid #d0d0d0;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #e8e8e8;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6fa894, #89c4ad);
+        border-radius: 4px;
+        transition: width 0.3s;
+      }
+
+      .match-score {
+        text-align: right;
+        font-size: 20px;
+        font-weight: 600;
+        color: #6fa894;
+        margin-bottom: 12px;
+      }
+
+      .traits {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+        background: #f8fafb;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #555;
+        line-height: 1.5;
+        margin-bottom: 12px;
+      }
+
+      .traits-icon {
+        color: #6fa894;
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+
+      .ai-analyze-btn {
+        width: 100%;
+        padding: 10px;
+        background: white;
+        border: 1.5px solid #6fa894;
+        border-radius: 8px;
+        color: #6fa894;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .ai-analyze-btn:hover {
+        background: #f0f7f3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- 左側對話區 -->
+      <div class="chat-section">
+        <div class="header">
+          <div class="logo-area">
+            <div class="logo">AI</div>
+            <div class="title-area">
+              <h1>AI人才搜索系統</h1>
+              <p>智能人才匹配與分析平台</p>
+            </div>
+          </div>
+          <button class="connect-btn">連接失敗</button>
+        </div>
+
+        <div class="chat-content">
+          <div class="message user-message">
+            <div class="user-avatar">👤</div>
+            <div class="message-content">有創造力的設計師</div>
+          </div>
+
+          <div class="message">
+            <div class="avatar">🤖</div>
+            <div class="message-content">
+              抱歉，搜索時發生錯誤，請確認 API 服務是否正在運行。
+            </div>
+          </div>
+
+          <div class="message user-message">
+            <div class="user-avatar">👤</div>
+            <div class="message-content">找出有意思的人</div>
+          </div>
+
+          <div class="message">
+            <div class="avatar">🤖</div>
+            <div class="message-content">
+              您正在尋找：創造性思考, 好奇心, 生活熱情 優秀的人才，找到
+              <span class="highlight">16 位</span>符合條件的候選人。。找到
+              <span class="highlight">16 位</span>候選人，以下是最匹配的結果。
+            </div>
+          </div>
+
+          <div class="message user-message">
+            <div class="user-avatar">👤</div>
+            <div class="message-content">從這16人 再篩選出聰明點的</div>
+          </div>
+
+          <div class="message">
+            <div class="avatar">🤖</div>
+            <div class="message-content">
+              您正在尋找：分析性思考, 認知彈性, 批判性思考 優秀的人才，找到
+              <span class="highlight">12 位</span>符合條件的候選人。。找到
+              <span class="highlight">12 位</span>候選人，以下是最匹配的結果。
+            </div>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div class="input-wrapper">
+            <input
+              type="text"
+              class="input-box"
+              placeholder="描述您需要的人才特質或直接提問..."
+            />
+            <button class="send-btn">發送</button>
+          </div>
+          <div class="suggestions">
+            <div class="suggestion-chip">已連接 3 個特質查行動能配</div>
+            <div class="suggestion-chip">喜歡更具體的描述</div>
+            <div class="suggestion-chip">查看候選人詳細資料</div>
+            <div class="suggestion-chip">為候選人準備面試問題</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右側結果區 -->
+      <div class="results-section">
+        <div class="results-header">
+          <h2>搜索結果</h2>
+          <div class="results-count">找到 12 位候選人</div>
+          <div class="filter-info">已選擇 0 位候選人</div>
+          <button class="generate-btn">生成面試問題</button>
+        </div>
+
+        <div class="candidates-list">
+          <div class="candidate-card">
+            <div class="checkbox"></div>
+            <div class="candidate-header">
+              <div class="candidate-avatar">EV</div>
+              <div class="candidate-info">
+                <h3>Evagelion</h3>
+                <div class="candidate-email">evah28622862@gmail.com</div>
+              </div>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 86%"></div>
+            </div>
+            <div class="match-score">86%</div>
+            <div class="traits">
+              <span class="traits-icon">💡</span>
+              <span
+                >匹配特質：分析性思考(84分), 認知彈性(68分),
+                批判性思考(67分)</span
+              >
+            </div>
+            <button class="ai-analyze-btn">
+              <span>🤖</span>
+              <span>生成 AI 分析</span>
+            </button>
+          </div>
+
+          <div class="candidate-card">
+            <div class="checkbox"></div>
+            <div class="candidate-header">
+              <div class="candidate-avatar">歐博</div>
+              <div class="candidate-info">
+                <h3>歐博宏</h3>
+                <div class="candidate-email">obo.ou@dejia.com.tw</div>
+              </div>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 86%"></div>
+            </div>
+            <div class="match-score">86%</div>
+            <div class="traits">
+              <span class="traits-icon">💡</span>
+              <span
+                >匹配特質：分析性思考(84分), 認知彈性(66分),
+                批判性思考(71分)</span
+              >
+            </div>
+            <button class="ai-analyze-btn">
+              <span>🤖</span>
+              <span>生成 AI 分析</span>
+            </button>
+          </div>
+
+          <div class="candidate-card">
+            <div class="checkbox"></div>
+            <div class="candidate-header">
+              <div class="candidate-avatar">JC</div>
+              <div class="candidate-info">
+                <h3>James Chen</h3>
+                <div class="candidate-email">james.chen@example.com</div>
+              </div>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 82%"></div>
+            </div>
+            <div class="match-score">82%</div>
+            <div class="traits">
+              <span class="traits-icon">💡</span>
+              <span
+                >匹配特質：分析性思考(79分), 認知彈性(72分),
+                批判性思考(75分)</span
+              >
+            </div>
+            <button class="ai-analyze-btn">
+              <span>🤖</span>
+              <span>生成 AI 分析</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

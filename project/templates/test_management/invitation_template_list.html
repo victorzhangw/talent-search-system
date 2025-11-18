@@ -1,0 +1,443 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}邀請管理 - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .template-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .template-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .template-card .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 12px 16px;
+    }
+    
+    .template-card .btn-group-sm .btn {
+        padding: 4px 8px;
+        font-size: 0.875rem;
+        border-radius: 3px;
+    }
+    
+    .template-card .btn-group-sm .btn:focus {
+        box-shadow: 0 0 0 0.1rem rgba(0, 123, 255, 0.25);
+    }
+    
+    .template-card .btn-group-sm .btn i {
+        font-size: 0.875rem;
+    }
+    
+    .template-stats {
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        padding: 8px;
+    }
+    
+    .template-stats .col-4 {
+        border-right: 1px solid #dee2e6;
+    }
+    
+    .template-stats .col-4:last-child {
+        border-right: none;
+    }
+    
+    .template-card .card-footer {
+        background-color: #fff;
+        border-top: 1px solid #dee2e6;
+        padding: 10px 16px;
+    }
+    
+    .template-card .btn-group .btn {
+        font-size: 0.875rem;
+        padding: 4px 8px;
+    }
+    
+    @media (max-width: 767.98px) {
+        .template-card .card-header {
+            padding: 10px 12px;
+        }
+        
+        .template-card .btn-group-sm .btn {
+            padding: 3px 6px;
+            font-size: 0.8rem;
+        }
+        
+        .template-card .btn-group-sm .btn i {
+            font-size: 0.8rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+<li class="breadcrumb-item active">邀請管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-envelope-paper me-2"></i>邀請管理</h2>
+        <div class="btn-group">
+            <a href="{% url 'invitation_template_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i>建立新模板
+            </a>
+            <form method="post" action="{% url 'create_default_templates' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-stars me-1"></i>建立預設模板
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <i class="bi bi-envelope-paper text-primary fs-2"></i>
+                    <h3 class="mt-2 mb-0">{{ stats.total_templates }}</h3>
+                    <small class="text-muted">總模板數</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <i class="bi bi-star-fill text-success fs-2"></i>
+                    <h5 class="mt-2 mb-0">
+                        {% if stats.default_template %}
+                            {{ stats.default_template.name }}
+                        {% else %}
+                            未設定
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">預設模板</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <i class="bi bi-graph-up text-info fs-2"></i>
+                    <h5 class="mt-2 mb-0">
+                        {% if stats.most_used %}
+                            {{ stats.most_used.name }}
+                        {% else %}
+                            無使用記錄
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">最常使用</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模板列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                邀請模板列表
+                <small class="text-muted">（共 {{ page_obj.paginator.count }} 個）</small>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if page_obj.object_list %}
+                <div class="row">
+                    {% for template in page_obj.object_list %}
+                    <div class="col-xl-4 col-lg-6 mb-3">
+                        <div class="card template-card h-100 {% if template.is_default %}border-success{% endif %}">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="flex-grow-1 me-2">
+                                    <h6 class="mb-0">
+                                        {{ template.name }}
+                                        {% if template.is_default %}
+                                            <span class="badge bg-success ms-2">預設</span>
+                                        {% endif %}
+                                    </h6>
+                                    <small class="text-muted">{{ template.get_template_type_display }}</small>
+                                </div>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'invitation_template_detail' template.id %}" 
+                                       class="btn btn-outline-primary" 
+                                       title="查看詳情">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'invitation_template_edit' template.id %}" 
+                                       class="btn btn-outline-secondary" 
+                                       title="編輯模板">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button class="btn btn-outline-info" 
+                                            onclick="copyTemplate({{ template.id }}, '{{ template.name }}')"
+                                            title="複製模板">
+                                        <i class="bi bi-copy"></i>
+                                    </button>
+                                    {% if not template.is_default %}
+                                    <button class="btn btn-outline-warning" 
+                                            onclick="setDefaultTemplate({{ template.id }}, '{{ template.name }}')"
+                                            title="設為預設">
+                                        <i class="bi bi-star"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" 
+                                            onclick="deleteTemplate({{ template.id }}, '{{ template.name }}')"
+                                            title="刪除模板">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <strong>主旨：</strong>
+                                    <div class="text-muted small">{{ template.subject_template|truncatechars:50 }}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong>內容：</strong>
+                                    <div class="text-muted small">{{ template.message_template|truncatechars:100 }}</div>
+                                </div>
+                                <div class="row text-center template-stats">
+                                    <div class="col-4">
+                                        <small class="text-muted">使用次數</small>
+                                        <div class="fw-bold">{{ template.usage_count }}</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted">建立時間</small>
+                                        <div class="fw-bold">{{ template.created_at|date:"m/d" }}</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted">最後使用</small>
+                                        <div class="fw-bold">
+                                            {% if template.last_used_at %}
+                                                {{ template.last_used_at|date:"m/d" }}
+                                            {% else %}
+                                                未使用
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <div class="btn-group w-100">
+                                    <a href="{% url 'invitation_template_detail' template.id %}" 
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-eye me-1"></i>查看
+                                    </a>
+                                    <a href="{% url 'invitation_template_edit' template.id %}" 
+                                       class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-pencil me-1"></i>編輯
+                                    </a>
+                                    <button class="btn btn-outline-info btn-sm" 
+                                            onclick="previewTemplate({{ template.id }})">
+                                        <i class="bi bi-eye-fill me-1"></i>預覽
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="分頁導航" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-envelope-paper text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3 text-muted">暫無邀請模板</h5>
+                    <p class="text-muted">建立您的第一個邀請模板，讓邀請訊息更專業</p>
+                    <div class="btn-group">
+                        <a href="{% url 'invitation_template_create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-1"></i>建立新模板
+                        </a>
+                        <form method="post" action="{% url 'create_default_templates' %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="bi bi-stars me-1"></i>使用預設模板
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 預覽模態框 -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">模板預覽</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">郵件主旨：</label>
+                    <div class="border rounded p-2 bg-light" id="previewSubject"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">郵件內容：</label>
+                    <div class="border rounded p-3 bg-light" id="previewMessage" style="white-space: pre-line;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 刪除模板
+function deleteTemplate(templateId, templateName) {
+    if (confirm(`確定要刪除模板「${templateName}」嗎？\n\n此操作無法復原。`)) {
+        fetch(`/enterprise/templates/${templateId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showAlert('danger', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '刪除失敗，請稍後再試');
+        });
+    }
+}
+
+// 設為預設模板
+function setDefaultTemplate(templateId, templateName) {
+    if (confirm(`確定要將「${templateName}」設為預設模板嗎？`)) {
+        fetch(`/enterprise/templates/${templateId}/set-default/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showAlert('danger', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '設定失敗，請稍後再試');
+        });
+    }
+}
+
+// 複製模板
+function copyTemplate(templateId, templateName) {
+    if (confirm(`確定要複製模板「${templateName}」嗎？`)) {
+        fetch(`/enterprise/templates/${templateId}/copy/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '複製失敗，請稍後再試');
+        });
+    }
+}
+
+// 預覽模板
+function previewTemplate(templateId) {
+    fetch(`/enterprise/templates/${templateId}/preview/`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('previewSubject').textContent = data.subject;
+            document.getElementById('previewMessage').textContent = data.message;
+            
+            const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+            modal.show();
+        } else {
+            showAlert('danger', '預覽失敗，請稍後再試');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', '預覽失敗，請稍後再試');
+    });
+}
+
+// 顯示提示訊息
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

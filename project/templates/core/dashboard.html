@@ -1,0 +1,604 @@
+{# templates/core/dashboard.html #}
+{% extends 'base.html' %}
+
+{% block title %}儀表板{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">儀表板</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-left: 4px solid;
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    .stat-card .stat-icon {
+        opacity: 0.25;
+        font-size: 2rem;
+    }
+    .stat-progress {
+        height: 0.25rem;
+        margin-top: 0.5rem;
+    }
+    .activity-timeline {
+        position: relative;
+    }
+    .activity-timeline::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 15px;
+        width: 2px;
+        background-color: #e9ecef;
+    }
+    .activity-item {
+        position: relative;
+        padding-left: 40px;
+        margin-bottom: 1rem;
+    }
+    .activity-icon {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 1;
+    }
+    .dashboard-chart {
+        min-height: 300px;
+    }
+    .user-welcome {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        color: white;
+        border-radius: 0.5rem;
+    }
+    .stat-card-primary {
+        border-left-color: #4e73df;
+    }
+    .stat-card-success {
+        border-left-color: #1cc88a;
+    }
+    .stat-card-info {
+        border-left-color: #36b9cc;
+    }
+    .stat-card-warning {
+        border-left-color: #f6c23e;
+    }
+    .stat-card-danger {
+        border-left-color: #e74a3b;
+    }
+    .stat-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #5a5c69;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #3a3b45;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 歡迎橫幅 -->
+<div class="user-welcome p-4 mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <h4 class="mb-1">歡迎回來, 管理員</h4>
+            <p class="mb-0 opacity-75">{{ date_info.year }}年{{ date_info.month }}月{{ date_info.day }}日 {{ date_info.weekday }}</p>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <p class="mb-0">
+                <span class="opacity-75">上次登入: </span>
+                <span class="fw-bold">2024-02-26 09:45</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- 統計數據卡片 -->
+<div class="row mb-4">
+    <!-- 今日訂單 -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2 stat-card stat-card-primary">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <div class="stat-title text-primary mb-1">今日訂單</div>
+                        <div class="stat-value">{{ stats.today.orders }} 筆</div>
+                        <div class="progress stat-progress">
+                            <div class="progress-bar bg-primary" 
+                                data-progress="{{ stats.today.orders_progress }}"
+                                id="ordersProgressBar">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-bag-check stat-icon text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 今日營收 -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2 stat-card stat-card-success">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <div class="stat-title text-success mb-1">今日營收</div>
+                        <div class="stat-value">{{ stats.today.revenue_formatted }}</div>
+                        <div class="progress stat-progress">
+                            <div class="progress-bar bg-success" 
+                                data-progress="{{ stats.today.revenue_progress }}"
+                                id="revenueProgressBar">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-currency-dollar stat-icon text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 待處理任務 -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2 stat-card stat-card-info">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <div class="stat-title text-info mb-1">待處理任務</div>
+                        <div class="stat-value">{{ stats.pending.total }} 項</div>
+                        <div class="progress stat-progress">
+                            <div class="progress-bar bg-info" 
+                                data-progress="{{ stats.pending.total_progress }}"
+                                id="pendingProgressBar">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-list-task stat-icon text-info"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 本月成長率 -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2 stat-card stat-card-warning">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <div class="stat-title text-warning mb-1">月成長率</div>
+                        <div class="stat-value">+15.2%</div>
+                        <div class="progress stat-progress">
+                            <div 
+                                class="progress-bar bg-warning" 
+                                data-progress="15.2"
+                                id="growthProgressBar"
+                            ></div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-graph-up stat-icon text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 待處理項目 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold">待處理項目</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body text-center py-4">
+                                <div class="display-4 text-warning">{{ stats.pending.quotes }}</div>
+                                <div class="text-uppercase">待審核報價單</div>
+                                <div class="mt-3">
+                                    <a href="{% url 'quotes' %}" class="btn btn-sm btn-outline-primary">查看報價單</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body text-center py-4">
+                                <div class="display-4 text-info">{{ stats.pending.orders }}</div>
+                                <div class="text-uppercase">待處理訂單</div>
+                                <div class="mt-3">
+                                    <a href="#" class="btn btn-sm btn-outline-primary">查看訂單</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body text-center py-4">
+                                <div class="display-4 text-danger">{{ stats.pending.shipments }}</div>
+                                <div class="text-uppercase">待出貨單</div>
+                                <div class="mt-3">
+                                    <a href="{% url 'shipments' %}" class="btn btn-sm btn-outline-primary">查看出貨單</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 圖表區域 -->
+<div class="row mb-4">
+    <!-- 銷售圖表 -->
+    <div class="col-xl-8 col-lg-7">
+        <div class="card shadow mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold">月度銷售趨勢</h6>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#">查看詳情</a></li>
+                        <li><a class="dropdown-item" href="#">匯出數據</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="dashboard-chart">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 圓餅圖 -->
+    <div class="col-xl-4 col-lg-5">
+        <div class="card shadow mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold">產品類別分佈</h6>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#">查看詳情</a></li>
+                        <li><a class="dropdown-item" href="#">匯出數據</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="dashboard-chart">
+                    <canvas id="productPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 訂單狀態圖表 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold">訂單狀態分佈</h6>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#">查看詳情</a></li>
+                        <li><a class="dropdown-item" href="#">匯出數據</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <div class="dashboard-chart">
+                            <canvas id="orderStatusChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mt-4 mt-md-0">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>待處理訂單</span>
+                                    <span class="text-warning fw-bold">32%</span>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    <div class="progress-bar bg-warning" style="width: 32%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>處理中訂單</span>
+                                    <span class="text-info fw-bold">18%</span>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    <div class="progress-bar bg-info" style="width: 18%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>已完成訂單</span>
+                                    <span class="text-success fw-bold">42%</span>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    <div class="progress-bar bg-success" style="width: 42%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>已取消訂單</span>
+                                    <span class="text-danger fw-bold">8%</span>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    <div class="progress-bar bg-danger" style="width: 8%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 活動記錄與日誌 -->
+<div class="row">
+    <!-- 最近活動 -->
+    <div class="col-xl-6 mb-4">
+        <div class="card shadow h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold">最近活動</h6>
+                <a href="#" class="btn btn-sm btn-outline-primary">查看全部</a>
+            </div>
+            <div class="card-body">
+                <div class="activity-timeline">
+                    {% for activity in activities|slice:":6" %}
+                    <div class="activity-item">
+                        <div class="activity-icon bg-{{ activity.color }}">
+                            <i class="bi {{ activity.icon }}"></i>
+                        </div>
+                        <div class="mb-2">
+                            <strong>{{ activity.description }}</strong>
+                        </div>
+                        <div class="small text-muted">{{ activity.time_text }}</div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-clock-history text-muted d-block mb-3" style="font-size: 2rem;"></i>
+                        <p class="mb-0 text-muted">暫無活動記錄</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 最近上傳的文件 -->
+    <div class="col-xl-6 mb-4">
+        <div class="card shadow h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold">最近上傳的文件</h6>
+                <a href="{% url 'file_list' %}" class="btn btn-sm btn-outline-primary">查看全部</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for file in files %}
+                    <div class="list-group-item d-flex align-items-center p-3">
+                        <div class="me-3">
+                            <i class="bi {{ file.icon_class }} fs-3
+                            {% if 'image' in file.file_type %}text-primary
+                            {% elif 'pdf' in file.file_type %}text-danger
+                            {% elif 'excel' in file.file_type %}text-success
+                            {% elif 'word' in file.file_type %}text-info
+                            {% else %}text-muted{% endif %}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">{{ file.filename }}</h6>
+                            <div class="small text-muted">{{ file.formatted_size }} • 上傳者: {{ file.uploaded_by }}</div>
+                        </div>
+                        <div>
+                            <span class="small text-muted">{{ file.time_since }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-folder2 text-muted d-block mb-3" style="font-size: 2rem;"></i>
+                        <p class="mb-0 text-muted">暫無文件記錄</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 設置進度條寬度
+        const progressBars = [
+            'ordersProgressBar', 
+            'revenueProgressBar', 
+            'pendingProgressBar', 
+            'growthProgressBar'
+        ];
+        progressBars.forEach(barId => {
+            const bar = document.getElementById(barId);
+            if (bar) {
+                const progress = parseFloat(bar.getAttribute('data-progress'));
+                bar.style.width = `${Math.min(Math.max(progress, 0), 100)}%`;
+            }
+        });
+        // 載入銷售圖表數據
+        fetch('{% url "chart_data" %}?type=sales')
+            .then(response => response.json())
+            .then(data => {
+                const salesCtx = document.getElementById('salesChart').getContext('2d');
+                new Chart(salesCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: data.datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('zh-TW', { 
+                                                style: 'currency', 
+                                                currency: 'TWD',
+                                                maximumFractionDigits: 0
+                                            }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value >= 1000000 
+                                            ? value / 1000000 + 'M' 
+                                            : value >= 1000 
+                                                ? value / 1000 + 'K' 
+                                                : value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        
+        // 載入產品分類圓餅圖數據
+        fetch('{% url "chart_data" %}?type=product')
+            .then(response => response.json())
+            .then(data => {
+                const pieCtx = document.getElementById('productPieChart').getContext('2d');
+                new Chart(pieCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.labels,
+                        datasets: data.datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed !== null) {
+                                            label += context.parsed + '%';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '60%'
+                    }
+                });
+            });
+        
+        // 載入訂單狀態圖表數據
+        fetch('{% url "chart_data" %}?type=order_status')
+            .then(response => response.json())
+            .then(data => {
+                const statusCtx = document.getElementById('orderStatusChart').getContext('2d');
+                new Chart(statusCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: data.datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += context.parsed.y + ' 筆訂單';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            });
+    });
+</script>
+{% endblock %}

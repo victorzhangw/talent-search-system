@@ -1,0 +1,151 @@
+<svg width="900" height="750" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 漸層定義 -->
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#059669;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0D9488;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#DC2626;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EA580C;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A855F7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#059669;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10B981;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- 陰影效果 -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#00000030"/>
+    </filter>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="#00000020"/>
+    </filter>
+    
+    <!-- 箭頭標記 -->
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4B5563"/>
+    </marker>
+    <marker id="arrowhead-light" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#6B7280"/>
+    </marker>
+  </defs>
+  
+  <!-- 擴大的背景圖層 -->
+  <rect x="15" y="15" width="870" height="720" rx="15" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
+  
+  <!-- 圖層標籤 -->
+  <rect x="35" y="35" width="120" height="30" rx="6" fill="#4F46E5" opacity="0.9"/>
+  <text x="95" y="55" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">用戶介面層</text>
+  
+  <rect x="35" y="125" width="120" height="30" rx="6" fill="#059669" opacity="0.9"/>
+  <text x="95" y="145" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">API 閘道層</text>
+  
+  <rect x="35" y="215" width="120" height="30" rx="6" fill="#DC2626" opacity="0.9"/>
+  <text x="95" y="235" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">核心服務層</text>
+  
+  <rect x="35" y="305" width="120" height="30" rx="6" fill="#8B5CF6" opacity="0.9"/>
+  <text x="95" y="325" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">AI 處理層</text>
+  
+  <rect x="35" y="395" width="120" height="30" rx="6" fill="#059669" opacity="0.9"/>
+  <text x="95" y="415" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">資料層</text>
+  
+  <!-- 用戶介面層 -->
+  <rect x="185" y="35" width="200" height="60" rx="12" fill="url(#grad1)" filter="url(#shadow)"/>
+  <text x="285" y="50" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="14" font-weight="bold">Vue.js 前端</text>
+  <text x="285" y="70" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">響應式聊天介面</text>
+  
+  <!-- API 閘道 -->
+  <rect x="185" y="125" width="200" height="50" rx="10" fill="url(#grad2)" filter="url(#shadow)"/>
+  <text x="285" y="150" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="14" font-weight="bold">API 閘道</text>
+  <text x="285" y="165" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="10">路由、認證、負載均衡</text>
+  
+  <!-- 核心服務層 -->
+  <g class="core-services">
+    <rect x="185" y="215" width="140" height="45" rx="8" fill="url(#grad3)" filter="url(#soft-shadow)"/>
+    <text x="255" y="240" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">聊天服務</text>
+    
+    <rect x="345" y="215" width="140" height="45" rx="8" fill="url(#grad3)" filter="url(#soft-shadow)"/>
+    <text x="415" y="240" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">搜索服務</text>
+    
+    <rect x="505" y="215" width="140" height="45" rx="8" fill="url(#grad3)" filter="url(#soft-shadow)"/>
+    <text x="575" y="240" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">LLM 增強引擎</text>
+    
+    <rect x="665" y="215" width="140" height="45" rx="8" fill="url(#grad3)" filter="url(#soft-shadow)"/>
+    <text x="735" y="240" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="12" font-weight="bold">用戶管理服務</text>
+  </g>
+  
+  <!-- AI 處理層 -->
+  <g class="ai-processing">
+    <rect x="185" y="305" width="120" height="40" rx="6" fill="url(#grad4)" filter="url(#soft-shadow)"/>
+    <text x="245" y="328" text-anchor="middle" fill="black" font-family="微軟正黑體" font-size="11">NLP 處理引擎</text>
+    
+    <rect x="325" y="305" width="120" height="40" rx="6" fill="url(#grad4)" filter="url(#soft-shadow)"/>
+    <text x="385" y="328" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">對話管理器</text>
+    
+    <rect x="465" y="305" width="120" height="40" rx="6" fill="url(#grad4)" filter="url(#soft-shadow)"/>
+    <text x="525" y="328" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">搜索引擎</text>
+    
+    <rect x="605" y="305" width="120" height="40" rx="6" fill="url(#grad4)" filter="url(#soft-shadow)"/>
+    <text x="665" y="328" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">開源 LLM</text>
+    
+    <rect x="745" y="305" width="120" height="40" rx="6" fill="url(#grad4)" filter="url(#soft-shadow)"/>
+    <text x="805" y="328" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">向量資料庫</text>
+  </g>
+  
+  <!-- 資料層 -->
+  <g class="data-layer">
+    <rect x="245" y="395" width="140" height="40" rx="6" fill="url(#grad5)" filter="url(#soft-shadow)"/>
+    <text x="315" y="418" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">人才資料庫</text>
+    
+    <rect x="405" y="395" width="140" height="40" rx="6" fill="url(#grad5)" filter="url(#soft-shadow)"/>
+    <text x="475" y="418" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">用戶資料庫</text>
+    
+    <rect x="565" y="395" width="140" height="40" rx="6" fill="url(#grad5)" filter="url(#soft-shadow)"/>
+    <text x="635" y="418" text-anchor="middle" fill="black"  font-family="微軟正黑體" font-size="11">Redis 快取</text>
+  </g>
+  
+  <!-- 連接線 - 垂直主要流程 -->
+  <path d="M 285 95 L 285 125" stroke="#4B5563" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- API 閘道到核心服務的連接線 -->
+  <path d="M 285 175 Q 285 195 255 215" stroke="#4B5563" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 285 175 Q 285 195 415 215" stroke="#4B5563" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 285 175 Q 285 195 575 215" stroke="#4B5563" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 285 175 Q 285 195 735 215" stroke="#4B5563" stroke-width="1.5" fill="none" marker-end="url(#arrowhead-light)"/>
+  
+  <!-- 核心服務到 AI 處理層的連接線 -->
+  <path d="M 255 260 Q 255 280 245 305" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 415 260 Q 415 280 385 305" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 575 260 Q 575 280 525 305" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 575 260 Q 575 280 665 305" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 735 260 Q 735 280 805 305" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  
+  <!-- AI 處理層到資料層的連接線 -->
+  <path d="M 245 345 Q 245 365 315 395" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 385 345 Q 385 365 475 395" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  <path d="M 525 345 Q 525 365 635 395" stroke="#6B7280" stroke-width="1.2" fill="none" marker-end="url(#arrowhead-light)"/>
+  
+  <!-- 擴大的圖例和說明 -->
+  <rect x="35" y="455" width="830" height="260" rx="12" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1" filter="url(#soft-shadow)"/>
+  <text x="55" y="480" fill="#1F2937" font-family="微軟正黑體" font-size="16" font-weight="bold">系統架構說明</text>
+  
+  <g font-family="微軟正黑體" font-size="12" fill="#4B5563">
+    <text x="55" y="505">• Vue.js 前端提供響應式聊天介面，支援即時通訊和結果展示</text>
+    <text x="55" y="530">• API 閘道負責路由、認證和負載均衡，統一管理 API 請求</text>
+    <text x="55" y="555">• 微服務架構確保系統可擴展性和維護性，各服務獨立部署</text>
+    <text x="55" y="580">• LLM 增強引擎整合開源大語言模型，提供智能搜索和結果解釋</text>
+    <text x="55" y="605">• 向量資料庫支援語義搜索和 RAG 架構，提升搜索準確性</text>
+    <text x="55" y="630">• Redis 快取提升系統響應速度和用戶體驗，減少資料庫壓力</text>
+    <text x="55" y="655">• 所有組件通過清晰的數據流連接，確保系統高效穩定運行</text>
+    <text x="55" y="680">• 系統採用分層設計，各層職責單一，便於維護和擴展</text>
+  </g>
+</svg>

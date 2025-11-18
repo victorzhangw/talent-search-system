@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}訂單查詢 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'point_dashboard' %}">點數管理</a></li>
+<li class="breadcrumb-item active">訂單查詢</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-receipt me-2"></i>點數購買訂單
+                    </h5>
+                    <a href="{% url 'point_purchase' %}" class="btn btn-primary">
+                        <i class="bi bi-cart-plus me-2"></i>購買點數
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if page_obj.object_list %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>訂單號</th>
+                                    <th>套餐</th>
+                                    <th>點數</th>
+                                    <th>金額</th>
+                                    <th>狀態</th>
+                                    <th>建立時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in page_obj.object_list %}
+                                <tr>
+                                    <td><code>{{ order.order_number }}</code></td>
+                                    <td>{{ order.package.name }}</td>
+                                    <td>
+                                        <span class="text-primary">{{ order.points }}</span>
+                                        {% if order.bonus_points %}
+                                        + <span class="text-success">{{ order.bonus_points }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ order.amount }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if order.status == 'completed' %}bg-success
+                                            {% elif order.status == 'pending' %}bg-warning
+                                            {% elif order.status == 'failed' %}bg-danger
+                                            {% elif order.status == 'cancelled' %}bg-secondary
+                                            {% else %}bg-info{% endif %}">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ order.created_at|date:"Y/m/d H:i" }}</td>
+                                    <td>
+                                        {% if order.status == 'pending' %}
+                                        <a href="{% url 'point_payment' order.order_number %}" 
+                                           class="btn btn-sm btn-primary me-1">付款</a>
+                                        <form method="post" action="{% url 'cancel_point_order' order.order_number %}" 
+                                              class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('確定要取消此訂單嗎？')">取消</button>
+                                        </form>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分頁 -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="分頁導航">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一頁</a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">下一頁</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-receipt fs-1"></i>
+                        <p class="mt-3">暫無訂單記錄</p>
+                        <a href="{% url 'point_purchase' %}" class="btn btn-primary">
+                            立即購買點數
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}交易記錄 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<!-- <li class="breadcrumb-item"><a href="{% url 'point_dashboard' %}">交易管理</a></li> -->
+<li class="breadcrumb-item active">交易管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-clock-history me-2"></i>交易管理
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 過濾器 -->
+                    <form method="get" class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <label class="form-label">交易類型</label>
+                            <select name="type" class="form-select">
+                                <option value="">全部類型</option>
+                                {% for value, label in transaction_types %}
+                                <option value="{{ value }}" {% if current_filters.type == value %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">開始日期</label>
+                            <input type="date" name="date_from" class="form-control" value="{{ current_filters.date_from }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">結束日期</label>
+                            <input type="date" name="date_to" class="form-control" value="{{ current_filters.date_to }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search me-1"></i>搜尋
+                                </button>
+                                <a href="{% url 'point_history' %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>重置
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+
+                    {% if page_obj.object_list %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>時間</th>
+                                    <th>類型</th>
+                                    <th>描述</th>
+                                    <th class="text-end">變化前</th>
+                                    <th class="text-end">點數變化</th>
+                                    <th class="text-end">變化後</th>
+                                    <th>狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in page_obj.object_list %}
+                                <tr>
+                                    <td>{{ transaction.created_at|date:"Y/m/d H:i:s" }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if transaction.transaction_type == 'purchase' %}bg-success
+                                            {% elif transaction.transaction_type == 'consumption' %}bg-danger
+                                            {% elif transaction.transaction_type == 'refund' %}bg-info
+                                            {% elif transaction.transaction_type == 'gift' %}bg-info
+                                            {% elif transaction.transaction_type == 'registration_bonus' %}bg-warning
+                                            {% elif transaction.transaction_type == 'admin_adjust' %}bg-primary
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ transaction.get_transaction_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {{ transaction.description|truncatechars:60 }}
+                                        {% if transaction.reference_id %}
+                                        <br><small class="text-muted">參考: {{ transaction.reference_id }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end text-muted">{{ transaction.balance_before }}</td>
+                                    <td class="text-end">
+                                        <span class="fw-bold {% if transaction.amount > 0 %}text-success{% else %}text-danger{% endif %}">
+                                            {% if transaction.amount > 0 %}+{% endif %}{{ transaction.amount }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-bold">{{ transaction.balance_after }}</td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if transaction.status == 'completed' %}bg-success
+                                            {% elif transaction.status == 'pending' %}bg-warning
+                                            {% elif transaction.status == 'failed' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ transaction.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分頁 -->
+                    {% if page_obj.has_other_pages %}
+                    <nav aria-label="分頁導航">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">上一頁</a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+                            
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">下一頁</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mt-3">暫無交易記錄</p>
+                        {% if current_filters.type or current_filters.date_from or current_filters.date_to %}
+                        <p>請嘗試調整搜尋條件</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

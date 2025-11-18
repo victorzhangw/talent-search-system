@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}爬蟲設定{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'crawler_dashboard' %}">爬蟲管理</a></li>
+<li class="breadcrumb-item active">爬蟲設定</li>
+{% endblock %}
+
+{% block content %}
+<div class="crawler-settings">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>⚙️ 爬蟲設定</h1>
+        <div>
+            <a href="{% url 'crawler_dashboard' %}" class="btn btn-outline-secondary">
+                ⬅️ 返回儀表板
+            </a>
+        </div>
+    </div>
+    
+    <!-- 基本設定 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">📝 基本設定</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" id="settings-form">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="timeout" class="form-label">⏱️ 頁面加載超時時間 (秒)</label>
+                            <input type="number" class="form-control" id="timeout" name="timeout" 
+                                   value="{{ settings.TIMEOUT }}" min="10" max="120">
+                            <div class="form-text">建議設定為 30-60 秒</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="retry_times" class="form-label">🔄 重試次數</label>
+                            <input type="number" class="form-control" id="retry_times" name="retry_times" 
+                                   value="{{ settings.RETRY_TIMES }}" min="1" max="10">
+                            <div class="form-text">失敗後的重試次數</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="delay" class="form-label">⏳ 請求間延遲 (秒)</label>
+                            <input type="number" class="form-control" id="delay" name="delay" 
+                                   value="{{ settings.DELAY_BETWEEN_REQUESTS }}" min="1" max="10" step="0.5">
+                            <div class="form-text">避免被反爬蟲機制封鎖</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="headless" class="form-label">🖥️ 無頭模式</label>
+                            <select class="form-select" id="headless" name="headless">
+                                <option value="true" {% if settings.HEADLESS %}selected{% endif %}>啟用 (推薦)</option>
+                                <option value="false" {% if not settings.HEADLESS %}selected{% endif %}>停用 (除錯用)</option>
+                            </select>
+                            <div class="form-text">無頭模式可提升效能並節省資源</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetToDefaults()">
+                        🔄 重設為預設值
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        💾 儲存設定
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 排程設定 -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">⏰ 排程設定</h5>
+            <a href="{% url 'crawler_schedule' %}" class="btn btn-sm btn-outline-primary">
+                📅 排程管理
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>🕷️ 自動爬取排程</h6>
+                    <p class="text-muted">目前設定：每 2 小時執行一次</p>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success me-2">已啟用</span>
+                        <small class="text-muted">下次執行：{{ next_crawl_time|default:"計算中..." }}</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6>🧹 日誌清理排程</h6>
+                    <p class="text-muted">目前設定：每日凌晨 2:30</p>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success me-2">已啟用</span>
+                        <small class="text-muted">清理 30 天前的舊日誌</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 監控資訊 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">📊 監控資訊</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="h4 text-primary">{{ total_tasks }}</div>
+                        <div class="text-muted">總排程任務</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="h4 text-success">{{ active_tasks }}</div>
+                        <div class="text-muted">運行中任務</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <div class="h4 text-info">{{ recent_executions_count }}</div>
+                        <div class="text-muted">今日執行次數</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function resetToDefaults() {
+    if (confirm('確定要重設為預設值嗎？')) {
+        document.getElementById('timeout').value = 30;
+        document.getElementById('retry_times').value = 3;
+        document.getElementById('delay').value = 2;
+        document.getElementById('headless').value = 'true';
+    }
+}
+
+document.getElementById('settings-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    fetch('{% url "crawler_settings" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('設定已成功儲存！');
+        } else {
+            alert('儲存失敗：' + (data.error || '未知錯誤'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('發生錯誤：' + error);
+    });
+});
+</script>
+{% endblock %}

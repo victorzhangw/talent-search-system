@@ -1,0 +1,46 @@
+{% if notifications %}
+    <div class="dropdown-header d-flex justify-content-between align-items-center">
+        <span>未讀通知 ({{ unread_count }})</span>
+        <a href="{% url 'mark_all_notifications_read' %}"
+           class="small text-muted mark-all-read"
+           data-url="{% url 'mark_all_notifications_read' %}">
+            全部標記已讀
+        </a>
+    </div>
+    {% for notification in notifications %}
+    {% if notification.link %}
+    <a href="{{ notification.link }}" class="dropdown-item notification-item-link mark-read-link {% if not notification.is_read %}bg-light{% endif %}"
+       data-mark-url="{% url 'mark_notification_read' notification.id %}"
+       data-notification-id="{{ notification.id }}">
+    {% else %}
+    <div class="dropdown-item {% if not notification.is_read %}bg-light{% endif %}">
+    {% endif %}
+        <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1">
+                <i class="bi {{ notification.icon }} me-2"></i>
+                {{ notification.title }}
+            </h6>
+            <small class="text-muted">{{ notification.time_since }}</small>
+        </div>
+        <p class="mb-1 small">{{ notification.message }}</p>
+        {% if not notification.is_read %}
+        <span class="btn btn-sm btn-outline-primary mark-read"
+              role="button"
+              tabindex="0"
+              data-notification-id="{{ notification.id }}"
+              data-url="{% url 'mark_notification_read' notification.id %}">
+            標記已讀
+        </span>
+        {% endif %}
+    {% if notification.link %}
+    </a>
+    {% else %}
+    </div>
+    {% endif %}
+    {% endfor %}
+{% else %}
+    <div class="p-3 text-center text-muted">
+        <i class="bi bi-bell-slash fs-3 mb-2"></i>
+        <p>目前沒有新通知</p>
+    </div>
+{% endif %}

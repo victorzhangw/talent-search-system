@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}帳號設定 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'profile_view' %}">個人資料</a></li>
+<li class="breadcrumb-item active">帳號設定</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-sliders me-2"></i>帳號設定
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Email 設定 -->
+                        <div class="col-md-6 mb-4">
+                            <h6 class="text-primary mb-3">Email 設定</h6>
+                            <div class="d-flex justify-content-between align-items-center p-3 border rounded">
+                                <div>
+                                    <strong>Email 驗證</strong>
+                                    <div class="small text-muted">{{ user.email }}</div>
+                                </div>
+                                <div>
+                                    {% if user.is_email_verified %}
+                                        <span class="badge bg-success">已驗證</span>
+                                    {% else %}
+                                        <a href="{% url 'resend_verification' %}" class="btn btn-sm btn-warning">
+                                            重新驗證
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 安全設定 -->
+                        <div class="col-md-6 mb-4">
+                            <h6 class="text-warning mb-3">安全設定</h6>
+                            <div class="d-flex justify-content-between align-items-center p-3 border rounded">
+                                <div>
+                                    <strong>密碼</strong>
+                                    <div class="small text-muted">上次更新：{{ user.updated_at|date:"Y/m/d" }}</div>
+                                </div>
+                                <div>
+                                    <a href="{% url 'change_password' %}" class="btn btn-sm btn-outline-warning">
+                                        修改密碼
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 通知設定 -->
+                    <div class="mb-4">
+                        <h6 class="text-info mb-3">通知設定</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
+                                    <label class="form-check-label" for="emailNotifications">
+                                        Email 通知
+                                    </label>
+                                </div>
+                                <small class="text-muted">接收重要系統通知郵件</small>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="systemNotifications" checked>
+                                    <label class="form-check-label" for="systemNotifications">
+                                        系統通知
+                                    </label>
+                                </div>
+                                <small class="text-muted">顯示系統內通知提醒</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 資料匯出 -->
+                    <!-- <div class="mb-4">
+                        <h6 class="text-secondary mb-3">資料管理</h6>
+                        <div class="d-flex justify-content-between align-items-center p-3 border rounded">
+                            <div>
+                                <strong>匯出個人資料</strong>
+                                <div class="small text-muted">下載您的所有個人資料</div>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="exportUserData()">
+                                    <i class="bi bi-download me-1"></i>匯出資料
+                                </button>
+                            </div>
+                        </div>
+                    </div> -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- 帳號狀態 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-shield-check me-2"></i>帳號狀態
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>帳號狀態：</span>
+                            <span class="badge bg-success">正常</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>用戶類型：</span>
+                            <span class="badge 
+                                {% if user.user_type == 'admin' %}bg-danger
+                                {% elif user.user_type == 'enterprise' %}bg-success
+                                {% else %}bg-primary{% endif %}">
+                                {{ user.get_user_type_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% if user.user_type == 'enterprise' %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>企業驗證：</span>
+                            {% if user.enterprise_profile.verification_status == 'approved' %}
+                                <span class="badge bg-success">已核准</span>
+                            {% elif user.enterprise_profile.verification_status == 'pending' %}
+                                <span class="badge bg-warning">待審核</span>
+                            {% else %}
+                                <span class="badge bg-danger">已拒絕</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% if user.user_type != 'enterprise' %}
+            <!-- 危險操作 -->
+            <div class="card mt-3 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>危險操作
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-danger small mb-3">
+                        <i class="bi bi-warning me-1"></i>
+                        停用帳號後將無法登入系統，如需重新啟用請聯繫客服
+                    </p>
+                    <button class="btn btn-danger w-100" onclick="confirmDeleteAccount()">
+                        <i class="bi bi-person-x me-1"></i>停用帳號
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function exportUserData() {
+    // 實作資料匯出功能
+    alert('資料匯出功能開發中...');
+}
+
+function confirmDeleteAccount() {
+    if (confirm('確定要停用帳號嗎？此操作不可逆轉！')) {
+        if (confirm('最後確認：停用後將無法登入系統，確定要繼續嗎？')) {
+            fetch('{% url "delete_account" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('帳號已停用');
+                    window.location.href = data.redirect;
+                } else {
+                    alert('操作失敗：' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('操作失敗，請稍後再試');
+            });
+        }
+    }
+}
+
+// 通知設定變更
+document.getElementById('emailNotifications').addEventListener('change', function() {
+    // 實作通知設定更新
+    console.log('Email 通知設定：', this.checked);
+});
+
+document.getElementById('systemNotifications').addEventListener('change', function() {
+    // 實作通知設定更新
+    console.log('系統通知設定：', this.checked);
+});
+</script>
+{% endblock %}

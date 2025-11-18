@@ -1,0 +1,590 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}受測人員管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+<li class="breadcrumb-item active">受測人員管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-people me-2"></i>受測人員管理</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInviteeModal">
+            <i class="bi bi-person-plus me-1"></i>新增受測人員
+        </button>
+    </div>
+
+    <!-- 搜尋框 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-8">
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="搜尋姓名、信箱或職位..." value="{{ search }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-search me-1"></i>搜尋
+                    </button>
+                    <a href="{% url 'invitee_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise me-1"></i>重置
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 受測人員列表 -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                受測人員列表
+                <small class="text-muted">（共 {{ page_obj.paginator.count }} 人）</small>
+            </h5>
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary" onclick="selectAll()">
+                    <i class="bi bi-check-square me-1"></i>全選
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="selectNone()">
+                    <i class="bi bi-square me-1"></i>取消全選
+                </button>
+                <button type="button" class="btn btn-outline-danger" onclick="batchDelete()" disabled id="batchDeleteBtn">
+                    <i class="bi bi-trash me-1"></i>批量刪除
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if page_obj.object_list %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th width="40">
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                </th>
+                                <th>姓名</th>
+                                <th>電子郵件</th>
+                                <th>聯絡電話</th>
+                                <th>狀態</th>
+                                <th>職位</th>
+                                <th>受邀次數</th>
+                                <th>完成率</th>
+                                <th>建立時間</th>
+                                <th width="150">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invitee in page_obj.object_list %}
+                            <tr id="invitee-row-{{ invitee.id }}">
+                                <td>
+                                    <input type="checkbox" class="invitee-checkbox" value="{{ invitee.id }}" onchange="updateBatchDeleteButton()">
+                                </td>
+                                <td>
+                                    <strong>{{ invitee.name }}</strong>
+                                    {% if invitee.notes %}
+                                    <i class="bi bi-chat-text text-info ms-1" title="{{ invitee.notes }}" data-bs-toggle="tooltip"></i>
+                                    {% endif %}
+                                </td>
+                                <td>{{ invitee.email }}</td>
+                                <td>{{ invitee.phone|default:"-" }}</td>
+                                <td>
+                                    <span class="badge bg-{% if invitee.status == 'employed' %}primary{% else %}secondary{% endif %}">
+                                        {{ invitee.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ invitee.position|default:"-" }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ invitee.invited_count }}</span>
+                                </td>
+                                <td>
+                                    {% if invitee.invited_count > 0 %}
+                                        <span class="badge bg-{% if invitee.completion_rate >= 80 %}success{% elif invitee.completion_rate >= 60 %}warning{% else %}danger{% endif %}">
+                                            {{ invitee.completion_rate }}%
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ invitee.created_at|date:"Y/m/d" }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'edit_invitee' invitee.id %}" class="btn btn-outline-primary" title="編輯">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button class="btn btn-outline-danger" onclick="deleteInvitee({{ invitee.id }}, '{{ invitee.name }}')" title="刪除">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        <button class="btn btn-outline-info" onclick="viewInvitations({{ invitee.id }}, '{{ invitee.name }}')" title="查看邀請記錄">
+                                            <i class="bi bi-envelope-open"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="分頁導航" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}">上一頁</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}">下一頁</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-people text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3 text-muted">尚未新增受測人員</h5>
+                    <p class="text-muted">新增受測人員來開始發送測驗邀請</p>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInviteeModal">
+                        <i class="bi bi-person-plus me-1"></i>新增第一位受測人員
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 新增受測人員 Modal -->
+<div class="modal fade" id="addInviteeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-person-plus me-2"></i>新增受測人員
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addInviteeForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">
+                                    姓名 <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       placeholder="請輸入姓名" maxlength="50" required>
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">
+                                    電子郵件 <span class="text-danger">*</span>
+                                </label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       placeholder="請輸入電子郵件" required>
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">聯絡電話</label>
+                                <input type="text" class="form-control" id="phone" name="phone" 
+                                       placeholder="請輸入聯絡電話（選填）" maxlength="20">
+                                <div class="invalid-feedback"></div>
+                                <div class="form-text">支援台灣手機和市話格式</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">狀態</label>
+                                <select class="form-control" id="status" name="status">
+                                    <option value="employed">在職</option>
+                                    <option value="job_seeker">求職者</option>
+                                </select>
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="position" class="form-label">職位</label>
+                                <input type="text" class="form-control" id="position" name="position" 
+                                       placeholder="請輸入職位（選填）" maxlength="50">
+                                <div class="invalid-feedback"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">備註</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                  placeholder="備註（選填）" maxlength="500"></textarea>
+                        <div class="invalid-feedback"></div>
+                        <div class="form-text">
+                            <span id="notesCount">0</span>/500 字
+                        </div>
+                    </div>
+                    
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="continueAdd">
+                        <label class="form-check-label" for="continueAdd">
+                            新增完繼續新增下一位
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check me-1"></i>確定新增
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 批量刪除確認 Modal -->
+<div class="modal fade" id="batchDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>批量刪除確認
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>您確定要刪除選中的 <span id="deleteCount" class="fw-bold text-danger"></span> 位受測人員嗎？</p>
+                <p class="text-muted small">注意：有測驗邀請記錄的受測人員將無法刪除</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" onclick="confirmBatchDelete()">
+                    <i class="bi bi-trash me-1"></i>確定刪除
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 初始化 tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // 備註字數統計
+    const notesTextarea = document.getElementById('notes');
+    const notesCount = document.getElementById('notesCount');
+    
+    notesTextarea.addEventListener('input', function() {
+        notesCount.textContent = this.value.length;
+    });
+});
+
+// 新增受測人員表單提交
+document.getElementById('addInviteeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // 防止重複提交
+    const submitBtn = this.querySelector('button[type="submit"]');
+    if (submitBtn.disabled) {
+        return; // 如果按鈕已被禁用，直接返回
+    }
+    
+    // 禁用提交按鈕
+    submitBtn.disabled = true;
+    const originalText = submitBtn.innerHTML;
+    submitBtn.setAttribute('data-original-text', originalText);
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 處理中...';
+    
+    const formData = new FormData(this);
+    
+    // 清除之前的錯誤狀態
+    clearFormErrors();
+    
+    // 顯示 loading（如果函數存在）
+    if (typeof window.showLoading === 'function') {
+        window.showLoading('正在新增受測人員...', '請稍候，系統正在處理您的請求');
+    }
+    
+    fetch('{% url "create_invitee" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 隱藏 loading 並顯示成功訊息
+            if (typeof window.hideLoading === 'function') {
+                window.hideLoading();
+            }
+            
+            // 成功提示
+            showAlert('success', data.message);
+            
+            // 檢查是否繼續新增
+            const continueAdd = document.getElementById('continueAdd').checked;
+            
+            if (continueAdd) {
+                // 清空表單，保持 modal 開啟
+                this.reset();
+                const notesCount = document.getElementById('notesCount');
+                if (notesCount) notesCount.textContent = '0';
+                document.getElementById('name').focus();
+                
+                // 隱藏 loading
+                if (typeof window.hideLoading === 'function') {
+                    window.hideLoading();
+                }
+            } else {
+                // 延遲關閉 modal 並刷新頁面
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addInviteeModal'));
+                    if (modal) modal.hide();
+                    window.location.reload();
+                }, 1500);
+            }
+        } else {
+            // 隱藏 loading
+            if (typeof window.hideLoading === 'function') {
+                window.hideLoading();
+            }
+            
+            // 顯示表單錯誤
+            if (data.errors) {
+                showFormErrors(data.errors);
+            } else {
+                showAlert('danger', data.message || '新增失敗，請稍後再試');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('新增受測人員錯誤:', error);
+        
+        // 隱藏 loading（如果函數存在）
+        if (typeof window.hideLoading === 'function') {
+            window.hideLoading();
+        }
+        
+        // 提供更詳細的錯誤信息
+        let errorMessage = '網路錯誤，請稍後再試';
+        if (error.name === 'TypeError') {
+            errorMessage = '請求處理出現問題，請重新整理頁面後再試';
+        } else if (error.message) {
+            errorMessage = `錯誤：${error.message}`;
+        }
+        
+        showAlert('danger', errorMessage);
+    })
+    .finally(() => {
+        // 恢復按鈕狀態
+        const submitBtn = this.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            const originalText = submitBtn.getAttribute('data-original-text');
+            if (originalText) {
+                submitBtn.innerHTML = originalText;
+                submitBtn.removeAttribute('data-original-text');
+            }
+        }
+    });
+    
+    // 🔧 加入超時保護
+    setTimeout(() => {
+        // 檢查是否還在 loading 狀態
+        const loadingElement = document.querySelector('.loading-overlay');
+        if (loadingElement && !loadingElement.classList.contains('d-none')) {
+            console.warn('新增受測人員超時，強制隱藏 loading');
+            if (typeof window.hideLoading === 'function') {
+                window.hideLoading();
+            }
+            showAlert('warning', '操作超時，請重試');
+        }
+    }, 10000); // 10秒超時
+});
+
+// 顯示表單錯誤
+function showFormErrors(errors) {
+    for (const [field, messages] of Object.entries(errors)) {
+        const input = document.getElementById(field);
+        if (input) {
+            input.classList.add('is-invalid');
+            const feedback = input.nextElementSibling;
+            if (feedback && feedback.classList.contains('invalid-feedback')) {
+                feedback.textContent = messages.join(', ');
+            }
+        }
+    }
+}
+
+// 清除表單錯誤
+function clearFormErrors() {
+    document.querySelectorAll('.is-invalid').forEach(el => {
+        el.classList.remove('is-invalid');
+    });
+}
+
+// 顯示提示訊息
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // 自動移除
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// 刪除單個受測人員
+function deleteInvitee(inviteeId, inviteeName) {
+    if (confirm(`確定要刪除受測人員「${inviteeName}」嗎？`)) {
+        // 顯示刪除 loading
+        window.showLoading('正在刪除受測人員...', '請稍候，系統正在處理刪除請求');
+        
+        fetch(`/enterprise/invitees/${inviteeId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // 顯示成功訊息
+                showAlert('success', data.message);
+                
+                // 延遲移除該行
+                setTimeout(() => {
+                    document.getElementById(`invitee-row-${inviteeId}`).remove();
+                    updateBatchDeleteButton();
+                    if (typeof window.hideLoading === 'function') {
+                        window.hideLoading();
+                    }
+                }, 1000);
+            } else {
+                if (typeof window.hideLoading === 'function') {
+                    window.hideLoading();
+                }
+                showAlert('danger', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (typeof window.hideLoading === 'function') {
+                window.hideLoading();
+            }
+            showAlert('danger', '刪除失敗，請稍後再試');
+        });
+    }
+}
+
+// 查看邀請記錄
+function viewInvitations(inviteeId, inviteeName) {
+    // 跳轉到邀請列表頁面，並篩選該受測人員
+    window.location.href = `{% url 'invitation_list' %}?invitee=${inviteeId}`;
+}
+
+// 全選/取消全選功能
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.invitee-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateBatchDeleteButton();
+}
+
+function selectAll() {
+    document.getElementById('selectAllCheckbox').checked = true;
+    toggleSelectAll();
+}
+
+function selectNone() {
+    document.getElementById('selectAllCheckbox').checked = false;
+    toggleSelectAll();
+}
+
+// 更新批量刪除按鈕狀態
+function updateBatchDeleteButton() {
+    const checkedBoxes = document.querySelectorAll('.invitee-checkbox:checked');
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    
+    if (checkedBoxes.length > 0) {
+        batchDeleteBtn.disabled = false;
+        batchDeleteBtn.innerHTML = `<i class="bi bi-trash me-1"></i>批量刪除 (${checkedBoxes.length})`;
+    } else {
+        batchDeleteBtn.disabled = true;
+        batchDeleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i>批量刪除';
+    }
+}
+
+// 批量刪除
+function batchDelete() {
+    const checkedBoxes = document.querySelectorAll('.invitee-checkbox:checked');
+    if (checkedBoxes.length === 0) return;
+    
+    document.getElementById('deleteCount').textContent = checkedBoxes.length;
+    new bootstrap.Modal(document.getElementById('batchDeleteModal')).show();
+}
+
+function confirmBatchDelete() {
+    const checkedBoxes = document.querySelectorAll('.invitee-checkbox:checked');
+    const inviteeIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+    // 這裡需要實作批量刪除的後端 API
+    showAlert('info', '批量刪除功能開發中...');
+    bootstrap.Modal.getInstance(document.getElementById('batchDeleteModal')).hide();
+}
+
+// Modal 重置功能
+document.getElementById('addInviteeModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('addInviteeForm').reset();
+    document.getElementById('notesCount').textContent = '0';
+    clearFormErrors();
+});
+</script>
+{% endblock %}

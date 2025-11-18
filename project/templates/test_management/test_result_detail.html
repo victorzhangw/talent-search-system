@@ -1,0 +1,882 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}測驗結果詳情 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_result_list' %}">評鑑結果列表</a></li>
+<li class="breadcrumb-item active">測驗結果詳情</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .result-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .radar-chart-container {
+        position: relative;
+        height: 500px;
+        width: 100%;
+        margin: 20px auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    #categoryRadarChart {
+        max-width: 100%;
+        max-height: 500px;
+    }
+    
+    .trait-score-bar {
+        height: 20px;
+        background: linear-gradient(to right, #28a745, #ffc107, #dc3545);
+        border-radius: 10px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .trait-score-fill {
+        height: 100%;
+        background: linear-gradient(to right, #007bff, #28a745);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+    
+    .trait-score-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 0.8rem;
+        font-weight: bold;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+    }
+    
+    .info-card {
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .info-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    
+    .status-indicator {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+    }
+    
+    .status-completed { background-color: #28a745; }
+    .status-failed { background-color: #dc3545; }
+    .status-crawling { background-color: #ffc107; animation: pulse 1.5s infinite; }
+
+    .card-header {
+        background-color: #EAF8FA;
+    }
+
+    .alert-success {
+        background-color: #F0F6ED;
+        border: none;
+    }
+    
+    .alert-danger {
+        background-color: #FEECED;
+        border: none;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-left: 2rem;
+        margin-bottom: 1rem;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: 0.5rem;
+        top: 0.5rem;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #007bff;
+    }
+    
+    .timeline-item::after {
+        content: '';
+        position: absolute;
+        left: 0.75rem;
+        top: 1.25rem;
+        width: 2px;
+        height: calc(100% - 0.5rem);
+        background: #e9ecef;
+    }
+    
+    .timeline-item:last-child::after {
+        display: none;
+    }
+    
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 結果標題區域 -->
+    <div class="result-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h4 class="mb-1">
+                    <i class="bi bi-person-circle me-2"></i>{{ result.test_invitation.invitee.name }}
+                </h4>
+                <p class="mb-2 opacity-75">
+                    
+                </p>
+                <h4 class="mb-1">
+                    <i class="bi bi-clipboard-check me-2"></i>{{ result.test_project.name }}
+                </h4>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group">
+                    {% if result.crawl_status == 'completed' %}
+                        <a href="{% url 'generate_test_result_pdf' result.id %}" class="btn btn-light">
+                            <i class="bi bi-file-pdf me-1"></i>下載報告
+                        </a>
+                        {% if is_admin %}
+                        <a href="{% url 'view_raw_data' result.id %}" class="btn btn-outline-light" target="_blank" title="管理員：查看爬蟲原始數據">
+                            <i class="bi bi-code-square me-1"></i>查看數據
+                        </a>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第一行：左側基本資訊 + 右側雷達圖 (col-lg-6 + col-lg-6) -->
+    <div class="row">
+        <!-- 左側：測驗結果概況、受測者資訊欄位、測驗狀態欄位 (col-lg-6) -->
+        <div class="col-lg-6">
+            <!-- 測驗結果概況 -->
+            {% comment %}檢查是否有任何數據可顯示{% endcomment %}
+            {% with score_exists=False prediction_exists=False %}
+                {% if result.test_project.score_field_chinese and result.test_project.score_field_system %}
+                    {% with score_value_direct=result.raw_data|get_item:result.test_project.score_field_system %}
+                    {% with score_value_performance=result.raw_data.performance_metrics|get_item:result.test_project.score_field_system %}
+                        {% if score_value_performance or score_value_direct %}
+                            {% with score_exists=True %}{% endwith %}
+                        {% endif %}
+                    {% endwith %}
+                    {% endwith %}
+                {% endif %}
+                
+                {% if result.test_project.prediction_field_chinese and result.test_project.prediction_field_system %}
+                    {% with prediction_value_direct=result.raw_data|get_item:result.test_project.prediction_field_system %}
+                    {% with prediction_value_performance=result.raw_data.performance_metrics|get_item:result.test_project.prediction_field_system %}
+                        {% if prediction_value_performance or prediction_value_direct %}
+                            {% with prediction_exists=True %}{% endwith %}
+                        {% endif %}
+                    {% endwith %}
+                    {% endwith %}
+                {% endif %}
+            {% endwith %}
+            
+            {% comment %}簡化版本：直接檢查數據{% endcomment %}
+            {% if result.test_project.score_field_chinese and result.test_project.score_field_system and result.raw_data.performance_metrics|get_item:result.test_project.score_field_system or result.test_project.prediction_field_chinese and result.test_project.prediction_field_system and result.raw_data.performance_metrics|get_item:result.test_project.prediction_field_system %}
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clipboard-data me-2"></i>測驗結果
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- 評分指標 -->
+                        {% if result.test_project.score_field_chinese and result.test_project.score_field_system %}
+                            {% with score_value_direct=result.raw_data|get_item:result.test_project.score_field_system %}
+                            {% with score_value_performance=result.raw_data.performance_metrics|get_item:result.test_project.score_field_system %}
+                            {% if score_value_performance or score_value_direct %}
+                            <div class="col-md-6">
+                                <div class="p-4 border rounded">
+                                    <div class="row align-items-center">
+                                        <!-- 左側：文字內容 -->
+                                        <div class="col-6 text-center">
+                                            <!-- 評分欄位中文名稱 -->
+                                            <h6 class="text-muted mb-1">{{ result.test_project.score_field_chinese }}</h6>
+                                            
+                                            <!-- Composite Index 描述（如果存在） -->
+                                            {% with composite_description=result.raw_data.performance_metrics.Composite_Index_Description %}
+                                            {% if composite_description %}
+                                                {% with description_parts=composite_description|split:":" %}
+                                                {% if description_parts|length > 1 %}
+                                                    <div class="text-info small">{{ description_parts.1|trim }}</div>
+                                                {% else %}
+                                                    <div class="text-info small">{{ composite_description }}</div>
+                                                {% endif %}
+                                                {% endwith %}
+                                            {% endif %}
+                                            {% endwith %}
+                                        </div>
+                                        
+                                        <!-- 右側：大數字 -->
+                                        <div class="col-6 text-center">
+                                            {% with ci_raw_value=result.raw_data.performance_metrics.CI_Raw_Value %}
+                                            {% if ci_raw_value %}
+                                                <h1 class="display-3 text-info mb-0 fw-bold fs-1">{{ ci_raw_value }}</h1>
+                                            {% elif score_value_performance %}
+                                                {% with clean_score=score_value_performance|cut:"%" %}
+                                                <h1 class="display-3 text-info mb-0 fw-bold fs-1">{{ clean_score }}</h1>
+                                                {% endwith %}
+                                            {% else %}
+                                                {% with clean_score=score_value_direct|cut:"%" %}
+                                                <h1 class="display-3 text-info mb-0 fw-bold fs-1">{{ clean_score }}</h1>
+                                                {% endwith %}
+                                            {% endif %}
+                                            {% endwith %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endwith %}
+                            {% endwith %}
+                        {% endif %}
+                        
+                        <!-- 預測指標 -->
+                        {% if result.test_project.prediction_field_chinese and result.test_project.prediction_field_system %}
+                            {% with prediction_value_direct=result.raw_data|get_item:result.test_project.prediction_field_system %}
+                            {% with prediction_value_performance=result.raw_data.performance_metrics|get_item:result.test_project.prediction_field_system %}
+                            {% if prediction_value_performance or prediction_value_direct %}
+                            <div class="col-md-6">
+                                <div class="p-4 border rounded">
+                                    <div class="row align-items-center">
+                                        <!-- 左側：文字內容 -->
+                                        <div class="col-8 text-center">
+                                            <h6 class="text-muted mb-1">{{ result.test_project.prediction_field_chinese }}</h6>
+                                        </div>
+                                        <!-- 右側：數值 -->
+                                        <div class="col-4 text-start">
+                                            {% if prediction_value_performance %}
+                                                <h1 class="display-3 mb-0 fw-bold fs-1" style="color: #FB828B;">{{ prediction_value_performance }}</h1>
+                                            {% else %}
+                                                <h1 class="display-3 mb-0 fw-bold fs-1" style="color: #FB828B;">{{ prediction_value_direct }}</h1>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endwith %}
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 受測者資訊與測驗狀態 -->
+            <div class="row">
+                <!-- 受測者資訊欄位 -->
+                <div class="col-lg-6">
+                    <div class="card info-card mb-4" style="min-height: 350px;">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-person me-2"></i>受測者資訊
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless table-sm">
+                                <tr>
+                                    <td class="fw-bold text-muted">姓名：</td>
+                                    <td>{{ result.test_invitation.invitee.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold text-muted">Email：</td>
+                                    <td>{{ result.test_invitation.invitee.email }}</td>
+                                </tr>
+                                {% if result.test_invitation.invitee.company %}
+                                <tr>
+                                    <td class="fw-bold text-muted">公司：</td>
+                                    <td>{{ result.test_invitation.invitee.company }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="fw-bold text-muted">狀態：</td>
+                                    <td>
+                                        <span class="badge bg-{% if result.test_invitation.invitee.status == 'employed' %}primary{% else %}secondary{% endif %}">
+                                            {{ result.test_invitation.invitee.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% if result.test_invitation.invitee.position %}
+                                <tr>
+                                    <td class="fw-bold text-muted">職位：</td>
+                                    <td>{{ result.test_invitation.invitee.position }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="fw-bold text-muted">測驗項目：</td>
+                                    <td>{{ result.test_project.name }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 測驗狀態欄位 -->
+                <div class="col-lg-6">
+                    <div class="card info-card mb-4" style="min-height: 350px;">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-info-circle me-2"></i>測驗狀態
+                            </h6>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex align-items-center mb-3">
+                                {% if result.crawl_status == 'completed' %}
+                                    <span class="status-indicator status-completed"></span>
+                                    <span class="badge bg-success">測驗完成</span>
+                                {% elif result.crawl_status == 'failed' %}
+                                    <span class="status-indicator status-failed"></span>
+                                    <span class="badge bg-danger">取得失敗</span>
+                                {% elif result.crawl_status == 'crawling' %}
+                                    <span class="status-indicator status-crawling"></span>
+                                    <span class="badge bg-warning">取得中</span>
+                                {% else %}
+                                    <span class="status-indicator bg-secondary"></span>
+                                    <span class="badge bg-secondary">待取得</span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- 時間軸 -->
+                            <div class="timeline flex-grow-1">
+                                <div class="timeline-item">
+                                    <strong>邀請發送</strong>
+                                    <div class="text-muted small">{{ result.test_invitation.invited_at|date:"Y-m-d H:i" }}</div>
+                                </div>
+                                {% if result.test_invitation.started_at %}
+                                <div class="timeline-item">
+                                    <strong>開始測驗</strong>
+                                    <div class="text-muted small">{{ result.test_invitation.started_at|date:"Y-m-d H:i" }}</div>
+                                </div>
+                                {% endif %}
+                                {% if result.test_invitation.completed_at %}
+                                <div class="timeline-item">
+                                    <strong>完成測驗</strong>
+                                    <div class="text-muted small">{{ result.test_invitation.completed_at|date:"Y-m-d H:i" }}</div>
+                                </div>
+                                {% endif %}
+                                {% if result.crawled_at %}
+                                <div class="timeline-item">
+                                    <strong>結果取得</strong>
+                                    <div class="text-muted small">{{ result.crawled_at|date:"Y-m-d H:i" }}</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：特質向度雷達圖 (col-lg-6) -->
+        <div class="col-lg-6">
+            <div class="card info-card mb-4" style="height: calc(100% - 1rem);">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-diagram-3 me-2"></i>特質向度雷達圖
+                        <!-- {% if category_scores %}
+                        <span class="badge bg-success">有數據</span>
+                        {% else %}
+                        <span class="badge bg-warning">無數據</span>
+                        {% endif %} -->
+                    </h6>
+                </div>
+                <div class="card-body py-2 d-flex align-items-center justify-content-center">
+                    {% if category_scores %}
+                    <div class="radar-chart-container">
+                        <canvas id="categoryRadarChart" width="600" height="600"></canvas>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info w-100">
+                        <p class="mb-0">暫無測驗結果數據可顯示雷達圖</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第二行：關鍵特質分數 (col-lg-12) -->
+    <div class="row">
+        <div class="col-lg-12">
+            {% if category_traits %}
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-star me-2"></i>關鍵特質分數
+                    </h6>
+                </div>
+                <div class="card-body px-4">
+                    <table class="table table-borderless">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 20%;">特質名稱</th>
+                                <th class="text-center" style="width: 10%;"></th>
+                                <th class="text-center" style="width: 70%;">分數</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% with unique_traits=category_traits|get_unique_traits %}
+                            {% for trait in unique_traits %}
+                            {% with headsupflag=result.raw_data|get_headsupflag:trait.system_name %}
+                            <tr>
+                                <td class="align-middle">
+                                    <strong>{{ trait.name }}</strong>
+                                </td>
+                                <td class="align-middle text-center">
+                                    {{ trait.score|floatformat:0 }}
+                                </td>
+                                <td class="align-middle text-center">
+                                    <div class="progress position-relative" style="height: 25px; background-color: #e9ecef;">
+                                        <div class="progress-bar" 
+                                             role="progressbar" 
+                                             style="width: {{ trait.score }}%; background-color: {% if headsupflag == 1 %}#FB828B{% else %}#9FDD95{% endif %};">
+                                        </div>
+                                        <div class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center">
+                                            <span class="text-white fw-bold">{{ trait.score|floatformat:0 }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% endfor %}
+                            {% endwith %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 第三行：左側圖表 + 右側分析 (col-lg-4 + col-lg-8) -->
+    {% if result.crawl_status == 'completed' %}
+    <div class="row">
+        <!-- 左側：圖表與發展建議區域 (col-lg-4) -->
+        <div class="col-lg-4">
+            <!-- 特質向度分數 -->
+            {% if category_scores %}
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-bar-chart me-2"></i>特質向度分數
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% for category, score in category_scores.items %}
+                    {% with category_obj=result.test_project|get_category_by_name:category %}
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #FFF0C1;">
+                            <h6 class="mb-0">{{ category }}</h6>
+                            <span class="fw-bold fs-5">{{ score|floatformat:0 }}</span>
+                        </div>
+                        <div class="card-body">
+                            {% if category_obj and category_obj.description %}
+                                <p class="mb-0">{{ category_obj.description }}</p>
+                            {% else %}
+                                <p class="mb-0 text-muted">暫無說明</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 發展建議參數 -->
+            {% if category_scores %}
+            {% with highest_category=category_scores|get_highest_score_category %}
+            {% if highest_category and highest_category.development_parameter_name %}
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-lightbulb me-2"></i>{{ highest_category.development_parameter_name }}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert ">
+                        {{ highest_category.development_parameter_content|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endwith %}
+            {% endif %}
+        </div>
+
+        <!-- 右側：綜合分析區域 (col-lg-8) -->
+        <div class="col-lg-8">
+            {% if mixed_role_categories %}
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-people-fill me-2"></i>混合型人才
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-primary mb-0">
+                        {{ mixed_role_sentence|default:'' }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <!-- 綜合分析 -->
+            {% if category_scores %}
+            <div class="card info-card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-bar-chart me-2"></i>綜合分析
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% with highest_category=category_scores|get_highest_score_category %}
+                    {% with lowest_category=category_scores|get_lowest_score_category %}
+                    {% if highest_category %}
+                    <div class="mb-3">
+                        <h6 class="text-success">
+                            <i class="bi bi-arrow-up-circle me-1"></i>優勢面向
+                        </h6>
+                        <div class="alert alert-success">
+                            <strong>{{ highest_category.name }}</strong>
+                            <div class="mt-2">{{ highest_category.advantage_analysis|safe }}</div>
+                        </div>
+                        {% if mixed_role_categories %}
+                            {% for category in mixed_role_categories %}
+                                {% if not highest_category or category.id != highest_category.id %}
+                                <div class="alert alert-success mt-3">
+                                    <strong>{{ category.name }}</strong>
+                                    <div class="mt-2">{{ category.advantage_analysis|default:'尚未提供資料'|safe }}</div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if lowest_category %}
+                    <div class="mb-3">
+                        <h6 class="text-danger">
+                            <i class="bi bi-arrow-down-circle me-1"></i>劣勢面向
+                        </h6>
+                        <div class="alert alert-danger text-dark">
+                            <strong>{{ lowest_category.name }}</strong>
+                            <div class="mt-2 ">{{ lowest_category.disadvantage_analysis|safe }}</div>
+                        </div>
+                        
+                        
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                    {% endwith %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <!-- 爬取失敗或未完成狀態 -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card info-card">
+                <div class="card-body text-center py-5">
+                    {% if result.crawl_status == 'failed' %}
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-danger">爬取失敗</h5>
+                        <p class="text-muted">測驗結果爬取過程中發生錯誤，請稍後重試。</p>
+                        <button type="button" class="btn btn-warning" onclick="retryCrawling()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>重新爬取
+                        </button>
+                    {% elif result.crawl_status == 'crawling' %}
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">爬取中...</span>
+                        </div>
+                        <h5 class="mt-3">正在爬取測驗結果</h5>
+                        <p class="text-muted">請稍後，這可能需要幾分鐘時間。</p>
+                    {% else %}
+                        <i class="bi bi-hourglass-split text-warning" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-warning">待爬取</h5>
+                        <p class="text-muted">測驗結果尚未開始爬取。</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if has_debug_data %}
+<div class="card info-card mb-4 border border-warning">
+    <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #FFF5E6;">
+        <div>
+            <h6 class="mb-0"><i class="bi bi-bug me-2"></i>特質比對 Debug</h6>
+            <small class="text-muted">左側為資料庫分類設定，右側為爬蟲抓到的特質分數。</small>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h6 class="fw-bold">資料庫分類特質</h6>
+                {% if debug_project_traits %}
+                <div class="accordion" id="dbTraitsAccordion">
+                    {% for category_name, category_info in debug_project_traits.items %}
+                    {% with traits=category_info.traits included=category_info.included has_missing=category_info.has_missing %}
+                    <div class="accordion-item {% if has_missing %}border border-danger{% endif %}">
+                        <h2 class="accordion-header" id="heading-db-{{ forloop.counter }}">
+                            <button class="accordion-button collapsed {% if has_missing %}text-danger bg-danger-subtle{% elif not included %}bg-warning-subtle{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-db-{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse-db-{{ forloop.counter }}">
+                                {{ category_name }}
+                                <span class="badge bg-secondary ms-2">{{ traits|length }}</span>
+                                {% if has_missing %}
+                                <span class="badge bg-danger ms-2">有特質未計算</span>
+                                {% elif not included %}
+                                <span class="badge bg-warning text-dark ms-2">未參與計算</span>
+                                {% else %}
+                                <span class="badge bg-success ms-2">全部計算</span>
+                                {% endif %}
+                            </button>
+                        </h2>
+                        <div id="collapse-db-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading-db-{{ forloop.counter }}" data-bs-parent="#dbTraitsAccordion">
+                            <div class="accordion-body p-2">
+                                {% if traits %}
+                                <ul class="list-group list-group-flush">
+                                    {% for trait in traits %}
+                                    <li class="list-group-item px-2 py-1 d-flex justify-content-between align-items-center {% if not trait.matched %}bg-warning-subtle border-warning text-danger{% endif %}">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                {{ trait.system_name }}
+                                                {% if not trait.matched %}
+                                                <span class="badge bg-danger ms-2">未找到分數</span>
+                                                {% else %}
+                                                <span class="badge bg-success-subtle text-success border border-success ms-2">已計算</span>
+                                                {% endif %}
+                                            </div>
+                                            <small class="text-muted">
+                                                {{ trait.chinese_name }} (ID: {{ trait.trait_id }})
+                                                {% if trait.score is not None %}
+                                                    · 分數 {{ trait.score|floatformat:2 }}
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                        <span class="badge bg-light text-dark border">權重 {{ trait.weight }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% else %}
+                                <div class="text-muted">此分類目前未設定特質。</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted">未找到分類特質設定。</div>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <h6 class="fw-bold">爬蟲抓到的特質分數</h6>
+                {% if debug_raw_traits %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 35%;">Key</th>
+                                <th style="width: 35%;">中文名稱</th>
+                                <th style="width: 15%;">分數</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trait in debug_raw_traits %}
+                            <tr class="{% if not trait.matched %}table-warning{% endif %}">
+                                <td class="fw-semibold">{{ trait.key }}</td>
+                                <td>{{ trait.chinese_name|default:"-" }}</td>
+                                <td>
+                                    {{ trait.score|default:"-" }}
+                                    {% if not trait.matched %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger ms-1">未匹配分類</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-muted">爬蟲資料中未找到特質分數。</div>
+                {% endif %}
+            </div>
+        </div>
+        {% if debug_summary_json %}
+        <div class="mt-3">
+            <h6 class="fw-bold">JSON 匹配摘要</h6>
+            <pre class="bg-dark text-light p-3 small overflow-auto" style="max-height: 460px;">{{ debug_summary_json|safe }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Chart.js Script -->
+{% if category_scores %}
+<script>
+// 動態載入並創建圖表
+function loadAndCreateChart() {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    script.onload = function() {
+        const canvas = document.getElementById('categoryRadarChart');
+        if (canvas) {
+            const chart = new Chart(canvas, {
+                type: 'radar',
+                data: {
+                    labels: {{ category_labels|safe }},
+                    datasets: [{
+                        label: '分類能力評估',
+                        data: {{ category_values|safe }},
+                        borderColor: '#4285f4',
+                        backgroundColor: 'rgba(66, 133, 244, 0.2)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#4285f4',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: {
+                            top: 20,
+                            bottom: 20,
+                            left: 20,
+                            right: 20
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return Math.round(context.parsed.r);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { 
+                                stepSize: 20,
+                                display: true,
+                                backdropColor: 'rgba(255, 255, 255, 0.8)',
+                                backdropPadding: 2,
+                                callback: function(value, index, values) {
+                                    if (value === 20 || value === 40 || value === 60 || value === 80 || value === 100) {
+                                        return value;
+                                    }
+                                    return '';
+                                },
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                },
+                                color: '#666'
+                            },
+                            pointLabels: {
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#333',
+                                callback: function(label, index) {
+                                    const values = {{ category_values|safe }};
+                                    return label + ' (' + Math.round(values[index]) + ')';
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            angleLines: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    };
+    document.head.appendChild(script);
+}
+
+// 立即執行
+loadAndCreateChart();
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('🚀 JavaScript 開始載入...');
+
+// 全域函數定義
+function handlePdfGeneration(link) {
+    console.log('PDF 按鈕被點擊:', link.href);
+    window.open(link.href, '_blank');
+    return false;
+}
+
+function testFunction() {
+    console.log('測試函數被調用');
+    alert('測試函數正常工作！');
+    return false;
+}
+
+// 註冊到全域
+window.handlePdfGeneration = handlePdfGeneration;
+window.testFunction = testFunction;
+
+console.log('✅ 所有函數已註冊:', {
+    handlePdfGeneration: typeof window.handlePdfGeneration,
+    testFunction: typeof window.testFunction
+});
+
+console.log('✅ 函數註冊完成！handlePdfGeneration: ' + typeof window.handlePdfGeneration);
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM 載入完成');
+});
+</script>
+{% endblock %}

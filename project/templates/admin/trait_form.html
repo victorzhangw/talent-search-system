@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}編輯特質{% else %}新增特質{% endif %} - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'trait_list' %}">測驗特質管理</a></li>
+<li class="breadcrumb-item active">{% if is_edit %}編輯特質{% else %}新增特質{% endif %}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0">
+            {% if is_edit %}
+                <i class="bi bi-pencil-square me-2"></i>編輯特質
+            {% else %}
+                <i class="bi bi-plus-circle me-2"></i>新增特質
+            {% endif %}
+        </h4>
+        <a href="{{ return_url }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left-circle me-1"></i>返回列表
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post" novalidate data-no-loading="true">
+                {% csrf_token %}
+                <input type="hidden" name="return_query" value="{{ return_query }}">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">中文特質名稱<span class="text-danger ms-1">*</span></label>
+                        {% with chinese_error=field_errors.chinese_name %}
+                        <input type="text" name="chinese_name" class="form-control{% if chinese_error %} is-invalid{% endif %}"
+                               value="{% if is_edit %}{{ trait.chinese_name }}{% else %}{{ form_data.chinese_name|default:'' }}{% endif %}"
+                               placeholder="輸入顯示在系統中的中文名稱" required>
+                        {% if chinese_error %}
+                        <div class="invalid-feedback">{{ chinese_error }}</div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">系統對應名稱<span class="text-danger ms-1">*</span></label>
+                        {% with system_error=field_errors.system_name %}
+                        <input type="text" name="system_name" class="form-control{% if system_error %} is-invalid{% endif %}"
+                               value="{% if is_edit %}{{ trait.system_name }}{% else %}{{ form_data.system_name|default:'' }}{% endif %}"
+                               placeholder="輸入系統識別使用的英文代碼" required>
+                        {% if system_error %}
+                        <div class="invalid-feedback">{{ system_error }}</div>
+                        {% endif %}
+                        {% endwith %}
+                        <div class="form-text">此欄位須唯一，建議使用英文或底線組合</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">特質描述</label>
+                        <textarea name="description" rows="6" class="form-control"
+                                  placeholder="補充說明此特質的定義與內容">{% if is_edit %}{{ trait.description }}{% else %}{{ form_data.description|default:'' }}{% endif %}</textarea>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{{ return_url }}" class="btn btn-outline-secondary">取消</a>
+                    <button type="submit" class="btn btn-primary">{% if is_edit %}儲存變更{% else %}建立特質{% endif %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

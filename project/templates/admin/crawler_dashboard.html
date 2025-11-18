@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}爬蟲管理儀表板{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item active">爬蟲管理儀表板</li>
+{% endblock %}
+
+{% block content %}
+<div class="crawler-dashboard">
+    <h1>🕷️ 爬蟲管理儀表板</h1>
+    
+    <!-- 統計卡片 -->
+    <div class="row" style="display: flex; gap: 20px; margin-bottom: 30px;">
+        <div class="stats-card">
+            <h3>待爬取邀請</h3>
+            <div class="stat-number" style="color: #ff6b35;">{{ pending_invitations }}</div>
+            <p>個邀請待處理</p>
+        </div>
+        
+        <div class="stats-card">
+            <h3>30天執行次數</h3>
+            <div class="stat-number" style="color: #007bff;">{{ stats.total_executions }}</div>
+            <p>次自動執行</p>
+        </div>
+        
+        <div class="stats-card">
+            <h3>成功率</h3>
+            <div class="stat-number" style="color: #28a745;">
+                {% if stats.total_executions > 0 %}
+                    {{ stats.successful_executions|floatformat:0 }}/{{ stats.total_executions }}
+                {% else %}
+                    -
+                {% endif %}
+            </div>
+            <p>執行成功率</p>
+        </div>
+        
+        <div class="stats-card">
+            <h3>爬取成功</h3>
+            <div class="stat-number" style="color: #17a2b8;">{{ stats.total_crawled }}</div>
+            <p>個結果已爬取</p>
+        </div>
+    </div>
+    
+    <!-- 操作按鈕 -->
+    <div class="actions" style="margin-bottom: 30px;">
+        <form method="post" action="{% url 'trigger_crawler' %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary" id="trigger-btn">
+                🚀 手動觸發爬蟲
+            </button>
+        </form>
+        
+        <a href="{% url 'crawler_logs' %}" class="btn btn-outline-secondary">
+            📋 查看執行日誌
+        </a>
+        
+        <a href="{% url 'crawler_settings' %}" class="btn btn-outline-secondary">
+            ⚙️ 爬蟲設定
+        </a>
+        
+        <a href="{% url 'crawler_schedule' %}" class="btn btn-outline-secondary">
+            ⏰ 排程管理
+        </a>
+    </div>
+    
+    <!-- 最近執行記錄 -->
+    <div class="recent-executions">
+        <h2>最近執行記錄</h2>
+        
+        {% if recent_executions %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>執行時間</th>
+                    <th>任務類型</th>
+                    <th>狀態</th>
+                    <th>成功/失敗/總計</th>
+                    <th>成功率</th>
+                    <th>執行訊息</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_executions %}
+                <tr>
+                    <td>{{ log.executed_at|date:"Y-m-d H:i" }}</td>
+                    <td>{{ log.get_task_name_display }}</td>
+                    <td>
+                        <span class="status-badge status-{{ log.status }}">
+                            {{ log.get_status_display }}
+                        </span>
+                    </td>
+                    <td>{{ log.success_count }}/{{ log.fail_count }}/{{ log.total_count }}</td>
+                    <td>
+                        <span style="color: {% if log.success_rate >= 90 %}green{% elif log.success_rate >= 70 %}orange{% else %}red{% endif %};">
+                            {{ log.success_rate }}%
+                        </span>
+                    </td>
+                    <td>{{ log.message|truncatechars:50 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>尚無執行記錄</p>
+        {% endif %}
+    </div>
+    
+    <!-- 即時狀態更新 -->
+    <div class="real-time-status" style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+        <h3>即時狀態 <span id="last-update" style="font-size: 12px; color: #666;"></span></h3>
+        <div id="status-content">
+            載入中...
+        </div>
+    </div>
+</div>
+
+<style>
+.stats-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+    min-width: 150px;
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.btn {
+    padding: 8px 16px;
+    margin: 0 5px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: #6c757d;
+    border: 1px solid #6c757d;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.table th, .table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #dee2e6;
+    text-align: left;
+}
+
+.table th {
+    background: #f8f9fa;
+    font-weight: bold;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.status-completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-running {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 自動更新狀態
+    function updateStatus() {
+        fetch('{% url "crawler_status_api" %}')
+            .then(response => response.json())
+            .then(data => {
+                const content = document.getElementById('status-content');
+                const lastUpdate = document.getElementById('last-update');
+                
+                let html = `
+                    <p><strong>待爬取邀請：</strong> ${data.pending_count} 個</p>
+                `;
+                
+                if (data.latest_execution) {
+                    html += `
+                        <p><strong>最近執行：</strong> ${new Date(data.latest_execution.time).toLocaleString()}</p>
+                        <p><strong>執行結果：</strong> 成功 ${data.latest_execution.success_count}，失敗 ${data.latest_execution.fail_count}</p>
+                    `;
+                }
+                
+                content.innerHTML = html;
+                lastUpdate.textContent = `(更新時間: ${new Date().toLocaleTimeString()})`;
+            })
+            .catch(error => {
+                console.error('更新狀態失敗:', error);
+            });
+    }
+    
+    // 初始載入
+    updateStatus();
+    
+    // 每30秒更新一次
+    setInterval(updateStatus, 30000);
+    
+    // 手動觸發按鈕
+    document.getElementById('trigger-btn').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        if (confirm('確定要手動觸發爬蟲任務嗎？')) {
+            this.disabled = true;
+            this.textContent = '🔄 執行中...';
+            
+            fetch('{% url "trigger_crawler" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('爬蟲任務已成功啟動！任務ID: ' + data.task_id);
+                    updateStatus(); // 立即更新狀態
+                } else {
+                    alert('啟動失敗: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('發生錯誤: ' + error);
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.textContent = '🚀 手動觸發爬蟲';
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

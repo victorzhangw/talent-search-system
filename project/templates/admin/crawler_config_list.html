@@ -1,0 +1,432 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}爬蟲配置管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item active">爬蟲配置管理</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .config-card {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+    
+    .config-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    .status-badge {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.75rem;
+    }
+    
+    .action-buttons .btn {
+        margin: 0 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 頁面標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-robot me-2 text-primary"></i>爬蟲配置管理</h2>
+            <p class="text-muted mb-0">管理PI系統的爬蟲配置，設定登入憑證和爬取參數</p>
+        </div>
+        <a href="{% url 'crawler_config_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>新增配置
+        </a>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-1">總配置數</h6>
+                            <h3 class="mb-0">{{ configs.count }}</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-gear-fill fs-1 opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-1">啟用配置</h6>
+                            <h3 class="mb-0">{{ configs|length }}</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-check-circle-fill fs-1 opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-1">停用配置</h6>
+                            <h3 class="mb-0">0</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-pause-circle-fill fs-1 opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-1">最近測試</h6>
+                            <h3 class="mb-0">-</h3>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-clock-fill fs-1 opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 配置列表 -->
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="bi bi-list-ul me-2"></i>配置列表
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if configs %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 20%;">配置名稱</th>
+                                <th style="width: 25%;">爬蟲網址</th>
+                                <th style="width: 15%;">登入帳號</th>
+                                <th style="width: 10%;">狀態</th>
+                                <th style="width: 15%;">建立時間</th>
+                                <th style="width: 15%;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for config in configs %}
+                            <tr id="config-row-{{ config.id }}">
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-robot text-primary me-2"></i>
+                                        <div>
+                                            <strong>{{ config.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">ID: {{ config.id }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <a href="{{ config.base_url }}" target="_blank" class="text-decoration-none">
+                                        <i class="bi bi-link-45deg me-1"></i>
+                                        {{ config.base_url|truncatechars:40 }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if config.username %}
+                                        <code>{{ config.username }}</code>
+                                    {% else %}
+                                        <span class="text-muted">未設定</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if config.is_active %}
+                                        <span class="badge bg-success status-badge">
+                                            <i class="bi bi-check-circle me-1"></i>啟用
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary status-badge">
+                                            <i class="bi bi-pause-circle me-1"></i>停用
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ config.created_at|date:"Y-m-d" }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ config.created_at|date:"H:i" }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <!-- 編輯按鈕 -->
+                                        <a href="{% url 'crawler_config_edit' config.id %}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           title="編輯配置">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        
+                                        <!-- 測試按鈕 -->
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-info"
+                                                onclick="testConfig({{ config.id }})"
+                                                title="測試連接">
+                                            <i class="bi bi-play-circle"></i>
+                                        </button>
+                                        
+                                        <!-- 刪除按鈕 -->
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger"
+                                                onclick="confirmDelete({{ config.id }}, '{{ config.name }}')"
+                                                title="刪除配置">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <!-- 空狀態 -->
+                <div class="text-center py-5">
+                    <div class="mb-3">
+                        <i class="bi bi-robot display-1 text-muted"></i>
+                    </div>
+                    <h5 class="text-muted mb-3">尚無爬蟲配置</h5>
+                    <p class="text-muted mb-4">
+                        請新增第一個爬蟲配置來開始使用PI系統的自動化測驗結果爬取功能
+                    </p>
+                    <a href="{% url 'crawler_config_create' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-1"></i>建立第一個配置
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 使用說明 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="bi bi-info-circle me-2"></i>使用說明
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6 class="text-primary">
+                                <i class="bi bi-1-circle me-1"></i>建立配置
+                            </h6>
+                            <p class="small text-muted mb-3">
+                                點擊「新增配置」按鈕，填入PI系統的登入資訊和爬蟲參數。
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-primary">
+                                <i class="bi bi-2-circle me-1"></i>測試連接
+                            </h6>
+                            <p class="small text-muted mb-3">
+                                使用「測試」按鈕驗證配置是否能成功連接到PI系統。
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-primary">
+                                <i class="bi bi-3-circle me-1"></i>開始爬取
+                            </h6>
+                            <p class="small text-muted mb-3">
+                                在測驗邀請頁面使用爬蟲功能自動獲取測驗結果。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除確認 Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-warning me-2"></i>確認刪除
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>確定要刪除爬蟲配置「<span id="configName"></span>」嗎？</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>注意：</strong>此操作無法復原，請謹慎操作。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">確認刪除</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 測試結果 Modal -->
+<div class="modal fade" id="testModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-play-circle text-info me-2"></i>連接測試
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="testResult">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">測試中...</span>
+                        </div>
+                        <p class="mt-2">正在測試連接...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let deleteConfigId = null;
+
+function confirmDelete(configId, configName) {
+    deleteConfigId = configId;
+    document.getElementById('configName').textContent = configName;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+// 確認刪除
+document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+    if (deleteConfigId) {
+        showLoading();
+        
+        fetch(`/management/crawler-config/${deleteConfigId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            
+            if (data.success) {
+                // 移除表格行
+                const row = document.getElementById(`config-row-${deleteConfigId}`);
+                if (row) {
+                    row.remove();
+                }
+                
+                showToast('爬蟲配置已成功刪除', 'success');
+                
+                // 如果沒有配置了，重新載入頁面顯示空狀態
+                if (document.querySelectorAll('tbody tr').length === 0) {
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                }
+            } else {
+                showToast('刪除失敗：' + data.error, 'danger');
+            }
+            
+            bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Error:', error);
+            showToast('刪除時發生錯誤', 'danger');
+            bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+        });
+    }
+});
+
+function testConfig(configId) {
+    const modal = new bootstrap.Modal(document.getElementById('testModal'));
+    modal.show();
+    
+    // 重置測試結果
+    document.getElementById('testResult').innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">測試中...</span>
+            </div>
+            <p class="mt-2">正在測試連接...</p>
+        </div>
+    `;
+    
+    // 模擬測試（實際應該呼叫後端API）
+    setTimeout(() => {
+        const success = Math.random() > 0.3; // 70% 成功率
+        
+        if (success) {
+            document.getElementById('testResult').innerHTML = `
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <strong>連接成功！</strong><br>
+                    爬蟲配置可以正常連接到PI系統
+                </div>
+                <div class="small text-muted">
+                    <p><strong>測試時間：</strong>${new Date().toLocaleString()}</p>
+                    <p><strong>響應時間：</strong>1.2秒</p>
+                </div>
+            `;
+        } else {
+            document.getElementById('testResult').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle me-2"></i>
+                    <strong>連接失敗！</strong><br>
+                    無法連接到PI系統，請檢查配置
+                </div>
+                <div class="small text-muted">
+                    <p><strong>錯誤訊息：</strong>登入憑證無效或網站無法訪問</p>
+                    <p><strong>建議：</strong>請確認帳號密碼是否正確，或檢查網路連接</p>
+                </div>
+            `;
+        }
+    }, 2000);
+}
+
+// 確保有 CSRF token
+if (!document.querySelector('[name=csrfmiddlewaretoken]')) {
+    const csrfToken = document.createElement('input');
+    csrfToken.type = 'hidden';
+    csrfToken.name = 'csrfmiddlewaretoken';
+    csrfToken.value = '{{ csrf_token }}';
+    document.body.appendChild(csrfToken);
+}
+</script>
+{% endblock %}

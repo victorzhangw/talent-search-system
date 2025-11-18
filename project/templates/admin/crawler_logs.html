@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}爬蟲執行日誌{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'crawler_dashboard' %}">爬蟲管理</a></li>
+<li class="breadcrumb-item active">執行日誌</li>
+{% endblock %}
+
+{% block content %}
+<div class="crawler-logs">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>📋 爬蟲執行日誌</h1>
+        <div>
+            <a href="{% url 'crawler_dashboard' %}" class="btn btn-outline-secondary">
+                ⬅️ 返回儀表板
+            </a>
+        </div>
+    </div>
+    
+    <!-- 搜尋和過濾 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="search" class="form-label">搜尋關鍵字</label>
+                    <input type="text" class="form-control" id="search" name="search" value="{{ search_query }}" placeholder="搜尋訊息或錯誤...">
+                </div>
+                <div class="col-md-3">
+                    <label for="task" class="form-label">任務類型</label>
+                    <select class="form-select" id="task" name="task">
+                        <option value="">全部任務</option>
+                        {% for choice in task_choices %}
+                            <option value="{{ choice.0 }}" {% if task_filter == choice.0 %}selected{% endif %}>
+                                {{ choice.1 }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="status" class="form-label">執行狀態</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">全部狀態</option>
+                        {% for choice in status_choices %}
+                            <option value="{{ choice.0 }}" {% if status_filter == choice.0 %}selected{% endif %}>
+                                {{ choice.1 }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-primary">🔍 搜尋</button>
+                        <a href="{% url 'crawler_logs' %}" class="btn btn-outline-secondary">清除</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 日誌列表 -->
+    {% if page_obj %}
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>執行時間</th>
+                            <th>任務類型</th>
+                            <th>狀態</th>
+                            <th>結果統計</th>
+                            <th>成功率</th>
+                            <th>執行時長</th>
+                            <th>訊息</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in page_obj %}
+                        <tr>
+                            <td>
+                                <small class="text-muted">{{ log.executed_at|date:"Y-m-d" }}</small><br>
+                                <strong>{{ log.executed_at|date:"H:i:s" }}</strong>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ log.get_task_name_display }}</span>
+                            </td>
+                            <td>
+                                <span class="badge 
+                                    {% if log.status == 'completed' %}bg-success
+                                    {% elif log.status == 'failed' %}bg-danger
+                                    {% elif log.status == 'running' %}bg-warning
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ log.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <small>
+                                    ✅ {{ log.success_count }} / 
+                                    ❌ {{ log.fail_count }} / 
+                                    📊 {{ log.total_count }}
+                                </small>
+                            </td>
+                            <td>
+                                <span class="fw-bold" style="color: 
+                                    {% if log.success_rate >= 90 %}green
+                                    {% elif log.success_rate >= 70 %}orange
+                                    {% else %}red{% endif %};">
+                                    {{ log.success_rate }}%
+                                </span>
+                            </td>
+                            <td>
+                                {% if log.duration %}
+                                    {{ log.duration|floatformat:1 }}s
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
+                                    {{ log.message|truncatechars:50 }}
+                                </div>
+                            </td>
+                            <td>
+                                <a href="{% url 'crawler_log_details' log.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye me-1"></i>詳情
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分頁 -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="日誌分頁">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if task_filter %}&task={{ task_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">上一頁</a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if task_filter %}&task={{ task_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if task_filter %}&task={{ task_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">下一頁</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <div class="mb-3">
+            <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
+        </div>
+        <h4 class="text-muted">暫無執行日誌</h4>
+        <p class="text-muted">當爬蟲任務執行後，相關日誌會顯示在這裡。</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 日誌詳情Modal -->
+<div class="modal fade" id="logDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">執行日誌詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="logDetailContent">
+                    <!-- 詳情內容會通過JavaScript填入 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showLogDetail(id, taskName, executedAt, message, errorDetails) {
+    const content = document.getElementById('logDetailContent');
+    
+    let html = `
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>任務類型：</strong></div>
+            <div class="col-md-9">${taskName}</div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>執行時間：</strong></div>
+            <div class="col-md-9">${executedAt}</div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>執行訊息：</strong></div>
+            <div class="col-md-9">
+                <div class="bg-light p-3 rounded" style="white-space: pre-wrap;">${message || '無訊息'}</div>
+            </div>
+        </div>
+    `;
+    
+    if (errorDetails && errorDetails.trim()) {
+        html += `
+            <div class="row mb-3">
+                <div class="col-md-3"><strong>錯誤詳情：</strong></div>
+                <div class="col-md-9">
+                    <div class="bg-danger-subtle p-3 rounded" style="white-space: pre-wrap; color: #842029;">${errorDetails}</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    content.innerHTML = html;
+    
+    const modal = new bootstrap.Modal(document.getElementById('logDetailModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

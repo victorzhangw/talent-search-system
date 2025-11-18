@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ project.name }} - 測驗項目詳情 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_templates' %}">測驗項目</a></li>
+<li class="breadcrumb-item active">{{ project.name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 測驗項目基本資訊 -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="bi bi-clipboard-check me-2"></i>{{ project.name }}
+                    </h4>
+                    <span class="badge bg-{% if project.assignment_type == 'all_open' %}success{% elif project.assignment_type == 'enterprise_only' %}info{% elif project.assignment_type == 'specific_assignment' %}warning{% else %}secondary{% endif %} fs-6">
+                        {{ project.get_assignment_type_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">{{ project.description|default:"暫無描述" }}</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>評分欄位：</strong>{{ project.score_field_chinese }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>預測欄位：</strong>{{ project.prediction_field_chinese }}
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="{{ project.test_link }}" target="_blank" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>前往測驗網站
+                        </a>
+                        <button class="btn btn-success" onclick="startInvitation({{ project.id }}, '{{ project.name }}')">
+                            <i class="bi bi-envelope-plus me-1"></i>發送邀請
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- 邀請統計 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-graph-up me-2"></i>邀請統計
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-primary mb-0">{{ invitation_stats.total }}</div>
+                            <small class="text-muted">總邀請數</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-warning mb-0">{{ invitation_stats.pending }}</div>
+                            <small class="text-muted">待完成</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h4 text-success mb-0">{{ invitation_stats.completed }}</div>
+                            <small class="text-muted">已完成</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h4 text-danger mb-0">{{ invitation_stats.expired }}</div>
+                            <small class="text-muted">已過期</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分類和特質 -->
+    <div class="row">
+        {% for category in categories %}
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{{ category.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <!-- 優劣勢分析 -->
+                    <div class="mb-3">
+                        <h6 class="text-success">
+                            <i class="bi bi-plus-circle me-1"></i>優勢分析
+                        </h6>
+                        <div class="text-muted small">
+                            {{ category.advantage_analysis|linebreaks }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-danger">
+                            <i class="bi bi-dash-circle me-1"></i>劣勢分析
+                        </h6>
+                        <div class="text-muted small">
+                            {{ category.disadvantage_analysis|linebreaks }}
+                        </div>
+                    </div>
+                    
+                    <!-- 特質列表 -->
+                    {% if category.traits.exists %}
+                    <div>
+                        <h6>
+                            <i class="bi bi-star me-1"></i>相關特質
+                        </h6>
+                        <div class="row">
+                            {% for trait in category.traits.all %}
+                            <div class="col-md-6 mb-2">
+                                <span class="badge bg-light text-dark border">
+                                    {{ trait.chinese_name }}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function startInvitation(projectId, projectName) {
+    // 這裡之後會實作邀請功能
+    alert('即將實作發送邀請功能，測驗項目：' + projectName);
+}
+</script>
+{% endblock %}

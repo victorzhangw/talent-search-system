@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}操作日誌詳情{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'activity_log_list' %}">操作日誌</a></li>
+<li class="breadcrumb-item active">詳情</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">操作日誌詳情</h5>
+                <a href="{% url 'activity_log_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> 返回列表
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h6 class="mb-0">基本資訊</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <th class="ps-0" style="width: 120px;">日誌 ID:</th>
+                                        <td>{{ log.id }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="ps-0">操作時間:</th>
+                                        <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="ps-0">操作用戶:</th>
+                                        <td>{{ log.user }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="ps-0">IP 地址:</th>
+                                        <td>{{ log.ip_address }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h6 class="mb-0">操作詳情</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <th class="ps-0" style="width: 120px;">操作類型:</th>
+                                        <td>
+                                            <span class="badge 
+                                                {% if log.action == 'create' %}bg-success
+                                                {% elif log.action == 'update' %}bg-info
+                                                {% elif log.action == 'delete' %}bg-danger
+                                                {% elif log.action == 'login' or log.action == 'logout' %}bg-secondary
+                                                {% elif log.action == 'approve' %}bg-primary
+                                                {% elif log.action == 'reject' %}bg-warning
+                                                {% else %}bg-dark
+                                                {% endif %}
+                                            ">
+                                                {{ action_label }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="ps-0">對象類型:</th>
+                                        <td>{{ target_label }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="ps-0">對象 ID:</th>
+                                        <td>{{ log.target_id|default:"--" }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 操作內容 -->
+                {% if log.content %}
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">操作內容</h6>
+                    </div>
+                    <div class="card-body">
+                        {% if content_data %}
+                            {% if content_data.message %}
+                            <div class="mb-3">
+                                <p class="mb-0">{{ content_data.message }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if content_data.changes %}
+                            <div>
+                                <h6>變更詳情:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>欄位</th>
+                                                <th>舊值</th>
+                                                <th>新值</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for field, values in content_data.changes.items %}
+                                            <tr>
+                                                <td>{{ field }}</td>
+                                                <td>{{ values.0 }}</td>
+                                                <td>{{ values.1 }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <pre class="bg-light p-3 rounded mb-0">{{ log.content }}</pre>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- 相關操作 -->
+                <div class="mt-4">
+                    <a href="{% url 'activity_log_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> 返回列表
+                    </a>
+                    
+                    <!-- 可以添加其他相關操作按鈕 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

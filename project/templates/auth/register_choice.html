@@ -1,0 +1,70 @@
+{% extends 'auth/auth_base.html' %}
+{% load static %}
+
+{% block title %}選擇註冊類型{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">註冊</li>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header text-center bg-primary text-white">
+                    <img src="{% static 'img/auth_logo.png' %}" alt="Traitty 特質評鑑" class="auth-logo">
+                    <h3><i class="bi bi-person-plus me-2"></i>選擇註冊類型</h3>
+                </div>
+                <div class="card-body p-5">
+                    <div class="row">
+                        <!-- 個人註冊 -->
+                        <div class="col-md-6 mb-4">
+                            <div class="text-center">
+                                <div class="mb-3">
+                                    <i class="bi bi-person-circle text-primary" style="font-size: 4rem;"></i>
+                                </div>
+                                <h4>個人用戶</h4>
+                                <p class="text-muted mb-4">
+                                    適合個人使用者<br>
+                                    快速註冊，立即開始測驗
+                                </p>
+                                <a href="{% url 'individual_register' %}" class="btn btn-primary btn-lg w-100">
+                                    <i class="bi bi-arrow-right me-2"></i>個人註冊
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- 企業註冊 -->
+                        <div class="col-md-6 mb-4">
+                            <div class="text-center">
+                                <div class="mb-3">
+                                    <i class="bi bi-building text-success" style="font-size: 4rem;"></i>
+                                </div>
+                                <h4>企業用戶</h4>
+                                <p class="text-muted mb-4">
+                                    適合企業人資部門<br>
+                                    管理員工測驗，批量邀請
+                                </p>
+                                <a href="{% url 'enterprise_register' %}" class="btn btn-success btn-lg w-100">
+                                    <i class="bi bi-arrow-right me-2"></i>企業註冊
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <p class="mb-2">已經有帳號了？</p>
+                        <a href="{% url 'login' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>立即登入
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

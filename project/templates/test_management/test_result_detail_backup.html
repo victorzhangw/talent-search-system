@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}測驗結果詳情 - UPDATED VERSION - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_result_list' %}">測驗結果管理</a></li>
+<li class="breadcrumb-item active">測驗結果詳情</li>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('🚀 JavaScript 開始載入...');
+
+// 全域函數定義
+function addDebugMessage(message) {
+    console.log('[調試] ' + message);
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;top:10px;right:10px;background:black;color:lime;padding:10px;z-index:9999;font-family:monospace;border:1px solid lime;';
+    container.textContent = '[' + new Date().toLocaleTimeString() + '] ' + message;
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), 5000);
+}
+
+function handlePdfGeneration(link) {
+    console.log('PDF 按鈕被點擊:', link.href);
+    addDebugMessage('PDF 按鈕被點擊');
+    window.open(link.href, '_blank');
+    return false;
+}
+
+function testFunction() {
+    console.log('測試函數被調用');
+    alert('測試函數正常工作！');
+    return false;
+}
+
+// 註冊到全域
+window.addDebugMessage = addDebugMessage;
+window.handlePdfGeneration = handlePdfGeneration;
+window.testFunction = testFunction;
+
+console.log('✅ 所有函數已註冊:', {
+    addDebugMessage: typeof window.addDebugMessage,
+    handlePdfGeneration: typeof window.handlePdfGeneration,
+    testFunction: typeof window.testFunction
+});
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM 載入完成');
+    // 調試訊息已禁用
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- 測驗結果詳情標題 -->
+            <div class="result-header text-center">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <h2>
+                            <i class="bi bi-person-circle me-2"></i>
+                            {{ result.test_invitation.invitee.name }}
+                        </h2>
+                        <p class="mb-0">{{ result.test_invitation.invitee.email }}</p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <h3>{{ result.test_project.name }}</h3>
+                        <span class="badge bg-light text-dark fs-6">
+                            {% if result.crawled_at %}
+                                爬取時間：{{ result.crawled_at|date:"Y-m-d H:i" }}
+                            {% else %}
+                                待處理
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="btn-group">
+                            {% if result.crawl_status == 'completed' %}
+                                <a href="{% url 'generate_test_result_pdf' result.id %}" class="btn btn-light" target="_blank" onclick="return window.handlePdfGeneration ? window.handlePdfGeneration(this) : (console.error('handlePdfGeneration 未定義'), false);">
+                                    <i class="bi bi-file-pdf me-1"></i>生成報告
+                                </a>
+                                <a href="{% url 'generate_test_result_pdf' result.id %}" class="btn btn-outline-info btn-sm" target="_blank" title="直接下載（備用）" onclick="window.addDebugMessage ? window.addDebugMessage('🔄 備用按鈕被點擊: ' + this.href) : console.log('addDebugMessage 未定義'); console.log('備用按鈕被點擊:', this.href);">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                {% if result.id %}
+                                <a href="{% url 'export_test_result' result.id %}" class="btn btn-outline-light">
+                                    <i class="bi bi-download me-1"></i>匯出數據
+                                </a>
+                                <button type="button" class="btn btn-warning btn-sm" onclick="return window.testFunction ? window.testFunction() : console.error('testFunction 未定義');">
+                                    🧪 測試
+                                </button>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <h5>測試內容</h5>
+                    <p>這是一個簡化的測試頁面，用於調試 PDF 生成功能。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

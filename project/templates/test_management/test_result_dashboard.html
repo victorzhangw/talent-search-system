@@ -1,0 +1,397 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}測驗結果儀表板 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_result_list' %}">測驗結果管理</a></li>
+<li class="breadcrumb-item active">統計儀表板</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        transition: all 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    
+    .chart-card {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .chart-card:hover {
+        box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    }
+    
+    .progress-ring {
+        width: 120px;
+        height: 120px;
+    }
+    
+    .progress-ring circle {
+        transition: stroke-dasharray 0.35s;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+    }
+    
+    .activity-item {
+        border-left: 3px solid #e9ecef;
+        padding-left: 15px;
+        margin-bottom: 15px;
+        position: relative;
+    }
+    
+    .activity-item::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 5px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #6c757d;
+    }
+    
+    .activity-item.success::before { background: #198754; }
+    .activity-item.warning::before { background: #ffc107; }
+    .activity-item.danger::before { background: #dc3545; }
+    
+    .metric-icon {
+        font-size: 2.5rem;
+        opacity: 0.8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-graph-up me-2"></i>測驗結果統計儀表板</h2>
+        <div class="btn-group">
+            <a href="{% url 'test_result_list' %}" class="btn btn-outline-primary">
+                <i class="bi bi-list-ul me-1"></i>結果列表
+            </a>
+            <button type="button" class="btn btn-primary" onclick="refreshDashboard()">
+                <i class="bi bi-arrow-clockwise me-1"></i>重新整理
+            </button>
+        </div>
+    </div>
+
+    <!-- 核心統計指標 -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <i class="bi bi-envelope-check metric-icon mb-3 d-block"></i>
+                    <h3 class="mb-1">{{ stats.total_invitations }}</h3>
+                    <p class="mb-0">總邀請數</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card bg-success text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-check-circle metric-icon mb-3 d-block"></i>
+                    <h3 class="mb-1">{{ stats.completed_invitations }}</h3>
+                    <p class="mb-0">已完成測驗</p>
+                    <small class="opacity-75">完成率 {{ stats.completion_rate|floatformat:1 }}%</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card bg-info text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-download metric-icon mb-3 d-block"></i>
+                    <h3 class="mb-1">{{ stats.crawled_results }}</h3>
+                    <p class="mb-0">已爬取結果</p>
+                    <small class="opacity-75">爬取率 {{ stats.crawl_rate|floatformat:1 }}%</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white text-center">
+                <div class="card-body">
+                    <i class="bi bi-exclamation-triangle metric-icon mb-3 d-block"></i>
+                    <h3 class="mb-1">{{ stats.failed_results }}</h3>
+                    <p class="mb-0">爬取失敗</p>
+                    {% if stats.crawled_results > 0 %}
+                        <small class="opacity-75">失敗率 {{ stats.failed_results|mul:100|div:stats.crawled_results|floatformat:1 }}%</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 爬蟲狀態分佈 -->
+        <div class="col-xl-6 mb-4">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pie-chart me-2"></i>爬蟲狀態分佈
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-secondary mb-1">{{ crawl_status_stats.pending }}</h4>
+                                <small class="text-muted">待爬取</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-warning mb-1">{{ crawl_status_stats.crawling }}</h4>
+                                <small class="text-muted">爬取中</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-success mb-1">{{ crawl_status_stats.completed }}</h4>
+                                <small class="text-muted">已完成</small>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="border rounded p-3">
+                                <h4 class="text-danger mb-1">{{ crawl_status_stats.failed }}</h4>
+                                <small class="text-muted">失敗</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 簡單的進度條視覺化 -->
+                    <div class="mt-3">
+                        {% with total=crawl_status_stats.pending|add:crawl_status_stats.crawling|add:crawl_status_stats.completed|add:crawl_status_stats.failed %}
+                        {% if total > 0 %}
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar bg-secondary" style="width: {{ crawl_status_stats.pending|mul:100|div:total }}%" 
+                                 title="待爬取: {{ crawl_status_stats.pending }}">
+                                {% if crawl_status_stats.pending > 0 %}{{ crawl_status_stats.pending }}{% endif %}
+                            </div>
+                            <div class="progress-bar bg-warning" style="width: {{ crawl_status_stats.crawling|mul:100|div:total }}%" 
+                                 title="爬取中: {{ crawl_status_stats.crawling }}">
+                                {% if crawl_status_stats.crawling > 0 %}{{ crawl_status_stats.crawling }}{% endif %}
+                            </div>
+                            <div class="progress-bar bg-success" style="width: {{ crawl_status_stats.completed|mul:100|div:total }}%" 
+                                 title="已完成: {{ crawl_status_stats.completed }}">
+                                {% if crawl_status_stats.completed > 0 %}{{ crawl_status_stats.completed }}{% endif %}
+                            </div>
+                            <div class="progress-bar bg-danger" style="width: {{ crawl_status_stats.failed|mul:100|div:total }}%" 
+                                 title="失敗: {{ crawl_status_stats.failed }}">
+                                {% if crawl_status_stats.failed > 0 %}{{ crawl_status_stats.failed }}{% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 測驗項目使用統計 -->
+        <div class="col-xl-6 mb-4">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-bar-chart me-2"></i>測驗項目使用統計
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if project_stats %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>測驗項目</th>
+                                        <th class="text-end">邀請數</th>
+                                        <th class="text-end">完成數</th>
+                                        <th>完成率</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for project in project_stats %}
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">{{ project.test_project__name|truncatechars:25 }}</div>
+                                        </td>
+                                        <td class="text-end">{{ project.invitation_count }}</td>
+                                        <td class="text-end">{{ project.completed_count }}</td>
+                                        <td>
+                                            {% with rate=project.completed_count|mul:100|div:project.invitation_count %}
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                                    <div class="progress-bar" style="width: {{ rate }}%"></div>
+                                                </div>
+                                                <small class="text-muted">{{ rate|floatformat:0 }}%</small>
+                                            </div>
+                                            {% endwith %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-graph-up text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2">暫無統計數據</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 最近活動 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>最近爬蟲活動
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_results %}
+                        <div class="row">
+                            {% for result in recent_results %}
+                            <div class="col-xl-6 mb-3">
+                                <div class="activity-item {% if result.crawl_status == 'completed' %}success{% elif result.crawl_status == 'failed' %}danger{% else %}warning{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="fw-semibold">{{ result.test_invitation.invitee.name }}</div>
+                                            <div class="text-muted small">{{ result.test_project.name|truncatechars:40 }}</div>
+                                            <div class="text-muted small">
+                                                <i class="bi bi-envelope me-1"></i>{{ result.test_invitation.invitee.email }}
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            {% if result.crawl_status == 'completed' %}
+                                                <span class="badge bg-success">已完成</span>
+                                            {% elif result.crawl_status == 'failed' %}
+                                                <span class="badge bg-danger">失敗</span>
+                                            {% elif result.crawl_status == 'crawling' %}
+                                                <span class="badge bg-warning">爬取中</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">待處理</span>
+                                            {% endif %}
+                                            <div class="text-muted small mt-1">
+                                                {% if result.crawled_at %}
+                                                    {{ result.crawled_at|date:"m/d H:i" }}
+                                                {% else %}
+                                                    {{ result.created_at|date:"m/d H:i" }}
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="text-center mt-3">
+                            <a href="{% url 'test_result_list' %}" class="btn btn-outline-primary">
+                                <i class="bi bi-list-ul me-1"></i>查看全部結果
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+                            <h6 class="mt-3 text-muted">暫無最近活動</h6>
+                            <p class="text-muted">開始您的第一個測驗邀請吧！</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化 tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // 自動重新整理（每5分鐘）
+    setInterval(function() {
+        updateActivityStatus();
+    }, 300000); // 5分鐘
+});
+
+// 重新整理儀表板
+function refreshDashboard() {
+    showLoading();
+    window.location.reload();
+}
+
+// 更新活動狀態（用於自動重新整理）
+function updateActivityStatus() {
+    // 這裡可以實作 AJAX 更新最新的爬蟲狀態
+    fetch('/management/test-results/dashboard/status/', {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.has_updates) {
+            // 如果有更新，顯示提示
+            showToast('有新的爬蟲活動更新', 'info');
+        }
+    })
+    .catch(error => {
+        console.log('Status check failed:', error);
+    });
+}
+
+// Toast 通知
+function showToast(message, type = 'info') {
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast show bg-${type}`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="toast-header">
+            <strong class="me-auto">${type === 'success' ? '成功' : type === 'danger' ? '錯誤' : '提示'}</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body text-white">
+            ${message}
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // 自動關閉
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+
+// 顯示載入狀態
+function showLoading() {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+        loadingOverlay.classList.remove('d-none');
+    }
+}
+</script>
+{% endblock %}

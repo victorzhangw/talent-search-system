@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block title %}角色權限管理{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item">系統管理</li>
+<li class="breadcrumb-item active">角色權限</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">角色列表</h5>
+            <button class="btn btn-primary" onclick="showAddRoleModal()">
+                <i class="bi bi-plus"></i> 新增角色
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- 角色列表 -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>角色名稱</th>
+                            <th>描述</th>
+                            <th>用戶數量</th>
+                            <th>創建時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>系統管理員</td>
+                            <td>擁有所有系統權限</td>
+                            <td>1</td>
+                            <td>2024-02-24</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="showEditRoleModal(1)">編輯</button>
+                                <button class="btn btn-sm btn-warning" onclick="showPermissionModal(1)">權限設定</button>
+                                <button class="btn btn-sm btn-danger" onclick="confirmDeleteRole(1)">刪除</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>一般用戶</td>
+                            <td>基本操作權限</td>
+                            <td>5</td>
+                            <td>2024-02-24</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="showEditRoleModal(2)">編輯</button>
+                                <button class="btn btn-sm btn-warning" onclick="showPermissionModal(2)">權限設定</button>
+                                <button class="btn btn-sm btn-danger" onclick="confirmDeleteRole(2)">刪除</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增/編輯角色 Modal -->
+<div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">新增角色</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="roleForm">
+                    <div class="mb-3">
+                        <label class="form-label">角色名稱</label>
+                        <input type="text" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveRole()">儲存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 權限設定 Modal -->
+<div class="modal fade" id="permissionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">權限設定</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- 系統管理權限 -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="systemManage">
+                                    <label class="form-check-label" for="systemManage">
+                                        系統管理
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="userManage">
+                                    <label class="form-check-label" for="userManage">
+                                        用戶管理
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="roleManage">
+                                    <label class="form-check-label" for="roleManage">
+                                        角色管理
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="logManage">
+                                    <label class="form-check-label" for="logManage">
+                                        日誌管理
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 業務管理權限 -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="businessManage">
+                                    <label class="form-check-label" for="businessManage">
+                                        業務管理
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="quoteManage">
+                                    <label class="form-check-label" for="quoteManage">
+                                        報價管理
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="orderManage">
+                                    <label class="form-check-label" for="orderManage">
+                                        訂單管理
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="shipmentManage">
+                                    <label class="form-check-label" for="shipmentManage">
+                                        出貨管理
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="savePermissions()">儲存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 新增角色
+function showAddRoleModal() {
+    const modal = new bootstrap.Modal(document.getElementById('roleModal'));
+    document.querySelector('#roleModal .modal-title').textContent = '新增角色';
+    document.getElementById('roleForm').reset();
+    modal.show();
+}
+
+// 編輯角色
+function showEditRoleModal(roleId) {
+    const modal = new bootstrap.Modal(document.getElementById('roleModal'));
+    document.querySelector('#roleModal .modal-title').textContent = '編輯角色';
+    // 這裡之後會加載角色數據
+    modal.show();
+}
+
+// 顯示權限設定
+function showPermissionModal(roleId) {
+    const modal = new bootstrap.Modal(document.getElementById('permissionModal'));
+    // 這裡之後會加載該角色的權限數據
+    modal.show();
+}
+
+// 刪除角色
+function confirmDeleteRole(roleId) {
+    if (confirm('確定要刪除此角色嗎？此操作將影響所有使用此角色的用戶。')) {
+        // 這裡之後會執行刪除操作
+        showToast('角色已刪除', 'success');
+    }
+}
+
+// 儲存角色
+function saveRole() {
+    const form = document.getElementById('roleForm');
+    if (form.checkValidity()) {
+        // 這裡之後會執行儲存操作
+        const modal = bootstrap.Modal.getInstance(document.getElementById('roleModal'));
+        modal.hide();
+        showToast('角色資料已儲存', 'success');
+    } else {
+        form.classList.add('was-validated');
+    }
+}
+
+// 儲存權限設定
+function savePermissions() {
+    // 這裡之後會執行權限儲存操作
+    const modal = bootstrap.Modal.getInstance(document.getElementById('permissionModal'));
+    modal.hide();
+    showToast('權限設定已更新', 'success');
+}
+
+// 權限群組全選/取消全選
+document.querySelectorAll('.card-header .form-check-input').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const card = this.closest('.card');
+        card.querySelectorAll('.card-body .form-check-input').forEach(item => {
+            item.checked = this.checked;
+        });
+    });
+});
+</script>
+{% endblock %}

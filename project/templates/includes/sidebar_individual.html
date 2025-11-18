@@ -1,0 +1,41 @@
+<!-- 個人用戶 Sidebar -->
+<div class="py-3">
+    <!-- 基本功能 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">基本功能</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'home' %}" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                    <i class="bi bi-house-door me-2"></i> 首頁
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'point_dashboard' %}" class="nav-link {% if 'points' in request.path %}active{% endif %}">
+                    <i class="bi bi-coin me-2"></i> 點數管理
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 個人功能 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">個人功能</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'profile_view' %}" class="nav-link">
+                    <i class="bi bi-person me-2"></i> 個人資料
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'individual_tests' %}" class="nav-link {% if 'individual-tests' in request.path %}active{% endif %}">
+                    <i class="bi bi-clipboard-data me-2"></i> 我的測驗
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'individual_test_results_list' %}" class="nav-link {% if 'my-test-results' in request.path %}active{% endif %}">
+                    <i class="bi bi-file-earmark-bar-graph me-2"></i> 我的結果
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>

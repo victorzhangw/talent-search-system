@@ -1,0 +1,271 @@
+{# templates/file_manager/file_upload.html #}
+{% extends 'base.html' %}
+
+{% block title %}上傳檔案{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'file_list' %}">檔案管理</a></li>
+<li class="breadcrumb-item active">上傳檔案</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 col-md-10 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">上傳檔案</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- 檔案選擇區域 -->
+                    <div class="mb-4">
+                        <div class="border rounded p-4 text-center dropzone" id="dropzone">
+                            <input type="file" name="file" id="fileInput" class="d-none" required>
+                            <div class="upload-icon mb-3">
+                                <i class="bi bi-cloud-arrow-up" style="font-size: 3rem; color: #6c757d;"></i>
+                            </div>
+                            <h5 class="mb-2">將檔案拖曳至此處或點擊上傳</h5>
+                            <p class="text-muted mb-3">支援的檔案類型: PDF, Word, Excel, 圖片, 等</p>
+                            <button type="button" class="btn btn-primary" id="browseButton">
+                                <i class="bi bi-folder2-open me-1"></i> 瀏覽檔案
+                            </button>
+                        </div>
+                        <div class="invalid-feedback">請選擇檔案</div>
+                    </div>
+                    
+                    <!-- 已選擇檔案預覽區 -->
+                    <div class="mb-4 d-none" id="filePreview">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">已選擇的檔案</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="file-icon me-3">
+                                        <i class="bi bi-file-earmark" style="font-size: 2rem;"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h6 class="file-name mb-1">filename.ext</h6>
+                                        <div class="text-muted small file-info">大小: 0 KB</div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="removeFile">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 檔案資訊 -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label">檔案描述 (選填)</label>
+                        <textarea class="form-control" name="description" id="description" rows="3" placeholder="請輸入檔案的描述或備註..."></textarea>
+                    </div>
+                    
+                    <!-- 上傳者資訊 (模擬，實際應用中會從登入用戶獲取) -->
+                    <div class="mb-4">
+                        <label for="uploaded_by" class="form-label">上傳者</label>
+                        <input type="text" class="form-control" name="uploaded_by" id="uploaded_by" value="admin" readonly>
+                        <div class="form-text">這是開發環境，實際應用會自動使用登入用戶</div>
+                    </div>
+                    
+                    <!-- 上傳進度 -->
+                    <div class="mb-4 d-none" id="uploadProgress">
+                        <label class="form-label">上傳進度</label>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="text-center mt-2">
+                            <span class="progress-text">準備上傳...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 按鈕區域 -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'file_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> 返回列表
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="uploadButton">
+                            <i class="bi bi-upload me-1"></i> 上傳檔案
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const browseButton = document.getElementById('browseButton');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = filePreview.querySelector('.file-name');
+        const fileInfo = filePreview.querySelector('.file-info');
+        const fileIcon = filePreview.querySelector('.file-icon i');
+        const removeFile = document.getElementById('removeFile');
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadButton = document.getElementById('uploadButton');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressBar = uploadProgress.querySelector('.progress-bar');
+        const progressText = uploadProgress.querySelector('.progress-text');
+        
+        // 點擊瀏覽按鈕
+        browseButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // 拖曳區域事件處理
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+        
+        // 拖曳效果
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, function() {
+                dropzone.classList.add('border-primary');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, function() {
+                dropzone.classList.remove('border-primary');
+            }, false);
+        });
+        
+        // 檔案拖放處理
+        dropzone.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length > 0) {
+                fileInput.files = files;
+                updateFilePreview();
+            }
+        }, false);
+        
+        // 檔案選擇處理
+        fileInput.addEventListener('change', function() {
+            if (fileInput.files.length > 0) {
+                updateFilePreview();
+            }
+        });
+        
+        // 更新檔案預覽
+        function updateFilePreview() {
+            const file = fileInput.files[0];
+            
+            if (file) {
+                // 顯示預覽區域
+                filePreview.classList.remove('d-none');
+                
+                // 更新檔案名稱和大小
+                fileName.textContent = file.name;
+                fileInfo.textContent = `大小: ${formatFileSize(file.size)}`;
+                
+                // 更新檔案圖標
+                updateFileIcon(file);
+            } else {
+                filePreview.classList.add('d-none');
+            }
+        }
+        
+        // 更新檔案圖標
+        function updateFileIcon(file) {
+            const fileType = file.type;
+            let iconClass = 'bi-file-earmark';
+            
+            if (fileType.startsWith('image/')) {
+                iconClass = 'bi-file-image';
+            } else if (fileType.includes('pdf')) {
+                iconClass = 'bi-file-pdf';
+            } else if (fileType.includes('word') || fileType.includes('doc')) {
+                iconClass = 'bi-file-word';
+            } else if (fileType.includes('excel') || fileType.includes('sheet')) {
+                iconClass = 'bi-file-excel';
+            } else if (fileType.includes('powerpoint') || fileType.includes('presentation')) {
+                iconClass = 'bi-file-ppt';
+            } else if (fileType.includes('zip') || fileType.includes('compress')) {
+                iconClass = 'bi-file-zip';
+            } else if (fileType.includes('text')) {
+                iconClass = 'bi-file-text';
+            }
+            
+            // 設置圖標
+            fileIcon.className = '';
+            fileIcon.classList.add('bi', iconClass);
+        }
+        
+        // 格式化檔案大小
+        function formatFileSize(bytes) {
+            if (bytes < 1024) {
+                return bytes + ' B';
+            } else if (bytes < 1048576) {
+                return (bytes / 1024).toFixed(1) + ' KB';
+            } else if (bytes < 1073741824) {
+                return (bytes / 1048576).toFixed(1) + ' MB';
+            } else {
+                return (bytes / 1073741824).toFixed(1) + ' GB';
+            }
+        }
+        
+        // 移除選擇的檔案
+        removeFile.addEventListener('click', function() {
+            fileInput.value = '';
+            filePreview.classList.add('d-none');
+        });
+        
+        // 表單提交處理
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // 表單驗證
+            if (!uploadForm.checkValidity()) {
+                e.stopPropagation();
+                uploadForm.classList.add('was-validated');
+                return;
+            }
+            
+            // 顯示上傳進度
+            uploadProgress.classList.remove('d-none');
+            uploadButton.disabled = true;
+            
+            // 在實際應用中，這裡會使用 AJAX 發送表單數據
+            // 這裡我們使用模擬進度
+            simulateUpload();
+        });
+        
+        // 模擬上傳進度
+        function simulateUpload() {
+            let progress = 0;
+            
+            const interval = setInterval(function() {
+                progress += 5;
+                progressBar.style.width = progress + '%';
+                progressText.textContent = `上傳中... ${progress}%`;
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    progressText.textContent = '上傳完成';
+                    
+                    // 模擬上傳完成後跳轉
+                    setTimeout(function() {
+                        // 實際應用中這裡應該從 AJAX 響應中獲取新檔案的 ID
+                        const newFileId = Math.floor(Math.random() * 100);
+                        window.location.href = `/files/${newFileId}/`;
+                    }, 1000);
+                }
+            }, 200);
+        }
+    });
+</script>
+{% endblock %}

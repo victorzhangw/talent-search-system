@@ -1,0 +1,292 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ project.name }} - 測驗統計 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item active">評鑑結果統計</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 測驗項目標題 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-graph-up me-2"></i>{{ project.name }} - 測驗統計</h2>
+            <p class="text-muted mb-0">{{ project.description|default:"暫無描述" }}</p>
+        </div>
+        <div>
+            <a href="{% url 'test_templates' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>返回測驗項目
+            </a>
+            <button class="btn btn-primary" onclick="startInvitation({{ project.id }}, '{{ project.name }}')">
+                <i class="bi bi-envelope-plus me-1"></i>發送邀請
+            </button>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ invitation_stats.total }}</h4>
+                    <small>總邀請</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ invitation_stats.pending }}</h4>
+                    <small>待完成</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ invitation_stats.in_progress }}</h4>
+                    <small>進行中</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ invitation_stats.completed }}</h4>
+                    <small>已完成</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ invitation_stats.expired }}</h4>
+                    <small>已過期</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ invitation_stats.cancelled }}</h4>
+                    <small>已取消</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細統計說明 -->
+    <!-- <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>統計說明：</strong>
+                總邀請 = 待完成({{ invitation_stats.pending }}) + 進行中({{ invitation_stats.in_progress }}) + 已完成({{ invitation_stats.completed }}) + 已過期({{ invitation_stats.expired }}) + 已取消({{ invitation_stats.cancelled }})
+            </div>
+        </div>
+    </div> -->
+
+    <!-- 搜尋和過濾 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">搜尋受測人員</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="輸入姓名、信箱或公司" value="{{ search }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">測驗狀態</label>
+                    <select name="status" class="form-select">
+                        <option value="">全部狀態</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search me-1"></i>搜尋
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <a href="{% url 'enterprise_test_project_stats' project.id %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise me-1"></i>重置
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 受測人員列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-people me-2"></i>受測人員列表
+                <small class="text-muted">（共 {{ page_obj.paginator.count }} 人）</small>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if page_obj.object_list %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>姓名</th>
+                                <th>信箱</th>
+                                <th>職位</th>
+                                <th>公司</th>
+                                <th>測驗狀態</th>
+                                <th>邀請時間</th>
+                                <th>分數</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invitation in page_obj.object_list %}
+                            <tr>
+                                <td>
+                                    <strong>{{ invitation.invitee.name }}</strong>
+                                </td>
+                                <td>{{ invitation.invitee.email }}</td>
+                                <td>{{ invitation.invitee.position|default:"-" }}</td>
+                                <td>{{ invitation.invitee.company|default:"-" }}</td>
+                                <td>
+                                    {% if invitation.status == 'pending' %}
+                                        <span class="badge bg-warning">待完成</span>
+                                    {% elif invitation.status == 'completed' %}
+                                        <span class="badge bg-success">已完成</span>
+                                    {% elif invitation.status == 'expired' %}
+                                        <span class="badge bg-danger">已過期</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ invitation.get_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ invitation.invited_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    {% if invitation.status == 'completed' %}
+                                        <span class="text-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <!-- 這裡之後會顯示實際分數 -->
+                                            待分析
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        {% if invitation.status == 'completed' %}
+                                            <button class="btn btn-outline-primary" onclick="viewTestResult({{ invitation.id }})">
+                                                <i class="bi bi-eye"></i> 查看結果
+                                            </button>
+                                            <button class="btn btn-outline-success" onclick="downloadReport({{ invitation.id }})">
+                                                <i class="bi bi-download"></i> 下載報告
+                                            </button>
+                                        {% elif invitation.status == 'pending' %}
+                                            <button class="btn btn-outline-warning btn-sm" onclick="resendInvitation({{ invitation.id }})">
+                                                <i class="bi bi-arrow-repeat"></i> 重新發送
+                                            </button>
+                                        {% elif invitation.status == 'expired' %}
+                                            <button class="btn btn-outline-info btn-sm" onclick="renewInvitation({{ invitation.id }})">
+                                                <i class="bi bi-arrow-clockwise"></i> 重新邀請
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="分頁導航" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">上一頁</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">下一頁</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <h5 class="mt-3 text-muted">暫無受測人員</h5>
+                    <p class="text-muted">還沒有發送任何測驗邀請</p>
+                    <button class="btn btn-primary" onclick="startInvitation({{ project.id }}, '{{ project.name }}')">
+                        <i class="bi bi-envelope-plus me-1"></i>發送第一個邀請
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function startInvitation(projectId, projectName) {
+    // 跳轉到測驗項目的邀請頁面
+    window.location.href = '/enterprise/test-projects/' + projectId + '/invite/';
+}
+
+function viewTestResult(invitationId) {
+    // 查看測驗結果
+    alert('查看測驗結果功能開發中，邀請ID: ' + invitationId);
+    // 未來實作：跳轉到測驗結果頁面
+}
+
+function downloadReport(invitationId) {
+    // 下載測驗報告
+    alert('下載測驗報告功能開發中，邀請ID: ' + invitationId);
+    // 未來實作：直接下載PDF報告
+}
+
+function resendInvitation(invitationId) {
+    // 重新發送邀請
+    if (confirm('確定要重新發送邀請嗎？')) {
+        alert('重新發送邀請功能開發中，邀請ID: ' + invitationId);
+        // 未來實作：AJAX 重新發送邀請
+    }
+}
+
+function renewInvitation(invitationId) {
+    // 重新邀請（過期後）
+    if (confirm('確定要重新建立邀請嗎？')) {
+        alert('重新邀請功能開發中，邀請ID: ' + invitationId);
+        // 未來實作：建立新的邀請
+    }
+}
+</script>
+{% endblock %}

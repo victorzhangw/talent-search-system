@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}企業測驗管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item active">企業測驗管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-building me-2"></i>企業測驗管理</h2>
+        <div class="btn-group" role="group">
+            <a href="{% url 'test_templates' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i>發送測驗邀請
+            </a>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h4 mb-0">{{ stats.total_invitees }}</div>
+                            <div class="small">受測人員</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-people"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="{% url 'invitee_list' %}">查看詳情</a>
+                    <div class="small text-white"><i class="bi bi-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h4 mb-0">{{ stats.total_invitations }}</div>
+                            <div class="small">總邀請數</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-envelope"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="{% url 'invitation_list' %}">查看詳情</a>
+                    <div class="small text-white"><i class="bi bi-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 修改：將「待執行測驗」改為「進行中測驗」 -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h4 mb-0">{{ stats.pending_invitations|add:stats.in_progress_invitations|default:stats.pending_invitations }}</div>
+                            <div class="small">進行中測驗</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-clock"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="{% url 'invitation_list' %}?status=pending">查看詳情</a>
+                    <div class="small text-white"><i class="bi bi-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <div class="h4 mb-0">{{ stats.completed_invitations }}</div>
+                            <div class="small">已完成測驗</div>
+                        </div>
+                        <div class="fa-3x">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex align-items-center justify-content-between">
+                    <a class="small text-white stretched-link" href="{% url 'invitation_list' %}?status=completed">查看詳情</a>
+                    <div class="small text-white"><i class="bi bi-angle-right"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 當有取消或過期邀請時，顯示詳細統計說明 -->
+    {% if stats.cancelled_invitations > 0 or stats.expired_invitations > 0 %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>邀請統計詳情：</strong>
+                總邀請 {{ stats.total_invitations }} = 
+                進行中 {{ stats.pending_invitations|add:stats.in_progress_invitations|default:stats.pending_invitations }} + 
+                已完成 {{ stats.completed_invitations }} + 
+                已結束 {{ stats.expired_invitations|add:stats.cancelled_invitations|default:stats.expired_invitations }}
+                {% if stats.cancelled_invitations > 0 %}
+                <br><small class="text-muted">已結束包含：已過期 {{ stats.expired_invitations }} 筆、已取消 {{ stats.cancelled_invitations }} 筆</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- 快速操作 -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-lightning me-2"></i>快速操作
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'test_templates' %}" class="btn btn-primary">
+                            <i class="bi bi-envelope-plus me-2"></i>發送測驗邀請
+                        </a>
+                        <a href="{% url 'invitee_list' %}" class="btn btn-success">
+                            <i class="bi bi-people me-2"></i>管理受測人員
+                        </a>
+                        <a href="{% url 'invitation_list' %}" class="btn btn-info">
+                            <i class="bi bi-list-check me-2"></i>查看邀請記錄
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 可用測驗範本 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clipboard-check me-2"></i>可用測驗範本
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if available_templates %}
+                        {% for template in available_templates %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>{{ template.name|truncatechars:25 }}</strong>
+                                <div class="small text-muted">{{ template.category.name }} • {{ template.duration_minutes }}分鐘</div>
+                            </div>
+                            <span class="badge bg-primary">{{ template.point_cost }} 點</span>
+                        </div>
+                        {% endfor %}
+                        <div class="text-center mt-3">
+                            <a href="{% url 'test_templates' %}" class="btn btn-sm btn-outline-primary">查看全部</a>
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">暫無可用的測驗範本</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近活動 -->
+        <div class="col-lg-8">
+            <div class="row">
+                <!-- 最近受測人員 -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="bi bi-person-plus me-2"></i>最近新增受測人員
+                            </h6>
+                            <a href="{% url 'invitee_list' %}" class="btn btn-sm btn-outline-primary">查看全部</a>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_invitees %}
+                                {% for invitee in recent_invitees %}
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <strong>{{ invitee.name }}</strong>
+                                        <div class="small text-muted">{{ invitee.company|default:"未填寫公司" }}</div>
+                                    </div>
+                                    <small class="text-muted">{{ invitee.created_at|date:"m/d" }}</small>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center">尚未新增受測人員</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 最近測驗邀請 -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="bi bi-envelope-paper me-2"></i>最近測驗邀請
+                            </h6>
+                            <a href="{% url 'invitation_list' %}" class="btn btn-sm btn-outline-primary">查看全部</a>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_invitations %}
+                                {% for invitation in recent_invitations %}
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <strong>{{ invitation.test_template.name|truncatechars:20 }}</strong>
+                                        <div class="small text-muted">{{ invitation.invitee.name }}</div>
+                                    </div>
+                                    <span class="badge 
+                                        {% if invitation.status == 'completed' %}bg-success
+                                        {% elif invitation.status == 'pending' %}bg-warning
+                                        {% elif invitation.status == 'expired' %}bg-danger
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ invitation.get_status_display }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center">尚無測驗邀請</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

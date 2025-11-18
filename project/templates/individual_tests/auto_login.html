@@ -1,0 +1,312 @@
+{% extends 'base.html' %}
+
+{% block title %}自動登入測驗平台{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'individual_tests' %}">我的測驗</a></li>
+<li class="breadcrumb-item active">自動登入</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 60vh;
+    }
+    
+    .login-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 1rem;
+        padding: 3rem;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        max-width: 500px;
+        width: 100%;
+    }
+    
+    .login-icon {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+    
+    .progress-bar {
+        background: rgba(255,255,255,0.3);
+        border-radius: 1rem;
+        height: 8px;
+        margin: 2rem 0;
+        overflow: hidden;
+    }
+    
+    .progress-fill {
+        background: white;
+        height: 100%;
+        border-radius: 1rem;
+        width: 0%;
+        transition: width 0.3s ease;
+        animation: fillProgress 3s ease-in-out;
+    }
+    
+    @keyframes fillProgress {
+        0% { width: 0%; }
+        100% { width: 100%; }
+    }
+    
+    .login-details {
+        background: rgba(255,255,255,0.1);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin: 1.5rem 0;
+        text-align: left;
+    }
+    
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+    }
+    
+    .detail-row:last-child {
+        margin-bottom: 0;
+    }
+    
+    .copyable {
+        cursor: pointer;
+        user-select: all;
+        padding: 2px 6px;
+        border-radius: 3px;
+        transition: background-color 0.2s;
+    }
+    
+    .copyable:hover {
+        background-color: rgba(255,255,255,0.2);
+    }
+    
+    .copy-tooltip {
+        position: relative;
+    }
+    
+    .copy-tooltip::after {
+        content: "點擊複製";
+        position: absolute;
+        bottom: -25px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.7rem;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+    }
+    
+    .copy-tooltip:hover::after {
+        opacity: 1;
+    }
+    
+    .manual-link {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .manual-link a {
+        color: white;
+        text-decoration: underline;
+    }
+    
+    .manual-link a:hover {
+        color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-icon">
+                <i class="bi bi-shield-lock"></i>
+            </div>
+            
+            <h3>正在為您自動登入</h3>
+            <p>請稍候，系統正在處理您的登入資訊...</p>
+            
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            
+            <div class="login-details">
+                <div class="detail-row">
+                    <span><strong>帳號：</strong></span>
+                    <span id="display-username" class="copyable copy-tooltip" onclick="copyToClipboard('{{ username }}', this)">{{ username }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>密碼：</strong></span>
+                    <span id="display-password" class="copyable copy-tooltip" style="font-family: monospace;" onclick="copyToClipboard('{{ password }}', this)">{{ password }}</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>目標平台：</strong></span>
+                    <span>測驗平台</span>
+                </div>
+                <div class="detail-row">
+                    <span><strong>狀態：</strong></span>
+                    <span id="login-status">準備中...</span>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>使用說明：</strong>
+                <ul class="mb-0 mt-2">
+                    <li>系統將為您開啟測驗平台登入頁面</li>
+                    <li>請使用上方顯示的帳號密碼進行登入</li>
+                    <li>您可以點擊帳號密碼進行複製</li>
+                </ul>
+            </div>
+            
+            <div id="countdown-info">
+                <small>將在 <span id="countdown">3</span> 秒後自動跳轉</small>
+            </div>
+            
+            <div class="manual-link">
+                <small>
+                    如果沒有自動跳轉，請 
+                    <a href="{{ redirect_url }}" target="_blank">點擊這裡手動前往</a>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let countdown = 3;
+let statusElement = document.getElementById('login-status');
+let countdownElement = document.getElementById('countdown');
+
+// 更新狀態顯示
+function updateStatus(message) {
+    statusElement.textContent = message;
+}
+
+// 倒計時函數
+function startCountdown() {
+    updateStatus('正在準備登入...');
+    
+    const timer = setInterval(() => {
+        countdown--;
+        countdownElement.textContent = countdown;
+        
+        if (countdown <= 0) {
+            clearInterval(timer);
+            performAutoLogin();
+        }
+    }, 1000);
+}
+
+// 執行自動登入
+function performAutoLogin() {
+    updateStatus('正在開啟測驗平台...');
+    document.getElementById('countdown-info').style.display = 'none';
+    
+    // 延遲後開啟測驗平台
+    setTimeout(() => {
+        const success = openTestPlatform();
+        
+        if (success) {
+            updateStatus('已開啟測驗平台，請使用上方帳號密碼登入');
+            
+            // 延遲後關閉當前頁面
+            setTimeout(() => {
+                window.close();
+                // 如果無法關閉視窗，則導航回測驗列表
+                if (!window.closed) {
+                    window.location.href = '{% url "individual_tests" %}';
+                }
+            }, 5000);
+        } else {
+            updateStatus('無法開啟新視窗，請點擊下方連結手動前往');
+        }
+    }, 1000);
+}
+
+// 開啟測驗平台
+function openTestPlatform() {
+    try {
+        const newWindow = window.open('{{ redirect_url }}', '_blank');
+        return newWindow !== null;
+    } catch (e) {
+        console.error('開啟視窗失敗:', e);
+        return false;
+    }
+}
+
+// 複製到剪貼板
+function copyToClipboard(text, element) {
+    navigator.clipboard.writeText(text).then(() => {
+        // 顯示複製成功的提示
+        const originalContent = element.textContent;
+        element.textContent = '已複製!';
+        element.style.backgroundColor = 'rgba(40, 167, 69, 0.3)';
+        
+        setTimeout(() => {
+            element.textContent = originalContent;
+            element.style.backgroundColor = '';
+        }, 1000);
+    }).catch(err => {
+        console.error('複製失敗:', err);
+        // 使用舊方法作為備用
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        // 顯示複製成功的提示
+        const originalContent = element.textContent;
+        element.textContent = '已複製!';
+        element.style.backgroundColor = 'rgba(40, 167, 69, 0.3)';
+        
+        setTimeout(() => {
+            element.textContent = originalContent;
+            element.style.backgroundColor = '';
+        }, 1000);
+    });
+}
+
+// 頁面載入完成後開始倒計時
+document.addEventListener('DOMContentLoaded', function() {
+    startCountdown();
+});
+
+// 如果用戶有設定自動填入表單的需求，可以在這裡實現
+// 注意：自動填入密碼可能會被瀏覽器的安全政策阻擋
+function attemptAutoFill() {
+    // 這個函數可以用來嘗試自動填入登入表單
+    // 但由於跨域和安全限制，通常不會成功
+    console.log('嘗試自動填入表單...');
+}
+</script>
+{% endblock %}

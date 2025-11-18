@@ -1,0 +1,396 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ template.name }} - 模板詳情 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'invitation_template_list' %}">邀請模板管理</a></li>
+<li class="breadcrumb-item active">{{ template.name }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- 主要內容 -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="bi bi-envelope-paper me-2"></i>{{ template.name }}
+                        {% if template.is_default %}
+                            <span class="badge bg-success ms-2">預設模板</span>
+                        {% endif %}
+                    </h4>
+                    <span class="badge fs-6 bg-secondary">{{ template.get_template_type_display }}</span>
+                </div>
+                <div class="card-body">
+                    <!-- 模板資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">基本資訊</h6>
+                            <table class="table table-borderless table-sm">
+                                <tr>
+                                    <td width="100"><strong>模板名稱：</strong></td>
+                                    <td>{{ template.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>模板類型：</strong></td>
+                                    <td>{{ template.get_template_type_display }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>狀態：</strong></td>
+                                    <td>
+                                        {% if template.is_active %}
+                                            <span class="badge bg-success">啟用中</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">已停用</span>
+                                        {% endif %}
+                                        {% if template.is_default %}
+                                            <span class="badge bg-primary ms-1">預設模板</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">使用統計</h6>
+                            <table class="table table-borderless table-sm">
+                                <tr>
+                                    <td width="100"><strong>使用次數：</strong></td>
+                                    <td>{{ template.usage_count }} 次</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>建立時間：</strong></td>
+                                    <td>{{ template.created_at|date:"Y年m月d日 H:i" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>最後使用：</strong></td>
+                                    <td>
+                                        {% if template.last_used_at %}
+                                            {{ template.last_used_at|date:"Y年m月d日 H:i" }}
+                                        {% else %}
+                                            未使用過
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 模板內容 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary">郵件主旨模板</h6>
+                            <div class="border rounded p-3 bg-light mb-3">
+                                <code>{{ template.subject_template }}</code>
+                            </div>
+                            
+                            <h6 class="text-primary">郵件內容模板</h6>
+                            <div class="border rounded p-3 bg-light" style="white-space: pre-line;">{{ template.message_template }}</div>
+                        </div>
+                    </div>
+
+                    <!-- 預覽效果 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-primary">預覽效果</h6>
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <i class="bi bi-eye me-2"></i>實際郵件預覽（使用示範數據）
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <strong>主旨：</strong>
+                                        <div class="border rounded p-2 bg-light">{{ sample_subject }}</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>內容：</strong>
+                                        <div class="border rounded p-3 bg-light" style="white-space: pre-line;">{{ sample_message }}</div>
+                                    </div>
+                                    <small class="text-muted">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        示範數據：受測者「{{ sample_context.invitee_name }}」，測驗「{{ sample_context.test_name }}」
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 側邊欄 -->
+        <div class="col-lg-4">
+            <!-- 操作按鈕 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">操作選項</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'invitation_template_edit' template.id %}" class="btn btn-primary">
+                            <i class="bi bi-pencil me-2"></i>編輯模板
+                        </a>
+                        
+                        <button class="btn btn-outline-info" onclick="copyTemplate({{ template.id }}, '{{ template.name }}')">
+                            <i class="bi bi-copy me-2"></i>複製模板
+                        </button>
+                        
+                        {% if not template.is_default %}
+                        <button class="btn btn-outline-success" onclick="setDefaultTemplate({{ template.id }}, '{{ template.name }}')">
+                            <i class="bi bi-star me-2"></i>設為預設模板
+                        </button>
+                        {% endif %}
+                        
+                        <button class="btn btn-outline-secondary" onclick="previewTemplate()">
+                            <i class="bi bi-eye me-2"></i>自訂預覽
+                        </button>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-grid">
+                        <a href="{% url 'invitation_template_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left me-2"></i>返回模板列表
+                        </a>
+                    </div>
+                    
+                    {% if not template.is_default %}
+                    <hr>
+                    <div class="d-grid">
+                        <button class="btn btn-outline-danger" onclick="deleteTemplate({{ template.id }}, '{{ template.name }}')">
+                            <i class="bi bi-trash me-2"></i>刪除模板
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 可用變數 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>可用變數說明</h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <strong>基本變數：</strong>
+                        <ul class="list-unstyled mt-2">
+                            <li><code>{invitee_name}</code> - 受測者姓名</li>
+                            <li><code>{enterprise_name}</code> - 企業名稱</li>
+                            <li><code>{test_name}</code> - 測驗名稱</li>
+                            <li><code>{company_name}</code> - 受測者公司</li>
+                        </ul>
+                        
+                        <strong>測驗相關：</strong>
+                        <ul class="list-unstyled mt-2">
+                            <li><code>{test_url}</code> - 測驗連結</li>
+                            <li><code>{expires_date}</code> - 過期時間</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 使用記錄 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">使用記錄</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <h4 class="text-primary mb-0">{{ template.usage_count }}</h4>
+                        <small class="text-muted">總使用次數</small>
+                        
+                        {% if template.last_used_at %}
+                        <hr>
+                        <div class="small">
+                            <strong>最後使用：</strong><br>
+                            {{ template.last_used_at|date:"Y年m月d日 H:i" }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 自訂預覽模態框 -->
+<div class="modal fade" id="customPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">自訂預覽</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">受測者姓名：</label>
+                        <input type="text" class="form-control" id="customInviteeName" value="張三">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">測驗名稱：</label>
+                        <input type="text" class="form-control" id="customTestName" value="PI人格特質測驗">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">公司名稱：</label>
+                        <input type="text" class="form-control" id="customCompanyName" value="科技公司">
+                    </div>
+                    <div class="col-md-6">
+                        <button class="btn btn-primary mt-4" onclick="updatePreview()">
+                            <i class="bi bi-arrow-clockwise me-1"></i>更新預覽
+                        </button>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="mb-3">
+                    <label class="form-label">預覽主旨：</label>
+                    <div class="border rounded p-2 bg-light" id="customPreviewSubject">{{ sample_subject }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">預覽內容：</label>
+                    <div class="border rounded p-3 bg-light" id="customPreviewMessage" style="white-space: pre-line;">{{ sample_message }}</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 刪除模板
+function deleteTemplate(templateId, templateName) {
+    if (confirm(`確定要刪除模板「${templateName}」嗎？\n\n此操作無法復原。`)) {
+        fetch(`/enterprise/templates/${templateId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                setTimeout(() => {
+                    window.location.href = "{% url 'invitation_template_list' %}";
+                }, 1500);
+            } else {
+                showAlert('danger', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '刪除失敗，請稍後再試');
+        });
+    }
+}
+
+// 設為預設模板
+function setDefaultTemplate(templateId, templateName) {
+    if (confirm(`確定要將「${templateName}」設為預設模板嗎？`)) {
+        fetch(`/enterprise/templates/${templateId}/set-default/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showAlert('danger', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '設定失敗，請稍後再試');
+        });
+    }
+}
+
+// 複製模板
+function copyTemplate(templateId, templateName) {
+    if (confirm(`確定要複製模板「${templateName}」嗎？`)) {
+        fetch(`/enterprise/templates/${templateId}/copy/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', '複製失敗，請稍後再試');
+        });
+    }
+}
+
+// 自訂預覽
+function previewTemplate() {
+    const modal = new bootstrap.Modal(document.getElementById('customPreviewModal'));
+    modal.show();
+}
+
+// 更新預覽
+function updatePreview() {
+    const inviteeName = document.getElementById('customInviteeName').value;
+    const testName = document.getElementById('customTestName').value;
+    const companyName = document.getElementById('customCompanyName').value;
+    
+    const url = `/enterprise/templates/{{ template.id }}/preview/?invitee_name=${encodeURIComponent(inviteeName)}&test_name=${encodeURIComponent(testName)}&company_name=${encodeURIComponent(companyName)}`;
+    
+    fetch(url)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('customPreviewSubject').textContent = data.subject;
+            document.getElementById('customPreviewMessage').textContent = data.message;
+        } else {
+            showAlert('danger', '預覽更新失敗');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', '預覽更新失敗，請稍後再試');
+    });
+}
+
+// 顯示提示訊息
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+
+<!-- 添加CSRF令牌 -->
+{% csrf_token %}
+{% endblock %}

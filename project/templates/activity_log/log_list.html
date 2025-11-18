@@ -1,0 +1,359 @@
+{% extends 'base.html' %}
+
+{% block title %}操作日誌{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">操作日誌</li>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">操作日誌記錄</h5>
+                <div>
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-download"></i> 匯出
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'export_activity_logs' %}?format=csv&{{ request.GET.urlencode }}">CSV</a></li>
+                            <li><a class="dropdown-item" href="{% url 'export_activity_logs' %}?format=excel&{{ request.GET.urlencode }}">Excel</a></li>
+                            <li><a class="dropdown-item" href="{% url 'export_activity_logs' %}?format=pdf&{{ request.GET.urlencode }}">PDF</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 篩選表單 -->
+                <form id="filterForm" method="GET" class="mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">用戶</label>
+                            <select name="user" class="form-select">
+                                <option value="">全部用戶</option>
+                                {% for user in users %}
+                                <option value="{{ user }}" {% if filters.user == user %}selected{% endif %}>{{ user }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">操作類型</label>
+                            <select name="action" class="form-select">
+                                <option value="">全部操作</option>
+                                {% for action in actions %}
+                                <option value="{{ action.key }}" {% if filters.action == action.key %}selected{% endif %}>{{ action.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">對象類型</label>
+                            <select name="target" class="form-select">
+                                <option value="">全部對象</option>
+                                {% for target in targets %}
+                                <option value="{{ target.key }}" {% if filters.target == target.key %}selected{% endif %}>{{ target.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">搜尋</label>
+                            <input type="text" class="form-control" name="search" value="{{ filters.search }}" placeholder="搜尋...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">開始日期</label>
+                            <input type="date" class="form-control" name="date_from" value="{{ filters.date_from }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">結束日期</label>
+                            <input type="date" class="form-control" name="date_to" value="{{ filters.date_to }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">每頁顯示</label>
+                            <select name="per_page" class="form-select">
+                                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label d-block">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-1"></i> 搜尋
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetFilter">
+                                <i class="bi bi-x-circle me-1"></i> 重置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- 日誌列表 -->
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <a href="javascript:void(0)" class="sort-link" data-field="created_at">
+                                        時間
+                                        {% if sort_by == 'created_at' %}
+                                        <i class="bi {% if sort_order == 'asc' %}bi-sort-up{% else %}bi-sort-down{% endif %}"></i>
+                                        {% else %}
+                                        <i class="bi bi-arrow-down-up text-muted"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="javascript:void(0)" class="sort-link" data-field="user">
+                                        用戶
+                                        {% if sort_by == 'user' %}
+                                        <i class="bi {% if sort_order == 'asc' %}bi-sort-up{% else %}bi-sort-down{% endif %}"></i>
+                                        {% else %}
+                                        <i class="bi bi-arrow-down-up text-muted"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="javascript:void(0)" class="sort-link" data-field="action">
+                                        操作
+                                        {% if sort_by == 'action' %}
+                                        <i class="bi {% if sort_order == 'asc' %}bi-sort-up{% else %}bi-sort-down{% endif %}"></i>
+                                        {% else %}
+                                        <i class="bi bi-arrow-down-up text-muted"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>對象</th>
+                                <th>詳情</th>
+                                <th>IP地址</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr>
+                                <td>{{ log.time_since }}<br><small class="text-muted">{{ log.created_at|date:"Y-m-d H:i:s" }}</small></td>
+                                <td>{{ log.user }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if log.action == 'create' %}bg-success
+                                        {% elif log.action == 'update' %}bg-info
+                                        {% elif log.action == 'delete' %}bg-danger
+                                        {% elif log.action == 'login' or log.action == 'logout' %}bg-secondary
+                                        {% elif log.action == 'approve' %}bg-primary
+                                        {% elif log.action == 'reject' %}bg-warning
+                                        {% else %}bg-dark
+                                        {% endif %}
+                                    ">
+                                        {{ log.action|upper }}
+                                    </span>
+                                </td>
+                                <td>{{ log.target_label }} {% if log.target_id %}({{ log.target_id }}){% endif %}</td>
+                                <td>
+                                    {% if log.content %}
+                                    <button class="btn btn-sm btn-outline-info view-content" data-bs-toggle="modal" data-bs-target="#contentModal" data-content="{{ log.content }}">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>{{ log.ip_address }}</td>
+                                <td>
+                                    <a href="{% url 'activity_log_detail' log.id %}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-info-circle"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="text-muted">
+                                        <i class="bi bi-exclamation-circle me-2"></i> 沒有找到符合條件的日誌記錄
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for i in page_obj.paginator.page_range %}
+                        {% if page_obj.number == i %}
+                        <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                        {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}&{{ request.GET.urlencode }}">{{ i }}</a></li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 內容詳情模態框 -->
+<div class="modal fade" id="contentModal" tabindex="-1" aria-labelledby="contentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contentModalLabel">操作詳情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contentDisplay" class="bg-light p-3 rounded">
+                    <!-- 內容將動態顯示 -->
+                </div>
+                
+                <div id="changesContainer" class="mt-3 d-none">
+                    <h6>變更詳情:</h6>
+                    <table class="table table-bordered table-sm">
+                        <thead>
+                            <tr>
+                                <th>欄位</th>
+                                <th>舊值</th>
+                                <th>新值</th>
+                            </tr>
+                        </thead>
+                        <tbody id="changesTable">
+                            <!-- 變更詳情將動態顯示 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 處理模態框顯示內容
+    document.addEventListener('DOMContentLoaded', function() {
+        // 查看內容詳情
+        document.querySelectorAll('.view-content').forEach(button => {
+            button.addEventListener('click', function() {
+                const contentStr = this.getAttribute('data-content');
+                const contentDisplay = document.getElementById('contentDisplay');
+                const changesContainer = document.getElementById('changesContainer');
+                const changesTable = document.getElementById('changesTable');
+                
+                let content;
+                try {
+                    // 嘗試解析 JSON
+                    content = JSON.parse(contentStr);
+                    
+                    // 顯示消息
+                    if (content.message) {
+                        contentDisplay.textContent = content.message;
+                    } else {
+                        contentDisplay.textContent = contentStr;
+                    }
+                    
+                    // 顯示變更詳情
+                    if (content.changes) {
+                        changesTable.innerHTML = '';
+                        changesContainer.classList.remove('d-none');
+                        
+                        for (const [field, values] of Object.entries(content.changes)) {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${field}</td>
+                                <td>${values[0]}</td>
+                                <td>${values[1]}</td>
+                            `;
+                            changesTable.appendChild(row);
+                        }
+                    } else {
+                        changesContainer.classList.add('d-none');
+                    }
+                } catch (e) {
+                    // 非 JSON 格式，直接顯示
+                    contentDisplay.textContent = contentStr;
+                    changesContainer.classList.add('d-none');
+                }
+            });
+        });
+        
+        // 排序處理
+        document.querySelectorAll('.sort-link').forEach(link => {
+            link.addEventListener('click', function() {
+                const field = this.getAttribute('data-field');
+                let order = 'asc';
+                
+                // 如果當前已經是升序，則切換為降序
+                if (field === '{{ sort_by }}' && '{{ sort_order }}' === 'asc') {
+                    order = 'desc';
+                }
+                
+                // 添加排序參數並提交
+                const form = document.getElementById('filterForm');
+                
+                // 創建或更新 sort_by 和 sort_order 隱藏字段
+                let sortByInput = form.querySelector('input[name="sort_by"]');
+                if (!sortByInput) {
+                    sortByInput = document.createElement('input');
+                    sortByInput.type = 'hidden';
+                    sortByInput.name = 'sort_by';
+                    form.appendChild(sortByInput);
+                }
+                sortByInput.value = field;
+                
+                let sortOrderInput = form.querySelector('input[name="sort_order"]');
+                if (!sortOrderInput) {
+                    sortOrderInput = document.createElement('input');
+                    sortOrderInput.type = 'hidden';
+                    sortOrderInput.name = 'sort_order';
+                    form.appendChild(sortOrderInput);
+                }
+                sortOrderInput.value = order;
+                
+                form.submit();
+            });
+        });
+        
+        // 重置篩選
+        document.getElementById('resetFilter').addEventListener('click', function() {
+            window.location.href = '{% url "activity_log_list" %}';
+        });
+    });
+</script>
+{% endblock %}

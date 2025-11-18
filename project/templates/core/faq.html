@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}常見問題與說明{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">常見問題與說明</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-question-circle me-2"></i>常見問題與說明
+                    </h4>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- 常見問題 -->
+                    <div class="mb-5">
+                        <h5 class="fw-bold text-primary mb-3">常見問題</h5>
+                        
+                        <!-- 問題 1 -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-2">評鑑填寫前該注意什麼？</h6>
+                            <ol>
+                                <li>Traitty平台採用美國PerceptionPredict AI 問卷系統進行測驗。</li>
+                                <li>評鑑邀請連結為一次性連結，受試者點擊邀請信件中的連結之後，需於Perception問卷系統畫面中，填入受測者收邀請信的email，始得進行填答。</li>
+                                <li>請於信中提醒的邀請截止時間前完成評鑑。</li>
+                            </ol>
+                        </div>
+                        
+                        <!-- 問題 2 -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-2">評鑑填寫中斷，該如何繼續填寫？</h6>
+                            <p>評鑑過程中若不小心跳出，請按步驟返回：</p>
+                            <ol>
+                                <li>開啟連結 <a href=" https://pi.perception-group.com/Login" target="_blank" class="text-primary">https://pi.perception-group.com/Login</a></li>
+                                <li>填寫受測者註冊的email，選擇「忘記密碼」，進行問卷系統的密碼設定後即可登入，並回到填答進度。</li>
+                            </ol>
+                        </div>
+                        
+                        <!-- 問題 3 -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-2">我有其他問題需要協助怎麼辦？</h6>
+                            <p>請於上班時間與我們聯繫，將由專人儘速為您服務</p>
+                            <p>客服信箱：<a href="mailto:service@traitty.com" class="text-primary">service@traitty.com</a></p>
+                        </div>
+                    </div>
+                    
+                    <!-- 評鑒注意事項 -->
+                    <div class="mb-5">
+                        <h5 class="fw-bold text-primary mb-3">評鑑注意事項</h5>
+                        <p>特質評鑑為輔助性人才識別工具，雖已具備準確性與預測力，但仍非100%判定結果。請避免將報告分數作對受測者貼標籤或產生偏見，在進行後續人才了解、培訓、資源提供時，仍應配合現況做出綜合考量。雖然評鑑工具經設計可反映結果之鑒別度，但為避免結果偏誤，填寫前的引導也請勿提及與工作權益相關，降低受測者無效填答機率。</p>
+                        
+                    </div>
+                    
+                    <!-- 隱私政策 -->
+                    <div class="mb-5">
+                        <h5 class="fw-bold text-primary mb-3">隱私政策</h5>
+                        <p>感謝您與貴單位使用WePredict的Traitty特質評鑑系統。為提供完整報告，本平台將蒐集您與貴單位所提供之姓名、電子信箱、職稱，以及測驗過程中的瀏覽記錄與測驗結果（含特質分數）。所有資料僅用於報告產出及服務優化，不會提供予第三方。您與貴單位可透過我方服務信箱申請查詢、更正或刪除個人資料。請注意，自您與貴單位註冊並開始填寫測驗，即視為同意資料儲存於我方雲端後台並供後續分析使用。</p>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* 自定義樣式 */
+.card {
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 10px;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px 10px 0 0 !important;
+    border: none;
+}
+
+.text-primary {
+    color: #667eea !important;
+}
+
+h6.fw-bold {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+ol li, p {
+    line-height: 1.6;
+    color: #555;
+}
+
+a {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.mb-4 {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+</style>
+{% endblock %}

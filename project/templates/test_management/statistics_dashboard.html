@@ -1,0 +1,412 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}測驗結果統計 - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.stat-card {
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+}
+
+.chart-container {
+    position: relative;
+    height: 400px;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.progress-bar-animated {
+    animation: progress-animation 2s ease-in-out;
+}
+
+@keyframes progress-animation {
+    from { width: 0; }
+}
+
+.filter-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+<li class="breadcrumb-item active">測驗結果統計</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 標題和篩選 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-bar-chart me-2"></i>測驗結果統計分析</h2>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-primary" onclick="changeTimeRange(7)">近7天</button>
+            <button type="button" class="btn btn-outline-primary" onclick="changeTimeRange(30)">近30天</button>
+            <button type="button" class="btn btn-outline-primary" onclick="changeTimeRange(90)">近90天</button>
+        </div>
+    </div>
+
+    <!-- 統計卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon me-3" style="background: linear-gradient(45deg, #667eea, #764ba2);">
+                        <i class="bi bi-envelope"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ basic_stats.total_invitations }}</h3>
+                        <small class="text-muted">總邀請數</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon me-3" style="background: linear-gradient(45deg, #f093fb, #f5576c);">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ basic_stats.completed_invitations }}</h3>
+                        <small class="text-muted">已完成</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon me-3" style="background: linear-gradient(45deg, #4facfe, #00f2fe);">
+                        <i class="bi bi-percent"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ basic_stats.completion_rate }}%</h3>
+                        <small class="text-muted">完成率</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-0 h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stat-icon me-3" style="background: linear-gradient(45deg, #43e97b, #38f9d7);">
+                        <i class="bi bi-coin"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-0">{{ basic_stats.points_consumed }}</h3>
+                        <small class="text-muted">消費點數</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 圖表區域 -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>邀請與完成趨勢</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>狀態分布</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詳細統計 -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>測驗項目表現</h5>
+                </div>
+                <div class="card-body">
+                    {% if project_stats %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>測驗項目</th>
+                                        <th>邀請數</th>
+                                        <th>完成率</th>
+                                        <th>平均分數</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for project in project_stats %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ project.name }}</strong>
+                                        </td>
+                                        <td>{{ project.total_invitations }}</td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                                    <div class="progress-bar progress-bar-animated" 
+                                                         style="width: {{ project.completion_rate }}%"></div>
+                                                </div>
+                                                <small>{{ project.completion_rate }}%</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ project.avg_score }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-clipboard-x text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2">暫無測驗項目數據</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-people me-2"></i>受測者表現排行</h5>
+                </div>
+                <div class="card-body">
+                    {% if invitee_stats %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>受測者</th>
+                                        <th>公司</th>
+                                        <th>參與次數</th>
+                                        <th>完成率</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for invitee in invitee_stats %}
+                                    <tr>
+                                        <td>
+                                            <div>
+                                                <strong>{{ invitee.name }}</strong>
+                                                <div class="small text-muted">{{ invitee.email }}</div>
+                                            </div>
+                                        </td>
+                                        <td>{{ invitee.company|default:"-" }}</td>
+                                        <td>
+                                            <span class="badge bg-info">{{ invitee.recent_invitations }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                                                    <div class="progress-bar bg-success" 
+                                                         style="width: {{ invitee.completion_rate }}%"></div>
+                                                </div>
+                                                <small>{{ invitee.completion_rate }}%</small>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-person-x text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2">暫無受測者數據</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模板使用統計 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-envelope-paper me-2"></i>邀請模板使用統計</h5>
+                </div>
+                <div class="card-body">
+                    {% if template_stats %}
+                        <div class="row">
+                            {% for template in template_stats %}
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6 class="mb-0">{{ template.name }}</h6>
+                                            {% if template.is_default %}
+                                                <span class="badge bg-success">預設</span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="small text-muted mb-2">{{ template.template_type }}</p>
+                                        <div class="d-flex justify-content-between">
+                                            <span class="small">使用次數：<strong>{{ template.usage_count }}</strong></span>
+                                            <span class="small text-muted">
+                                                {% if template.last_used_at %}
+                                                    {{ template.last_used_at|date:"m/d" }}
+                                                {% else %}
+                                                    未使用
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-envelope-paper text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2">暫無模板使用數據</p>
+                            <a href="{% url 'invitation_template_list' %}" class="btn btn-outline-primary">
+                                <i class="bi bi-plus-circle me-1"></i>管理邀請模板
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 圖表配置
+const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            position: 'top',
+        }
+    }
+};
+
+// 趨勢圖表
+const trendCtx = document.getElementById('trendChart').getContext('2d');
+const chartData = {{ chart_data|safe }};
+
+const trendChart = new Chart(trendCtx, {
+    type: 'line',
+    data: {
+        labels: chartData.daily_trend.dates || [],
+        datasets: [{
+            label: '邀請數',
+            data: chartData.daily_trend.invitations || [],
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.4
+        }, {
+            label: '完成數',
+            data: chartData.daily_trend.completions || [],
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            tension: 0.4
+        }]
+    },
+    options: {
+        ...chartOptions,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// 狀態分布圖表
+const statusCtx = document.getElementById('statusChart').getContext('2d');
+const statusChart = new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+        labels: chartData.status_distribution.labels || [],
+        datasets: [{
+            data: chartData.status_distribution.data || [],
+            backgroundColor: chartData.status_distribution.colors || ['#6c757d'],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        ...chartOptions,
+        cutout: '60%'
+    }
+});
+
+// 切換時間範圍
+function changeTimeRange(days) {
+    const url = new URL(window.location);
+    url.searchParams.set('days', days);
+    window.location.href = url.toString();
+}
+
+// 高亮當前選中的時間範圍按鈕
+document.addEventListener('DOMContentLoaded', function() {
+    const currentDays = {{ days }};
+    const buttons = document.querySelectorAll('.btn-group .btn');
+    
+    buttons.forEach(button => {
+        const buttonDays = parseInt(button.textContent.match(/\d+/)[0]);
+        if (buttonDays === currentDays) {
+            button.classList.remove('btn-outline-primary');
+            button.classList.add('btn-primary');
+        }
+    });
+    
+    // 動畫效果
+    const progressBars = document.querySelectorAll('.progress-bar-animated');
+    progressBars.forEach(bar => {
+        setTimeout(() => {
+            bar.style.width = bar.style.width;
+        }, 100);
+    });
+});
+
+// 定期刷新數據（可選）
+setInterval(() => {
+    // 可以添加AJAX更新邏輯
+}, 300000); // 5分鐘
+</script>
+{% endblock %}

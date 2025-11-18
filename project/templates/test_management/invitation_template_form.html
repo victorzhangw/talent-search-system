@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.variable-help {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.variable-tag {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+    margin: 2px;
+    display: inline-block;
+}
+
+.variable-tag:hover {
+    background-color: #dee2e6;
+}
+
+.template-preview {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.form-floating > .form-control {
+    height: auto;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+<li class="breadcrumb-item"><a href="{% url 'invitation_template_list' %}">邀請模板管理</a></li>
+<li class="breadcrumb-item active">{{ action == 'create' and '建立模板' or '編輯模板' }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-envelope-paper me-2"></i>{{ title }}</h2>
+                <a href="{% url 'invitation_template_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>返回列表
+                </a>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <!-- 模板表單 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">模板資訊</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" id="templateForm">
+                                {% csrf_token %}
+                                
+                                <!-- 基本資訊 -->
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label for="{{ form.name.id_for_label }}" class="form-label">
+                                            模板名稱 <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.name }}
+                                        {% if form.name.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ form.name.errors.0 }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="{{ form.template_type.id_for_label }}" class="form-label">模板類型</label>
+                                        {{ form.template_type }}
+                                        {% if form.template_type.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ form.template_type.errors.0 }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- 郵件主旨 -->
+                                <div class="mb-3">
+                                    <label for="{{ form.subject_template.id_for_label }}" class="form-label">
+                                        郵件主旨模板 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.subject_template }}
+                                    <div class="form-text">{{ form.subject_template.help_text }}</div>
+                                    {% if form.subject_template.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.subject_template.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 郵件內容 -->
+                                <div class="mb-3">
+                                    <label for="{{ form.message_template.id_for_label }}" class="form-label">
+                                        郵件內容模板 <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.message_template }}
+                                    <div class="form-text">{{ form.message_template.help_text }}</div>
+                                    {% if form.message_template.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.message_template.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- 預設模板選項 -->
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        {{ form.is_default }}
+                                        <label class="form-check-label" for="{{ form.is_default.id_for_label }}">
+                                            設為預設模板
+                                        </label>
+                                        <div class="form-text">預設模板會在建立新邀請時自動選用</div>
+                                    </div>
+                                </div>
+
+                                <!-- 操作按鈕 -->
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-secondary me-2" onclick="window.history.back()">
+                                        <i class="bi bi-x-circle me-1"></i>取消
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info me-2" onclick="previewTemplate()">
+                                        <i class="bi bi-eye me-1"></i>預覽效果
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-save me-1"></i>{{ action == 'create' and '建立模板' or '更新模板' }}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <!-- 變數說明 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>可用變數</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-3">點擊變數可自動插入到游標位置</p>
+                            
+                            <div class="mb-3">
+                                <strong class="small">基本變數：</strong><br>
+                                <span class="variable-tag" onclick="insertVariable('{invitee_name}')">{invitee_name}</span>
+                                <span class="variable-tag" onclick="insertVariable('{enterprise_name}')">{enterprise_name}</span>
+                                <span class="variable-tag" onclick="insertVariable('{test_name}')">{test_name}</span>
+                                <span class="variable-tag" onclick="insertVariable('{company_name}')">{company_name}</span>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <strong class="small">測驗相關：</strong><br>
+                                <span class="variable-tag" onclick="insertVariable('{test_url}')">{test_url}</span>
+                                <span class="variable-tag" onclick="insertVariable('{expires_date}')">{expires_date}</span>
+                            </div>
+
+                            <hr>
+                            
+                            <div class="small">
+                                <strong>變數說明：</strong>
+                                <ul class="list-unstyled mt-2">
+                                    <li><code>{invitee_name}</code> - 受測者姓名</li>
+                                    <li><code>{enterprise_name}</code> - 企業名稱</li>
+                                    <li><code>{test_name}</code> - 測驗名稱</li>
+                                    <li><code>{company_name}</code> - 受測者公司</li>
+                                    <li><code>{test_url}</code> - 測驗連結</li>
+                                    <li><code>{expires_date}</code> - 過期時間</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 預設模板範例 -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-lightbulb me-2"></i>模板範例</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="btn-group-vertical w-100">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadTemplate('standard')">
+                                    載入標準模板
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadTemplate('formal')">
+                                    載入正式模板
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadTemplate('casual')">
+                                    載入輕鬆模板
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 預覽模態框 -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">模板預覽</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">郵件主旨：</label>
+                    <div class="border rounded p-2 bg-light" id="previewSubject"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">郵件內容：</label>
+                    <div class="border rounded p-3 bg-light" id="previewMessage" style="white-space: pre-line;"></div>
+                </div>
+                <div class="alert alert-info">
+                    <small><i class="bi bi-info-circle me-1"></i>此為示範效果，實際發送時會使用真實資料</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 當前焦點的輸入框
+let currentInput = null;
+
+// 監聽輸入框焦點
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('#id_subject_template, #id_message_template');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            currentInput = this;
+        });
+    });
+});
+
+// 插入變數
+function insertVariable(variable) {
+    if (currentInput) {
+        const cursorPos = currentInput.selectionStart;
+        const textBefore = currentInput.value.substring(0, cursorPos);
+        const textAfter = currentInput.value.substring(currentInput.selectionEnd);
+        
+        currentInput.value = textBefore + variable + textAfter;
+        
+        // 設置游標位置
+        const newPos = cursorPos + variable.length;
+        currentInput.setSelectionRange(newPos, newPos);
+        currentInput.focus();
+    } else {
+        alert('請先點擊要插入變數的輸入框');
+    }
+}
+
+// 載入模板範例
+function loadTemplate(type) {
+    const templates = {
+        standard: {
+            subject: '【{enterprise_name}】測驗邀請 - {test_name}',
+            message: `親愛的 {invitee_name} 您好：
+
+{enterprise_name} 邀請您參與 {test_name} 測驗。
+
+此測驗將協助我們更了解您的特質與能力，請於 {expires_date} 前完成測驗。
+
+測驗連結：{test_url}
+
+如有任何問題，請隨時與我們聯絡。
+
+祝您順心
+{enterprise_name} 敬上`
+        },
+        formal: {
+            subject: '{enterprise_name} - {test_name} 人才評估邀請',
+            message: `尊敬的 {invitee_name}：
+
+感謝您對 {enterprise_name} 的關注。
+
+為了更好地了解您的專業能力與個人特質，我們誠摯邀請您參與 {test_name} 評估。
+
+評估資訊：
+• 測驗名稱：{test_name}
+• 截止時間：{expires_date}
+• 評估連結：{test_url}
+
+此評估結果將作為我們人才選拔的重要參考依據，請您務必在截止時間前完成。
+
+如有疑問，歡迎隨時聯繫我們。
+
+此致
+敬禮
+
+{enterprise_name}
+人力資源部`
+        },
+        casual: {
+            subject: '來完成一個有趣的測驗吧！- {test_name}',
+            message: `Hi {invitee_name}！
+
+{enterprise_name} 這邊有個有趣的測驗想邀請你參與 😊
+
+測驗名稱：{test_name}
+花費時間：大約10-15分鐘
+完成期限：{expires_date}
+
+點這裡開始：{test_url}
+
+這個測驗會幫助我們更了解你的特質和優勢，別擔心，沒有標準答案，誠實回答就好！
+
+有任何問題都可以聯絡我們哦～
+
+{enterprise_name} 團隊`
+        }
+    };
+    
+    if (templates[type]) {
+        if (confirm('載入模板範例會覆蓋當前內容，確定要繼續嗎？')) {
+            document.getElementById('id_subject_template').value = templates[type].subject;
+            document.getElementById('id_message_template').value = templates[type].message;
+        }
+    }
+}
+
+// 預覽模板
+function previewTemplate() {
+    const subject = document.getElementById('id_subject_template').value;
+    const message = document.getElementById('id_message_template').value;
+    
+    if (!subject || !message) {
+        alert('請先填寫主旨和內容模板');
+        return;
+    }
+    
+    // 示範數據
+    const sampleData = {
+        invitee_name: '張三',
+        enterprise_name: '您的企業名稱',
+        test_name: 'PI人格特質測驗',
+        company_name: '科技公司',
+        test_url: 'https://example.com/test/abc123',
+        expires_date: '2025年01月15日'
+    };
+    
+    // 替換變數
+    let previewSubject = subject;
+    let previewMessage = message;
+    
+    Object.keys(sampleData).forEach(key => {
+        const regex = new RegExp(`{${key}}`, 'g');
+        previewSubject = previewSubject.replace(regex, sampleData[key]);
+        previewMessage = previewMessage.replace(regex, sampleData[key]);
+    });
+    
+    document.getElementById('previewSubject').textContent = previewSubject;
+    document.getElementById('previewMessage').textContent = previewMessage;
+    
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,423 @@
+/* 響應式設計 CSS - 僅針對移動端優化 */
+/* 桌面版保持原有的美觀布局，移動端啟用響應式優化 */
+
+/* 移動端專用優化 - 小於 768px */
+@media (max-width: 767.98px) {
+    /* 隱藏桌面版專用元素 */
+    .mobile-hidden {
+        display: none !important;
+    }
+    
+    /* 移動端居中 */
+    .mobile-center {
+        text-align: center !important;
+    }
+    
+    /* 移動端全寬 */
+    .mobile-full-width {
+        width: 100% !important;
+    }
+    
+    /* 移動端內邊距 */
+    .mobile-padding {
+        padding: 10px !important;
+    }
+    
+    /* 移動端外邊距 */
+    .mobile-margin {
+        margin: 10px 0 !important;
+    }
+    
+    /* 容器優化 */
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    /* 導航欄移動優化 */
+    .navbar-collapse {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .navbar-nav {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .navbar-nav .nav-link {
+        padding: 12px 15px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    /* 卡片移動優化 */
+    .card {
+        margin-bottom: 15px;
+        border-radius: 8px;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    .card-header {
+        padding: 12px 15px;
+    }
+    
+    /* 統計卡片移動優化 */
+    .dashboard-card {
+        margin-bottom: 15px;
+    }
+    
+    .dashboard-card .card-body {
+        padding: 15px;
+        text-align: center;
+    }
+    
+    .dashboard-card .h5 {
+        font-size: 1.1rem;
+    }
+    
+    .dashboard-card .fa-3x {
+        font-size: 2rem;
+    }
+    
+    /* 表格移動優化 */
+    .table-responsive {
+        border: none;
+        font-size: 0.875rem;
+    }
+    
+    .table-mobile {
+        font-size: 0.8rem;
+    }
+    
+    .table-mobile th,
+    .table-mobile td {
+        padding: 8px;
+        vertical-align: middle;
+    }
+    
+    .table th,
+    .table td {
+        padding: 8px;
+        font-size: 0.875rem;
+    }
+    
+    /* 按鈕移動優化 */
+    .btn-mobile {
+        width: 100%;
+        margin-bottom: 8px;
+    }
+    
+    .btn-group-mobile {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .btn-group-mobile .btn {
+        width: 100%;
+    }
+    
+    /* 表單移動優化 */
+    .form-control {
+        font-size: 16px !important; /* 防止 iOS 縮放 */
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    /* 模態框移動優化 */
+    .modal-dialog {
+        margin: 10px;
+        max-width: calc(100% - 20px);
+    }
+    
+    .modal-body {
+        padding: 15px;
+    }
+    
+    .modal-footer {
+        padding: 10px 15px;
+    }
+    
+    /* 側邊欄移動優化 */
+    #sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 1050 !important; /* 確保在遮罩之上 */
+    }
+    
+    #sidebar.active {
+        transform: translateX(0);
+    }
+    
+    #content {
+        margin-left: 0 !important;
+    }
+    
+    /* 側邊欄滾動優化 */
+    .sidebar-scroll {
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 響應式文字大小 */
+    .h1, h1 { font-size: 1.5rem; }
+    .h2, h2 { font-size: 1.3rem; }
+    .h3, h3 { font-size: 1.2rem; }
+    .h4, h4 { font-size: 1.1rem; }
+    .h5, h5 { font-size: 1rem; }
+    .h6, h6 { font-size: 0.9rem; }
+    
+    /* 間距調整 */
+    .mb-4 { margin-bottom: 1rem !important; }
+    .mb-3 { margin-bottom: 0.8rem !important; }
+    .p-4 { padding: 15px !important; }
+    .p-3 { padding: 12px !important; }
+    
+    /* 圖標大小調整 */
+    .bi {
+        font-size: 1rem;
+    }
+    
+    /* 徽章調整 */
+    .badge {
+        font-size: 0.7rem;
+        padding: 0.2em 0.5em;
+    }
+    
+    /* 麵包屑移動優化 */
+    .breadcrumb-container {
+        padding: 8px 15px;
+        margin-bottom: 15px;
+    }
+    
+    .breadcrumb {
+        font-size: 0.875rem;
+    }
+    
+    /* 通知容器移動優化 */
+    .toast-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    /* 頂部導航移動優化 */
+    .top-navbar {
+        padding: 10px 15px;
+    }
+    
+    .top-navbar .btn {
+        padding: 6px 12px;
+    }
+    
+    /* 用戶下拉選單移動優化 */
+    .user-dropdown .dropdown-menu {
+        right: 0;
+        left: auto;
+        min-width: 200px;
+    }
+    
+    /* 表格容器移動優化 */
+    .table-container {
+        margin: 10px;
+        padding: 15px;
+    }
+}
+
+/* 小螢幕手機優化 - 小於 576px */
+@media (max-width: 575.98px) {
+    /* 更小的間距 */
+    .container-fluid {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+    
+    .card-body {
+        padding: 12px;
+    }
+    
+    .btn {
+        font-size: 0.875rem;
+        padding: 8px 12px;
+    }
+    
+    .btn-sm {
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+    
+    /* 統計卡片更緊湊 */
+    .dashboard-card .card-body {
+        padding: 12px;
+    }
+    
+    .dashboard-card .h5 {
+        font-size: 1rem;
+    }
+    
+    .dashboard-card .fa-3x {
+        font-size: 1.5rem;
+    }
+    
+    /* 表格更緊湊 */
+    .table th,
+    .table td {
+        padding: 6px;
+        font-size: 0.8rem;
+    }
+    
+    /* 模態框更緊湊 */
+    .modal-dialog {
+        margin: 5px;
+        max-width: calc(100% - 10px);
+    }
+    
+    /* 頂部導航更緊湊 */
+    .top-navbar {
+        padding: 8px 10px;
+    }
+    
+    /* 側邊欄更緊湊 */
+    .sidebar-logo {
+        padding: 15px;
+    }
+    
+    .sidebar-group-title {
+        font-size: 0.75rem;
+        padding: 8px 15px;
+    }
+    
+    .nav-link {
+        padding: 8px 15px;
+        font-size: 0.875rem;
+    }
+}
+
+/* 載入動畫 */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 通知樣式 */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    max-width: 300px;
+    padding: 15px;
+    border-radius: 5px;
+    color: white;
+    z-index: 1050;
+    animation: slideIn 0.3s ease-out;
+}
+
+@media (max-width: 767.98px) {
+    .notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
+.notification.success {
+    background-color: #28a745;
+}
+
+.notification.error {
+    background-color: #dc3545;
+}
+
+.notification.warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.notification.info {
+    background-color: #17a2b8;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* 無障礙設計 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* 高對比度模式 */
+@media (prefers-contrast: high) {
+    .btn {
+        border-width: 2px;
+    }
+    
+    .card {
+        border-width: 2px;
+    }
+    
+    .form-control {
+        border-width: 2px;
+    }
+}
+
+/* 減少動畫偏好 */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* 暗色模式準備 */
+@media (prefers-color-scheme: dark) {
+    .dark-mode-ready {
+        background-color: #1a1a1a;
+        color: #ffffff;
+    }
+    
+    .dark-mode-ready .card {
+        background-color: #2d2d2d;
+        border-color: #404040;
+    }
+    
+    .dark-mode-ready .form-control {
+        background-color: #2d2d2d;
+        border-color: #404040;
+        color: #ffffff;
+    }
+}

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tooltip 測試</title>
+    <style>
+      body {
+        font-family: "Microsoft JhengHei", sans-serif;
+        padding: 40px;
+        background: #f5f5f5;
+      }
+
+      .test-container {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 600px;
+        margin: 0 auto;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      h2 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      .match-reason {
+        font-size: 14px;
+        color: #6b7280;
+        line-height: 1.8;
+        background: #f9fafb;
+        padding: 16px;
+        border-radius: 8px;
+        border-left: 3px solid #667eea;
+        margin-bottom: 20px;
+      }
+
+      /* Tooltip 樣式 - 修正後 */
+      .trait-tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+        border-bottom: 1px dashed #667eea;
+        color: #667eea;
+        font-weight: 500;
+      }
+
+      .trait-tooltip .tooltip-text {
+        visibility: hidden;
+        width: 320px;
+        background-color: #1f2937;
+        color: #fff;
+        text-align: left;
+        border-radius: 8px;
+        padding: 12px;
+        position: fixed;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 13px;
+        line-height: 1.5;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        white-space: normal;
+      }
+
+      .trait-tooltip .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 20px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1f2937 transparent transparent transparent;
+      }
+
+      .trait-tooltip:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .test-section {
+        margin-bottom: 30px;
+      }
+
+      .test-label {
+        font-weight: 600;
+        color: #667eea;
+        margin-bottom: 10px;
+      }
+
+      .status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: 10px;
+      }
+
+      .status.success {
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      .status.info {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-container">
+      <h2>🧪 Tooltip 顯示測試</h2>
+
+      <div class="test-section">
+        <div class="test-label">
+          測試 1: 單個特質 <span class="status success">✓ 中文名稱</span>
+        </div>
+        <div class="match-reason">
+          匹配特質：<span class="trait-tooltip"
+            >溝通能力(85分)
+            <span class="tooltip-text">
+              <strong>溝通能力</strong><br />
+              能夠清晰表達想法，有效傳遞信息，善於傾聽他人意見。<br /><br />
+              分數: 85/100
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-label">
+          測試 2: 多個特質（第二行測試）
+          <span class="status info">⚠ 重點測試</span>
+        </div>
+        <div class="match-reason">
+          匹配特質：
+          <span class="trait-tooltip"
+            >溝通能力(85分)
+            <span class="tooltip-text">
+              <strong>溝通能力</strong><br />
+              能夠清晰表達想法，有效傳遞信息，善於傾聽他人意見。<br /><br />
+              分數: 85/100
+            </span> </span
+          >,
+          <span class="trait-tooltip"
+            >領導力(78分)
+            <span class="tooltip-text">
+              <strong>領導力</strong><br />
+              能夠帶領團隊，激勵他人達成目標，具有決策能力。<br /><br />
+              分數: 78/100
+            </span> </span
+          >,
+          <span class="trait-tooltip"
+            >創造力(92分)
+            <span class="tooltip-text">
+              <strong>創造力</strong><br />
+              能夠提出創新想法，突破傳統思維，解決複雜問題。<br /><br />
+              分數: 92/100
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-label">測試 3: 優勢特質</div>
+        <div class="match-reason">
+          優勢特質：
+          <span class="trait-tooltip"
+            >分析能力(88分)
+            <span class="tooltip-text">
+              <strong>分析能力</strong><br />
+              能夠深入分析問題，找出關鍵因素，提出有效解決方案。<br /><br />
+              分數: 88/100
+            </span> </span
+          >,
+          <span class="trait-tooltip"
+            >邏輯思維(91分)
+            <span class="tooltip-text">
+              <strong>邏輯思維</strong><br />
+              思維清晰，推理嚴謹，能夠建立完整的邏輯體系。<br /><br />
+              分數: 91/100
+            </span> </span
+          >,
+          <span class="trait-tooltip"
+            >學習能力(95分)
+            <span class="tooltip-text">
+              <strong>學習能力</strong><br />
+              快速掌握新知識，善於總結經驗，持續自我提升。<br /><br />
+              分數: 95/100
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <div class="test-label">
+          測試說明 <span class="status info">ℹ 使用指南</span>
+        </div>
+        <div
+          style="
+            background: #f0f9ff;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 3px solid #0284c7;
+          "
+        >
+          <p style="margin: 0 0 10px 0; color: #0c4a6e; font-size: 14px">
+            <strong>測試步驟：</strong>
+          </p>
+          <ol
+            style="
+              margin: 0;
+              padding-left: 20px;
+              color: #0c4a6e;
+              font-size: 13px;
+              line-height: 1.8;
+            "
+          >
+            <li>將鼠標移到藍色虛線的特質名稱上</li>
+            <li>觀察 tooltip 是否完整顯示</li>
+            <li>特別測試第二行的特質（領導力、創造力等）</li>
+            <li>移動到視窗邊緣測試自動調整</li>
+          </ol>
+          <p style="margin: 10px 0 0 0; color: #0c4a6e; font-size: 13px">
+            <strong>✅ 修正內容：</strong><br />
+            • 使用 fixed 定位，不會被遮擋<br />
+            • 寬度增加到 320px<br />
+            • 允許文字換行<br />
+            • 自動檢測邊界並調整位置
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 動態定位 tooltip（與前端代碼一致）
+      document.querySelectorAll(".trait-tooltip").forEach((element) => {
+        element.addEventListener("mouseenter", function (event) {
+          const tooltip = this.querySelector(".tooltip-text");
+          if (tooltip) {
+            const rect = this.getBoundingClientRect();
+            const tooltipHeight = 120;
+
+            let top = rect.top - tooltipHeight - 10;
+            let left = rect.left;
+
+            // 如果上方空間不足，顯示在下方
+            if (top < 10) {
+              top = rect.bottom + 10;
+            }
+
+            // 確保不會超出右側
+            if (left + 320 > window.innerWidth) {
+              left = window.innerWidth - 330;
+            }
+
+            // 確保不會超出左側
+            if (left < 10) {
+              left = 10;
+            }
+
+            tooltip.style.top = top + "px";
+            tooltip.style.left = left + "px";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

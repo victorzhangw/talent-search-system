@@ -1,0 +1,417 @@
+{# templates/file_manager/file_list.html #}
+{% extends 'base.html' %}
+
+{% block title %}檔案管理{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'home' %}">首頁</a></li>
+<li class="breadcrumb-item active">檔案管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">檔案管理</h5>
+                <div>
+                    <a href="{% url 'upload_file' %}" class="btn btn-primary">
+                        <i class="bi bi-upload me-1"></i> 上傳檔案
+                    </a>
+                    <button class="btn btn-danger ms-2 d-none" id="batchDeleteBtn">
+                        <i class="bi bi-trash me-1"></i> 批量刪除
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 篩選表單 -->
+                <form id="filterForm" method="GET" class="mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">檔案名稱</label>
+                            <input type="text" class="form-control" name="filename" value="{{ filters.filename }}" placeholder="搜尋檔案名稱...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">上傳者</label>
+                            <select name="uploaded_by" class="form-select">
+                                <option value="">全部上傳者</option>
+                                {% for uploader in uploaders %}
+                                <option value="{{ uploader }}" {% if filters.uploaded_by == uploader %}selected{% endif %}>{{ uploader }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">檔案類型</label>
+                            <select name="file_type" class="form-select">
+                                <option value="">全部類型</option>
+                                {% for type in file_types %}
+                                <option value="{{ type.key }}" {% if filters.file_type == type.key %}selected{% endif %}>{{ type.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">每頁顯示</label>
+                            <select name="per_page" class="form-select">
+                                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                                <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">開始日期</label>
+                            <input type="date" class="form-control" name="date_from" value="{{ filters.date_from }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">結束日期</label>
+                            <input type="date" class="form-control" name="date_to" value="{{ filters.date_to }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label d-block">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search me-1"></i> 搜尋
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary ms-2" id="resetFilter">
+                                <i class="bi bi-x-circle me-1"></i> 重置
+                            </button>
+                            <a href="{% url 'generate_test_files' %}" class="btn btn-outline-info ms-2">
+                                <i class="bi bi-database-add me-1"></i> 生成測試數據
+                            </a>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- 檔案列表 -->
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" id="selectAll" class="form-check-input">
+                                </th>
+                                <th style="width: 50px;">#</th>
+                                <th>
+                                    <a href="javascript:void(0)" class="sort-link" data-field="filename">
+                                        檔案名稱
+                                        {% if sort_by == 'filename' %}
+                                        <i class="bi {% if sort_order == 'asc' %}bi-sort-up{% else %}bi-sort-down{% endif %}"></i>
+                                        {% else %}
+                                        <i class="bi bi-arrow-down-up text-muted"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="javascript:void(0)" class="sort-link" data-field="file_size">
+                                        大小
+                                        {% if sort_by == 'file_size' %}
+                                        <i class="bi {% if sort_order == 'asc' %}bi-sort-up{% else %}bi-sort-down{% endif %}"></i>
+                                        {% else %}
+                                        <i class="bi bi-arrow-down-up text-muted"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="javascript:void(0)" class="sort-link" data-field="uploaded_by">
+                                        上傳者
+                                        {% if sort_by == 'uploaded_by' %}
+                                        <i class="bi {% if sort_order == 'asc' %}bi-sort-up{% else %}bi-sort-down{% endif %}"></i>
+                                        {% else %}
+                                        <i class="bi bi-arrow-down-up text-muted"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>
+                                    <a href="javascript:void(0)" class="sort-link" data-field="created_at">
+                                        上傳時間
+                                        {% if sort_by == 'created_at' %}
+                                        <i class="bi {% if sort_order == 'asc' %}bi-sort-up{% else %}bi-sort-down{% endif %}"></i>
+                                        {% else %}
+                                        <i class="bi bi-arrow-down-up text-muted"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for file in files %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input file-checkbox" value="{{ file.id }}">
+                                </td>
+                                <td>
+                                    <i class="bi {{ file.icon_class }} fs-4 {% if 'image' in file.file_type %}text-primary{% elif 'excel' in file.file_type %}text-success{% elif 'word' in file.file_type %}text-info{% elif 'pdf' in file.file_type %}text-danger{% else %}text-muted{% endif %}"></i>
+                                </td>
+                                <td>
+                                    <a href="{% url 'file_detail' file.id %}" class="text-decoration-none">
+                                        {{ file.filename }}
+                                    </a>
+                                    {% if file.description %}
+                                    <div><small class="text-muted">{{ file.description }}</small></div>
+                                    {% endif %}
+                                </td>
+                                <td>{{ file.formatted_size }}</td>
+                                <td>{{ file.uploaded_by }}</td>
+                                <td>
+                                    {{ file.time_since }}
+                                    <div><small class="text-muted">{{ file.created_at|date:"Y-m-d H:i" }}</small></div>
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'download_file' file.id %}" class="btn btn-sm btn-outline-success" title="下載">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        <a href="{% url 'file_detail' file.id %}" class="btn btn-sm btn-outline-info" title="查看詳情">
+                                            <i class="bi bi-info-circle"></i>
+                                        </a>
+                                        <a href="{% url 'update_file' file.id %}" class="btn btn-sm btn-outline-primary" title="編輯">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-danger delete-file" title="刪除" data-file-id="{{ file.id }}" data-file-name="{{ file.filename }}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="text-muted">
+                                        <i class="bi bi-folder2-open mb-3" style="font-size: 3rem;"></i>
+                                        <p>沒有找到符合條件的檔案</p>
+                                        <p><a href="{% url 'upload_file' %}" class="btn btn-primary btn-sm">上傳第一個檔案</a></p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for i in page_obj.paginator.page_range %}
+                        {% if page_obj.number == i %}
+                        <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                        {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}&{{ request.GET.urlencode }}">{{ i }}</a></li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 刪除確認模態框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">確認刪除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                您確定要刪除檔案 <span id="deleteFileName" class="fw-bold"></span> 嗎？此操作無法復原。
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form id="deleteForm" method="POST">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">確認刪除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 批量刪除確認模態框 -->
+<div class="modal fade" id="batchDeleteModal" tabindex="-1" aria-labelledby="batchDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="batchDeleteModalLabel">確認批量刪除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                您確定要刪除所選的 <span id="selectedCount" class="fw-bold"></span> 個檔案嗎？此操作無法復原。
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form id="batchDeleteForm" method="POST" action="{% url 'batch_delete_files' %}">
+                    {% csrf_token %}
+                    <div id="selectedFilesContainer"></div>
+                    <button type="submit" class="btn btn-danger">確認刪除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 單個檔案刪除
+        document.querySelectorAll('.delete-file').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const fileId = this.getAttribute('data-file-id');
+                const fileName = this.getAttribute('data-file-name');
+                
+                document.getElementById('deleteFileName').textContent = fileName;
+                document.getElementById('deleteForm').action = `/files/${fileId}/delete/`;
+                
+                // 顯示確認對話框
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                deleteModal.show();
+            });
+        });
+        
+        // 全選/取消全選
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const fileCheckboxes = document.querySelectorAll('.file-checkbox');
+        const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+        
+        selectAllCheckbox.addEventListener('change', function() {
+            fileCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            
+            updateBatchDeleteButton();
+        });
+        
+        // 更新批量刪除按鈕狀態
+        function updateBatchDeleteButton() {
+            const checkedCount = document.querySelectorAll('.file-checkbox:checked').length;
+            
+            if (checkedCount > 0) {
+                batchDeleteBtn.classList.remove('d-none');
+                batchDeleteBtn.textContent = `批量刪除 (${checkedCount})`;
+            } else {
+                batchDeleteBtn.classList.add('d-none');
+            }
+        }
+        
+        // 監聽檔案選擇變化
+        fileCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                // 如果有未選中的檔案，取消全選勾選狀態
+                if (!this.checked) {
+                    selectAllCheckbox.checked = false;
+                }
+                
+                // 如果所有檔案都被選中，勾選全選
+                if (document.querySelectorAll('.file-checkbox:checked').length === fileCheckboxes.length) {
+                    selectAllCheckbox.checked = true;
+                }
+                
+                updateBatchDeleteButton();
+            });
+        });
+        
+        // 批量刪除按鈕點擊事件
+        batchDeleteBtn.addEventListener('click', function() {
+            const selectedFiles = document.querySelectorAll('.file-checkbox:checked');
+            const selectedCount = selectedFiles.length;
+            
+            if (selectedCount === 0) {
+                showToast('請至少選擇一個檔案', 'warning');
+                return;
+            }
+            
+            // 更新模態框內容
+            document.getElementById('selectedCount').textContent = selectedCount;
+            
+            // 清空並重新添加選中的檔案ID隱藏輸入
+            const container = document.getElementById('selectedFilesContainer');
+            container.innerHTML = '';
+            
+            selectedFiles.forEach(file => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'file_ids';
+                input.value = file.value;
+                container.appendChild(input);
+            });
+            
+            // 顯示批量刪除確認對話框
+            const batchDeleteModal = new bootstrap.Modal(document.getElementById('batchDeleteModal'));
+            batchDeleteModal.show();
+        });
+        
+        // 排序處理
+        document.querySelectorAll('.sort-link').forEach(link => {
+            link.addEventListener('click', function() {
+                const field = this.getAttribute('data-field');
+                let order = 'asc';
+                
+                // 如果當前已經是升序，則切換為降序
+                if (field === '{{ sort_by }}' && '{{ sort_order }}' === 'asc') {
+                    order = 'desc';
+                }
+                
+                // 添加排序參數並提交
+                const form = document.getElementById('filterForm');
+                
+                // 創建或更新 sort_by 和 sort_order 隱藏字段
+                let sortByInput = form.querySelector('input[name="sort_by"]');
+                if (!sortByInput) {
+                    sortByInput = document.createElement('input');
+                    sortByInput.type = 'hidden';
+                    sortByInput.name = 'sort_by';
+                    form.appendChild(sortByInput);
+                }
+                sortByInput.value = field;
+                
+                let sortOrderInput = form.querySelector('input[name="sort_order"]');
+                if (!sortOrderInput) {
+                    sortOrderInput = document.createElement('input');
+                    sortOrderInput.type = 'hidden';
+                    sortOrderInput.name = 'sort_order';
+                    form.appendChild(sortOrderInput);
+                }
+                sortOrderInput.value = order;
+                
+                form.submit();
+            });
+        });
+        
+        // 重置篩選
+        document.getElementById('resetFilter').addEventListener('click', function() {
+            window.location.href = '{% url "file_list" %}';
+        });
+    });
+</script>
+{% endblock %}

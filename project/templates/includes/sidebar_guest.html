@@ -1,0 +1,36 @@
+<!-- 訪客 Sidebar -->
+<div class="py-3">
+    <!-- 基本功能 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">基本功能</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'home' %}" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                    <i class="bi bi-house-door me-2"></i> 首頁
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'point_dashboard' %}" class="nav-link {% if 'points' in request.path %}active{% endif %}">
+                    <i class="bi bi-coin me-2"></i> 點數管理
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 開始使用 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">開始使用</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'register_choice' %}" class="nav-link">
+                    <i class="bi bi-person-plus me-2"></i> 立即註冊
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'login' %}" class="nav-link">
+                    <i class="bi bi-box-arrow-in-right me-2"></i> 用戶登入
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>

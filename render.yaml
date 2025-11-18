@@ -1,0 +1,50 @@
+services:
+  # 後端 API 服務
+  - type: web
+    name: talent-search-api
+    runtime: python
+    buildCommand: pip install -r BackEnd/requirements.txt
+    startCommand: cd BackEnd && python start_fixed_api.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DB_SSH_HOST
+        sync: false
+      - key: DB_SSH_PORT
+        value: 22
+      - key: DB_SSH_USERNAME
+        sync: false
+      - key: DB_SSH_PRIVATE_KEY
+        sync: false
+      - key: DB_HOST
+        value: localhost
+      - key: DB_PORT
+        value: 5432
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_API_HOST
+        value: https://api.siliconflow.cn
+      - key: LLM_MODEL
+        value: deepseek-ai/DeepSeek-V3
+    healthCheckPath: /health
+
+  # 前端靜態網站
+  - type: web
+    name: talent-search-frontend
+    runtime: node
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 18.0.0
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: talent-search-api
+          envVarKey: RENDER_EXTERNAL_URL

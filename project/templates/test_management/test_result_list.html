@@ -1,0 +1,937 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% load tz %}
+{% csrf_token %}
+
+{% block title %}測驗結果管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<!-- {% if user.user_type == 'admin' %}
+<li class="breadcrumb-item"><a href="{% url 'test_result_dashboard' %}">測驗結果儀表板</a></li>
+{% else %}
+<li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li>
+{% endif %} -->
+<li class="breadcrumb-item active">評鑑結果列表</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.status-badge {
+    font-size: 0.875em;
+    font-weight: 500;
+}
+
+.crawl-status-badge {
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.action-buttons .btn {
+    margin-right: 0.25rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 隱藏的 CSRF Token -->
+    <form style="display: none;">
+        {% csrf_token %}
+    </form>
+    {% if project_overview %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <h2><i class="bi bi-graph-up me-2"></i>{{ project_overview.project.name }} - 測驗統1111計</h2>
+            <p class="text-muted mb-0">{{ project_overview.project.description|default:"暫無描述" }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'test_templates' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>返回測驗項目
+            </a>
+            <a href="{% url 'quick_invitation' project_overview.project.id %}" class="btn btn-primary">
+                <i class="bi bi-envelope-plus me-1"></i>發送邀請
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4 g-3">
+        {% with stats=project_overview.invitation_stats %}
+        <div class="col-6 col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ stats.total }}</h4>
+                    <small>總邀請</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ stats.pending }}</h4>
+                    <small>待完成</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ stats.in_progress }}</h4>
+                    <small>進行中</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ stats.completed }}</h4>
+                    <small>已完成</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ stats.expired }}</h4>
+                    <small>已過期</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0">{{ stats.cancelled }}</h4>
+                    <small>已取消</small>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+    </div>
+    {% else %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-clipboard-data me-2"></i>評鑑結果列表
+        </h2>
+        {% if user.user_type == 'admin' %}
+        <div>
+            <a href="{% url 'test_result_dashboard' %}" class="btn btn-outline-primary">
+                <i class="bi bi-graph-up me-1"></i>返回儀表板
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 搜尋和過濾 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label">搜尋受測人員</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="輸入姓名或 Email" value="{{ search }}">
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label">評鑑別</label>
+                    {% if lock_project_filter %}
+                        <input type="hidden" name="project" value="{{ project_filter }}">
+                    {% endif %}
+                    <select name="project" class="form-select" {% if lock_project_filter %}disabled{% endif %}>
+                        <option value="">全部項目</option>
+                        {% for project in project_choices %}
+                            <option value="{{ project.id }}" {% if project_filter == project.id|stringformat:"s" %}selected{% endif %}>{{ project.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if lock_project_filter and project_overview %}
+                        <small class="text-muted">目前僅顯示「{{ project_overview.project.name }}」的結果</small>
+                    {% endif %}
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label">受測身份</label>
+                    <select name="identity" class="form-select">
+                        <option value="">全部身份</option>
+                        {% for value, label in identity_choices %}
+                            <option value="{{ value }}" {% if identity_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label">職位</label>
+                    <select name="position" class="form-select">
+                        <option value="">全部職位</option>
+                        {% for pos in position_choices %}
+                            <option value="{{ pos }}" {% if position_filter == pos %}selected{% endif %}>{{ pos }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label">測驗狀態</label>
+                    <select name="status" class="form-select">
+                        <option value="">全部狀態</option>
+                        {% for value, label in status_choices %}
+                            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label">結果狀態</label>
+                    <select name="crawl_status" class="form-select">
+                        <option value="">全部結果</option>
+                        {% for value, label in crawl_status_choices %}
+                            <option value="{{ value }}" {% if crawl_status_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label">排序方式</label>
+                    <select name="order" class="form-select">
+                        {% for value, label in order_choices %}
+                            <option value="{{ value }}" {% if order_option == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6 align-self-end">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search me-1"></i>搜尋
+                        </button>
+                        <a href="{% url 'test_result_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise me-1"></i>重置
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 結果列表 -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                評鑑結果列表
+                <small class="text-muted">（共 {{ page_obj.paginator.count }} 筆）</small>
+            </h5>
+        <div class="ms-auto">
+            <a href="{% url 'export_filtered_test_results' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-outline-success">
+                <i class="bi bi-download me-1"></i> 匯出結果
+            </a>
+        </div>
+            <!-- 全選功能已隱藏 -->
+        </div>
+        <div class="card-body p-0">
+            {% if page_obj.object_list %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>評鑑別</th>
+                                <th>受試者</th>
+                                <th>身份別</th>
+                                <th>職位</th>
+                                <th>完成時間</th>
+                                <th>分數</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invitation in page_obj.object_list %}
+                            <tr>
+                                <!-- 選取複選框已隱藏 -->
+                                <td>
+                                    <div>
+                                        <strong>{{ invitation.test_project.name }}</strong>
+                                        {% if invitation.test_project.category %}
+                                        <div class="small text-muted">{{ invitation.test_project.category.name }}</div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ invitation.invitee.name }}</strong>
+                                        <div class="small text-muted">{{ invitation.invitee.email }}</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {{ invitation.invitee.get_status_display }}
+                                </td>
+                                <td>
+                                    {{ invitation.invitee.position|default:"-" }}
+                                </td>
+                                <td>
+                                    {% if invitation.effective_completed_at %}
+                                        {{ invitation.effective_completed_at|localtime|date:"Y-m-d H:i" }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% with result=invitation.testprojectresult %}
+                                        {% if result and result.crawl_status == 'completed' %}
+                                            {% with score_value_direct=result.raw_data|get_item:invitation.test_project.score_field_system %}
+                                            {% with score_value_performance=result.raw_data.performance_metrics|get_item:invitation.test_project.score_field_system %}
+                                            {% with prediction_value_direct=result.raw_data|get_item:invitation.test_project.prediction_field_system %}
+                                            {% with prediction_value_performance=result.raw_data.performance_metrics|get_item:invitation.test_project.prediction_field_system %}
+                                            {% with ci_raw_value=result.raw_data.performance_metrics.CI_Raw_Value %}
+                                            {% with ci_value=ci_raw_value|default:score_value_performance|default:score_value_direct %}
+                                            {% with prediction_value=prediction_value_performance|default:prediction_value_direct %}
+                                                <div class="small">
+                                                    {% if ci_value %}
+                                                        <div>CI 分數：{{ ci_value|cut:"%" }}</div>
+                                                    {% endif %}
+                                                    {% if prediction_value %}
+                                                        <div>預測值分數：{{ prediction_value }}</div>
+                                                    {% endif %}
+                                                    {% if not ci_value and not prediction_value %}
+                                                        <span class="text-muted">暫無數據</span>
+                                                    {% endif %}
+                                                </div>
+                                            {% endwith %}
+                                            {% endwith %}
+                                            {% endwith %}
+                                            {% endwith %}
+                                            {% endwith %}
+                                            {% endwith %}
+                                            {% endwith %}
+                                        {% else %}
+                                            <span class="text-muted small">暫無數據</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        {% with result=invitation.testprojectresult %}
+                                        {% if result %}
+                                            {% if result.crawl_status == 'completed' %}
+                                                {% if user.user_type == 'admin' %}
+                                                    {% url 'admin_test_result_detail' result.id as detail_url %}
+                                                    {% url 'admin_generate_test_result_pdf' result.id as pdf_url %}
+                                                {% else %}
+                                                    {% url 'test_result_detail' result.id as detail_url %}
+                                                    {% url 'generate_test_result_pdf' result.id as pdf_url %}
+                                                {% endif %}
+                                                <a href="{{ detail_url }}" class="btn btn-success btn-sm" title="查看詳細結果">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{{ pdf_url }}" class="btn btn-outline-info btn-sm" title="下載PDF報告" target="_blank" rel="noopener">
+                                                    <i class="bi bi-file-earmark-pdf"></i>
+                                                </a>
+                                                {% if user.user_type == 'admin' %}
+                                                <!-- 管理員專用：重新爬取按鈕 -->
+                                                <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                        onclick="forceRecrawl({{ invitation.id }})" title="管理員：強制重新爬取">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% elif result.crawl_status == 'failed' %}
+                                                <button type="button" class="btn btn-warning btn-sm" 
+                                                        onclick="startCrawling({{ invitation.id }})" title="重新處理">
+                                                    <i class="bi bi-arrow-clockwise"></i>
+                                                </button>
+                                                {% if user.user_type == 'admin' %}
+                                                <!-- 管理員專用：強制重新爬取按鈕 -->
+                                                <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                        onclick="forceRecrawl({{ invitation.id }})" title="管理員：強制重新爬取">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% elif result.crawl_status == 'crawling' %}
+                                                <span class="text-info small">
+                                                    <i class="bi bi-hourglass-split me-1"></i>系統處理中...
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            {% if invitation.status == 'completed' %}
+                                                <button type="button" class="btn btn-primary btn-sm" 
+                                                        onclick="startCrawling({{ invitation.id }})" title="取得測驗結果">
+                                                    <i class="bi bi-arrow-clockwise me-1"></i>取得結果
+                                                </button>
+                                            {% elif invitation.status == 'in_progress' %}
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled
+                                                        title="測驗進行中，請等待完成">
+                                                    <i class="bi bi-hourglass-split me-1"></i>測驗中
+                                                </button>
+                                                {% if user.user_type == 'admin' %}
+                                                <!-- 管理員專用：強制爬取按鈕 -->
+                                                <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                        onclick="forceRecrawl({{ invitation.id }})" title="管理員：強制爬取（忽略測驗狀態）">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% elif invitation.status == 'pending' %}
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled
+                                                        title="受測者尚未開始測驗">
+                                                    <i class="bi bi-clock me-1"></i>待開始
+                                                </button>
+                                                {% if user.user_type == 'admin' %}
+                                                <!-- 管理員專用：強制爬取按鈕 -->
+                                                <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                        onclick="forceRecrawl({{ invitation.id }})" title="管理員：強制爬取（忽略測驗狀態）">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% elif invitation.status == 'expired' %}
+                                                <span class="text-muted small">
+                                                    <i class="bi bi-calendar2-x me-1"></i>已過期
+                                                </span>
+                                                {% if user.user_type == 'admin' %}
+                                                <!-- 管理員專用：強制爬取按鈕 -->
+                                                <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                        onclick="forceRecrawl({{ invitation.id }})" title="管理員：強制爬取（忽略測驗狀態）">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% elif invitation.status == 'cancelled' %}
+                                                <span class="text-muted small">
+                                                    <i class="bi bi-x-circle me-1"></i>已取消
+                                                </span>
+                                                {% if user.user_type == 'admin' %}
+                                                <!-- 管理員專用：強制爬取按鈕 -->
+                                                <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                        onclick="forceRecrawl({{ invitation.id }})" title="管理員：強制爬取（忽略測驗狀態）">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% else %}
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" disabled
+                                                        title="狀態未知">
+                                                    <i class="bi bi-question-circle me-1"></i>未知狀態
+                                                </button>
+                                                {% if user.user_type == 'admin' %}
+                                                <!-- 管理員專用：強制爬取按鈕 -->
+                                                <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                        onclick="forceRecrawl({{ invitation.id }})" title="管理員：強制爬取（忽略測驗狀態）">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 分頁控制 -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="分頁導航" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if querystring %}&{{ querystring }}{% endif %}" aria-label="第一頁">
+                                    <span aria-hidden="true">&laquo;&laquo;</span>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}" aria-label="上一頁">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if querystring %}&{{ querystring }}{% endif %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}" aria-label="下一頁">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if querystring %}&{{ querystring }}{% endif %}" aria-label="最後一頁">
+                                    <span aria-hidden="true">&raquo;&raquo;</span>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                    
+                    <!-- 分頁資訊 -->
+                    <div class="text-center mt-2">
+                        <small class="text-muted">
+                            第 {{ page_obj.number }} 頁，共 {{ page_obj.paginator.num_pages }} 頁
+                            （第 {{ page_obj.start_index }}-{{ page_obj.end_index }} 筆，總共 {{ page_obj.paginator.count }} 筆）
+                        </small>
+                    </div>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <h5 class="mt-3 text-muted">沒有找到測驗結果</h5>
+                    <p class="text-muted">嘗試調整篩選條件或建立新的測驗邀請</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 批量處理確認對話框已隱藏 -->
+
+<!-- 進度提示 Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">處理中...</span>
+                </div>
+                <h6 id="progressText">正在處理測驗結果...</h6>
+                <p class="text-muted" id="progressDetail">請稍後，這可能需要幾分鐘時間</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast 容器 -->
+<div class="toast-container position-fixed top-0 end-0 p-3"></div>
+
+<!-- 核心 JavaScript -->
+<script type="text/javascript">
+
+// ===== 全域變數 =====
+let selectedInvitations = [];
+
+// ===== 主要函數：開始單個處理 =====
+function startCrawling(invitationId) {
+    console.log('🎯 startCrawling 被調用，邀請 ID:', invitationId);
+    
+    if (!confirm('確定要開始處理這個測驗結果嗎？此過程可能需要幾分鐘時間。')) {
+        return;
+    }
+    
+    // 顯示進度 Modal
+    showProgressModal('正在處理測驗結果...', '請稍後，這可能需要幾分鐘時間');
+    
+    // 獲取 CSRF token - 改進版本
+    let csrfToken = getCookie('csrftoken');
+    
+    // 如果無法從 cookie 獲取，嘗試從表單獲取
+    if (!csrfToken) {
+        const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfInput) {
+            csrfToken = csrfInput.value;
+        }
+    }
+    
+    // 檢查 token 是否有效（長度檢查）
+    if (!csrfToken || csrfToken.length < 32) {
+        showToast('❌ 無法獲取有效的安全令牌，請刷新頁面後重試', 'danger');
+        console.error('Invalid CSRF token:', csrfToken);
+        hideProgressModal();
+        return;
+    }
+    
+    console.log('🔐 CSRF Token 獲取成功，長度:', csrfToken.length);
+    
+    // 發送 AJAX 請求
+    fetch(`/enterprise/invitations/${invitationId}/crawl/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',  // 確保發送 cookies
+    })
+    .then(response => {
+        console.log('收到響應，狀態：', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('📊 處理結果：', data);
+        
+        // 關閉進度 Modal
+        hideProgressModal();
+        
+        if (data.success) {
+            showToast('測驗結果處理完成！', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            // 處理包含換行符的錯誤訊息
+            const errorMessage = data.error || '未知錯誤';
+            showToast(`處理失敗：${errorMessage}`, 'danger', 8000);  // 延長顯示時間
+        }
+    })
+    .catch(error => {
+        console.error('處理錯誤：', error);
+        hideProgressModal();
+        
+        if (error.message.includes('403')) {
+            showToast('❌ 沒有權限執行此操作，請刷新頁面後重試', 'danger');
+        } else if (error.message.includes('401')) {
+            showToast('❌ 登入已過期，請重新登入', 'danger');
+        } else {
+            showToast('❌ 處理過程中發生錯誤，請稍後重試', 'danger');
+        }
+    });
+}
+
+// ===== 管理員強制重新爬取函數 =====
+function forceRecrawl(invitationId) {
+    console.log('🔧 forceRecrawl 被調用，邀請 ID:', invitationId);
+    
+    if (!confirm('⚠️ 管理員操作：確定要強制重新爬取這個測驗結果嗎？\n\n此操作將覆蓋現有數據，建議僅在需要修復數據時使用。')) {
+        return;
+    }
+    
+    // 獲取 CSRF token - 改進版本
+    let csrfToken = getCookie('csrftoken');
+    
+    // 如果無法從 cookie 獲取，嘗試從表單獲取
+    if (!csrfToken) {
+        const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfInput) {
+            csrfToken = csrfInput.value;
+        }
+    }
+    
+    // 檢查 token 是否有效（長度檢查）
+    if (!csrfToken || csrfToken.length < 32) {
+        showToast('❌ 無法獲取有效的安全令牌，請刷新頁面後重試', 'danger');
+        console.error('Invalid CSRF token:', csrfToken);
+        return;
+    }
+    
+    console.log('🔐 CSRF Token 獲取成功，長度:', csrfToken.length);
+    
+    // 顯示進度 Modal
+    showProgressModal('正在執行強制重新爬取...', '管理員操作進行中，請稍後...');
+    
+    // 發送強制重新爬取請求
+    fetch(`/management/invitations/${invitationId}/force-recrawl/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',  // 確保發送 cookies
+    })
+    .then(response => {
+        console.log('收到強制重新爬取響應，狀態：', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('📊 強制重新爬取結果：', data);
+        
+        // 關閉進度 Modal
+        hideProgressModal();
+        
+        if (data.success) {
+            showToast('✅ 強制重新爬取任務已啟動！系統將重新處理該測驗結果。', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            showToast(`❌ 強制重新爬取失敗：${data.error || '未知錯誤'}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('強制重新爬取錯誤：', error);
+        hideProgressModal();
+        
+        if (error.message.includes('403')) {
+            showToast('❌ 沒有權限執行此操作，請確認您是管理員身份', 'danger');
+        } else if (error.message.includes('401')) {
+            showToast('❌ 請先登入後再操作', 'danger');
+        } else {
+            showToast('❌ 強制重新爬取過程中發生錯誤，請檢查系統狀態後重試', 'danger');
+        }
+    });
+}
+
+// ===== 顯示批量處理 Modal =====
+function showBulkCrawlModal() {
+    const checkedBoxes = document.querySelectorAll('.invitation-checkbox:checked');
+    
+    if (checkedBoxes.length === 0) {
+        showToast('請先選擇要處理的測驗邀請', 'warning');
+        return;
+    }
+    
+    updateSelectedCount();
+    const bulkCrawlModal = new bootstrap.Modal(document.getElementById('bulkCrawlModal'));
+    bulkCrawlModal.show();
+}
+
+// ===== 執行批量處理 =====
+function executeBulkCrawl() {
+    if (selectedInvitations.length === 0) {
+        showToast('沒有選擇要處理的項目', 'warning');
+        return;
+    }
+    
+    // 關閉確認 Modal
+    const bulkCrawlModal = bootstrap.Modal.getInstance(document.getElementById('bulkCrawlModal'));
+    bulkCrawlModal.hide();
+    
+    // 顯示進度 Modal
+    showProgressModal('正在批量處理測驗結果...', `處理 ${selectedInvitations.length} 個項目，請稍後...`);
+    
+    // 獲取 CSRF token
+    let csrfToken = getCookie('csrftoken');
+    if (!csrfToken) {
+        const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfInput) {
+            csrfToken = csrfInput.value;
+        }
+    }
+    
+    if (!csrfToken || csrfToken.length < 32) {
+        showToast('❌ 無法獲取有效的安全令牌，請刷新頁面後重試', 'danger');
+        hideProgressModal();
+        return;
+    }
+    
+    // 發送批量處理請求
+    fetch('/enterprise/test-results/bulk-crawl/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            invitation_ids: selectedInvitations
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideProgressModal();
+        
+        if (data.success) {
+            showToast(`批量處理已開始，成功處理 ${data.processed_count} 個項目`, 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            showToast(`批量處理失敗：${data.error || '未知錯誤'}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('批量處理錯誤：', error);
+        hideProgressModal();
+        showToast('批量處理過程中發生錯誤', 'danger');
+    });
+}
+
+// ===== 全選功能 =====
+function initializeSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const selectAllHeader = document.getElementById('selectAllHeader');
+    const invitationCheckboxes = document.querySelectorAll('.invitation-checkbox');
+    
+    // 綁定頭部全選
+    if (selectAllHeader) {
+        selectAllHeader.addEventListener('change', function() {
+            invitationCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            if (selectAllCheckbox) selectAllCheckbox.checked = this.checked;
+            updateSelectedCount();
+        });
+    }
+    
+    // 綁定側邊全選
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            invitationCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            if (selectAllHeader) selectAllHeader.checked = this.checked;
+            updateSelectedCount();
+        });
+    }
+    
+    // 綁定個別複選框
+    invitationCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateSelectedCount();
+            
+            const checkedCount = document.querySelectorAll('.invitation-checkbox:checked').length;
+            const totalCount = invitationCheckboxes.length;
+            
+            const isAllChecked = checkedCount === totalCount && totalCount > 0;
+            const isPartialChecked = checkedCount > 0 && checkedCount < totalCount;
+            
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = isAllChecked;
+                selectAllCheckbox.indeterminate = isPartialChecked;
+            }
+            
+            if (selectAllHeader) {
+                selectAllHeader.checked = isAllChecked;
+                selectAllHeader.indeterminate = isPartialChecked;
+            }
+        });
+    });
+}
+
+// ===== 更新選中計數 =====
+function updateSelectedCount() {
+    const checkedBoxes = document.querySelectorAll('.invitation-checkbox:checked');
+    selectedInvitations = Array.from(checkedBoxes).map(checkbox => checkbox.value);
+    
+    const countElement = document.getElementById('selectedCountModal');
+    if (countElement) {
+        countElement.textContent = selectedInvitations.length;
+    }
+}
+
+// ===== 顯示進度 Modal =====
+function showProgressModal(title, detail) {
+    console.log('🔄 顯示進度 Modal：', title);
+    
+    const progressModal = document.getElementById('progressModal');
+    const progressText = document.getElementById('progressText');
+    const progressDetail = document.getElementById('progressDetail');
+    
+    if (progressText) progressText.textContent = title;
+    if (progressDetail) progressDetail.textContent = detail;
+    
+    const modal = new bootstrap.Modal(progressModal);
+    modal.show();
+}
+
+// ===== 隱藏進度 Modal =====
+function hideProgressModal() {
+    
+    const progressModal = document.getElementById('progressModal');
+    const modal = bootstrap.Modal.getInstance(progressModal);
+    
+    if (modal) {
+        modal.hide();
+        
+        // 延遲檢查是否真的關閉了
+        setTimeout(() => {
+            const isVisible = progressModal.classList.contains('show');
+            console.log('Modal 是否還顯示:', isVisible);
+            
+            if (isVisible) {
+                console.log('❌ Modal 仍然顯示，執行強制關閉');
+                // 強制關閉
+                progressModal.classList.remove('show', 'fade');
+                progressModal.style.display = 'none';
+                
+                // 移除背景
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(backdrop => backdrop.remove());
+                
+                // 恢復 body
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                
+                console.log('💪 強制關閉完成');
+            }
+        }, 500);
+    } else {
+        console.log('❌ 沒有找到 Modal 實例');
+    }
+}
+
+// ===== 顯示 Toast 通知 =====
+function showToast(message, type = 'info', duration) {
+    const toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) return;
+    
+    const toastId = 'toast_' + Date.now();
+    const bgClass = `bg-${type}`;
+    const iconClass = type === 'success' ? 'check-circle' : 
+                     type === 'danger' ? 'exclamation-triangle' : 
+                     type === 'warning' ? 'exclamation-circle' : 'info-circle';
+    
+    // 處理換行符，將 \n 轉換為 <br>
+    const formattedMessage = message.replace(/\n/g, '<br>');
+    
+    const toastHTML = `
+        <div id="${toastId}" class="toast ${bgClass} text-white" role="alert" style="max-width: 500px;">
+            <div class="toast-header ${bgClass} text-white border-0">
+                <i class="bi bi-${iconClass} me-2"></i>
+                <strong class="me-auto">系統通知</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${formattedMessage}
+            </div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, {
+        autohide: true,
+        delay: duration || (type === 'success' ? 3000 : (type === 'danger' ? 8000 : 5000))
+    });
+    
+    toast.show();
+    
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+
+// ===== 獲取 CSRF Token =====
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// ===== DOM 載入完成後初始化 =====
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM 載入完成，開始初始化功能...');
+    
+    // 初始化全選功能
+    initializeSelectAll();
+    
+    // 更新選中計數
+    updateSelectedCount();
+    
+    console.log('所有功能初始化完成');
+    console.log('startCrawling 函數狀態:', typeof startCrawling);
+});
+
+console.log('🚀 測驗結果管理系統 JavaScript 載入完成');
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('extra_js block 載入完成');
+</script>
+{% endblock %}

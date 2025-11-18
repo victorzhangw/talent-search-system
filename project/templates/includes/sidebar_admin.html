@@ -1,0 +1,124 @@
+<!-- 管理員 Sidebar -->
+<div class="py-3">
+    <!-- 基本功能 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">基本功能</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'home' %}" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                    <i class="bi bi-house-door me-2"></i> 首頁
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'point_dashboard' %}" class="nav-link {% if 'points' in request.path %}active{% endif %}">
+                    <i class="bi bi-coin me-2"></i> 點數管理
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 測驗管理 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">測驗管理</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'trait_list' %}" class="nav-link {% if 'traits' in request.path %}active{% endif %}">
+                    <i class="bi bi-tags me-2"></i> 測驗特質管理
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'test_project_list' %}" class="nav-link {% if 'test-projects' in request.path %}active{% endif %}">
+                    <i class="bi bi-clipboard-check me-2"></i> 測驗項目管理
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'test_result_list' %}" class="nav-link {% if 'test-results' in request.path and 'management' in request.path %}active{% endif %}">
+                    <i class="bi bi-file-text me-2"></i> 測驗結果管理
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'crawler_config_list' %}" class="nav-link {% if 'crawler-config' in request.path %}active{% endif %}">
+                    <i class="bi bi-robot me-2"></i> 爬蟲配置管理
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link collapsed d-flex align-items-center justify-content-between" href="#" data-bs-toggle="collapse" data-bs-target="#pointsCollapse" aria-expanded="false">
+                    <span><i class="bi bi-coin me-2"></i> 點數交易管理</span>
+                    <i class="bi bi-chevron-down"></i>
+                </a>
+                <div class="collapse {% if 'management/points' in request.path %}show{% endif %}" id="pointsCollapse">
+                    <ul class="nav flex-column ms-3">
+                        <li class="nav-item">
+                            <a href="{% url 'admin_point_overview' %}" class="nav-link {% if 'management/points/overview' in request.path %}active{% endif %}">
+                                <i class="bi bi-bar-chart me-2"></i> 點數總覽
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{% url 'admin_point_management' %}" class="nav-link {% if request.resolver_match.url_name == 'admin_point_management' %}active{% endif %}">
+                                <i class="bi bi-list-ul me-2"></i> 點數交易紀錄
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'statistics_dashboard' %}" class="nav-link {% if 'statistics' in request.path %}active{% endif %}">
+                    <i class="bi bi-graph-up me-2"></i> 分析設定
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'invitation_template_list' %}" class="nav-link {% if 'templates' in request.path %}active{% endif %}">
+                    <i class="bi bi-file-earmark-text me-2"></i> 報告模板
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 用戶管理 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">用戶管理</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'user_list' %}" class="nav-link {% if 'users' in request.path %}active{% endif %}">
+                    <i class="bi bi-people me-2"></i> 用戶列表
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'role_list' %}" class="nav-link {% if 'roles' in request.path %}active{% endif %}">
+                    <i class="bi bi-shield-check me-2"></i> 角色管理
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'enterprise_approval_list' %}" class="nav-link {% if 'enterprise-approval' in request.path %}active{% endif %}">
+                    <i class="bi bi-building me-2"></i> 企業審核
+                    <!-- 如果有待審核的企業，可以顯示數量徽章 -->
+                    <!-- <span class="badge bg-warning ms-auto">{{ pending_enterprise_count }}</span> -->
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- 服務管理 -->
+    <div class="sidebar-group">
+        <div class="sidebar-group-title">服務管理</div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a href="{% url 'crawler_dashboard' %}" class="nav-link {% if 'crawler' in request.path %}active{% endif %}">
+                    <i class="bi bi-robot me-2"></i> 爬蟲管理
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'activity_log_list' %}" class="nav-link {% if 'logs' in request.path and 'logs/export' not in request.path %}active{% endif %}">
+                    <i class="bi bi-journal-text me-2"></i> 操作日誌
+                </a>
+            </li>
+            {% comment %}
+            <li class="nav-item">
+                <a href="#" class="nav-link disabled">
+                    <i class="bi bi-tools me-2"></i> 服務方案
+                </a>
+            </li>
+            {% endcomment %}
+        </ul>
+    </div>
+</div>

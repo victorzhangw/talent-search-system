@@ -1,0 +1,697 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}評鑑邀請詳情 - {{ invitation.invitee.name }} - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<!-- <li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li> -->
+<li class="breadcrumb-item"><a href="{% url 'invitation_list' %}">邀請列表</a></li>
+<li class="breadcrumb-item active">評鑑邀請詳情</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% csrf_token %}
+    <div class="row">
+        <!-- 主要內容 -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="bi bi-envelope-open me-2"></i>評鑑邀請詳情
+                    </h4>
+                    <span class="badge fs-6 bg-{% if invitation.status == 'completed' %}success{% elif invitation.status == 'pending' %}warning{% elif invitation.status == 'in_progress' %}info{% elif invitation.status == 'expired' %}danger{% elif invitation.status == 'cancelled' %}secondary{% else %}secondary{% endif %}">
+                        {{ invitation.get_status_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- 基本資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">受測人員資訊</h6>
+                            <table class="table table-borderless table-sm">
+                                <tr>
+                                    <td width="100"><strong>姓名：</strong></td>
+                                    <td>{{ invitation.invitee.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>電子郵件：</strong></td>
+                                    <td>{{ invitation.invitee.email }}</td>
+                                </tr>
+                                {% if invitation.invitee.phone %}
+                                <tr>
+                                    <td><strong>聯絡電話：</strong></td>
+                                    <td>{{ invitation.invitee.phone }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td><strong>狀態：</strong></td>
+                                    <td>
+                                        <span class="badge bg-{% if invitation.invitee.status == 'employed' %}primary{% else %}secondary{% endif %}">
+                                            {{ invitation.invitee.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% if invitation.invitee.position %}
+                                <tr>
+                                    <td><strong>職位：</strong></td>
+                                    <td>{{ invitation.invitee.position }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if invitation.invitee.company %}
+                                <tr>
+                                    <td><strong>公司：</strong></td>
+                                    <td>{{ invitation.invitee.company }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">測驗資訊</h6>
+                            <table class="table table-borderless table-sm">
+                                <tr>
+                                    <td width="100"><strong>測驗名稱：</strong></td>
+                                    <td>
+                                        {% if invitation.test_project %}
+                                            {{ invitation.test_project.name }}
+                                        {% elif invitation.test_template %}
+                                            {{ invitation.test_template.name }}
+                                        {% else %}
+                                            未知測驗
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if invitation.test_project %}
+                                <tr>
+                                    <td><strong>測驗描述：</strong></td>
+                                    <td>{{ invitation.test_project.description|default:"暫無描述" }}</td>
+                                </tr>
+                                {% endif %}
+                                <!-- <tr>
+                                    <td><strong>邀請碼：</strong></td>
+                                    <td>
+                                        <code>{{ invitation.invitation_code }}</code>
+                                        <button class="btn btn-sm btn-outline-secondary ms-2" 
+                                                onclick="copyToClipboard('{{ invitation.invitation_code }}')" 
+                                                title="複製邀請碼">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                    </td>
+                                </tr> -->
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- 時間資訊 -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary">時間資訊</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <i class="bi bi-send text-info fs-4"></i>
+                                        <div class="mt-2">
+                                            <strong>邀請時間</strong>
+                                            <div class="small text-muted">
+                                                {{ invitation.invited_at|date:"Y/m/d H:i" }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <i class="bi bi-clock text-warning fs-4"></i>
+                                        <div class="mt-2">
+                                            <strong>截止時間</strong>
+                                            <div class="small text-muted">
+                                                {{ invitation.expires_at|date:"Y/m/d H:i" }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if invitation.started_at %}
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <i class="bi bi-play-circle text-success fs-4"></i>
+                                        <div class="mt-2">
+                                            <strong>開始時間</strong>
+                                            <div class="small text-muted">
+                                                {{ invitation.started_at|date:"Y/m/d H:i" }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% if invitation.completed_at %}
+                                <div class="col-md-3">
+                                    <div class="border rounded p-3 text-center">
+                                        <i class="bi bi-check-circle text-success fs-4"></i>
+                                        <div class="mt-2">
+                                            <strong>完成時間</strong>
+                                            <div class="small text-muted">
+                                                {{ invitation.completed_at|date:"Y/m/d H:i" }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 測驗連結 -->
+                    {% if invitation.result_data.short_url %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary">測驗連結</h6>
+                            <div class="input-group">
+                                <input type="text" class="form-control" 
+                                       value="{{ invitation.result_data.short_url }}" 
+                                       id="testUrl" readonly>
+                                <button class="btn btn-outline-secondary" 
+                                        onclick="copyToClipboard('{{ invitation.result_data.short_url }}')" 
+                                        title="複製連結">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <a href="{{ invitation.result_data.short_url }}" target="_blank" 
+                                   class="btn btn-outline-primary">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </div>
+                            <div class="form-text">此為專屬短網址，受測人員可通過此連結進行測驗</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- 自訂訊息 -->
+                    {% if invitation.custom_message %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary">自訂邀請訊息</h6>
+                            <div class="border rounded p-3 bg-light">
+                                {{ invitation.custom_message|linebreaks }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- 測驗結果 -->
+                    {% if invitation.status == 'completed' %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary">測驗結果</h6>
+                            {% if invitation.result_data %}
+                                <div class="card border-success">
+                                    <div class="card-header bg-success text-white">
+                                        <i class="bi bi-check-circle me-2"></i>測驗已完成
+                                    </div>
+                                    <div class="card-body">
+                                        {% if invitation.result_data.score %}
+                                        <div class="row mb-3">
+                                            <div class="col-md-4">
+                                                <div class="text-center">
+                                                    <h4 class="text-primary mb-0">{{ invitation.result_data.score }}分</h4>
+                                                    <small class="text-muted">測驗分數</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="text-center">
+                                                    <h4 class="text-info mb-0">{{ invitation.result_data.duration|default:"未記錄" }}</h4>
+                                                    <small class="text-muted">完成時間</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="text-center">
+                                                    <h4 class="text-success mb-0">{{ invitation.result_data.rank|default:"未排名" }}</h4>
+                                                    <small class="text-muted">排名</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if invitation.result_data.feedback %}
+                                        <div class="mb-3">
+                                            <h6>系統評語</h6>
+                                            <p class="mb-0">{{ invitation.result_data.feedback }}</p>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if invitation.result_data.categories %}
+                                        <div class="mb-3">
+                                            <h6>各項目表現</h6>
+                                            <div class="row">
+                                                {% for category, score in invitation.result_data.categories.items %}
+                                                <div class="col-md-6 mb-2">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>{{ category }}</span>
+                                                        <span class="fw-bold">{{ score }}分</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 6px;">
+                                                        <div class="progress-bar" style="width: {{ score }}%"></div>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if invitation.result_data.details_url %}
+                                        <div class="text-end">
+                                            <a href="{{ invitation.result_data.details_url }}" target="_blank" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-file-text me-1"></i>查看詳細報告
+                                            </a>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>測驗結果數據尚未同步，請稍後重新整理頁面。
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- 操作記錄 -->
+                    {% if invitation.notes or invitation.invited_count > 1 %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary">操作記錄</h6>
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="timeline">
+                                        <div class="timeline-item">
+                                            <div class="timeline-icon bg-info">
+                                                <i class="bi bi-send"></i>
+                                            </div>
+                                            <div class="timeline-content">
+                                                <h6>發送邀請</h6>
+                                                <p class="text-muted mb-0">{{ invitation.invited_at|date:"Y年m月d日 H:i" }}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if invitation.started_at %}
+                                        <div class="timeline-item">
+                                            <div class="timeline-icon bg-warning">
+                                                <i class="bi bi-play"></i>
+                                            </div>
+                                            <div class="timeline-content">
+                                                <h6>開始測驗</h6>
+                                                <p class="text-muted mb-0">{{ invitation.started_at|date:"Y年m月d日 H:i" }}</p>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if invitation.completed_at %}
+                                        <div class="timeline-item">
+                                            <div class="timeline-icon bg-success">
+                                                <i class="bi bi-check"></i>
+                                            </div>
+                                            <div class="timeline-content">
+                                                <h6>完成測驗</h6>
+                                                <p class="text-muted mb-0">{{ invitation.completed_at|date:"Y年m月d日 H:i" }}</p>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    {% if invitation.notes %}
+                                    <div class="mt-3 pt-3 border-top">
+                                        <h6>備註</h6>
+                                        <p class="mb-0">{{ invitation.notes|linebreaks }}</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 側邊欄 -->
+        <div class="col-lg-4">
+            <!-- 操作按鈕 -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">操作選項</h6>
+                </div>
+                <div class="card-body">
+                    {% if invitation.status == 'pending' or invitation.status == 'in_progress' %}
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary w-100" id="resendInvitationBtn"
+                                data-invitation-id="{{ invitation.id }}">
+                            <i class="bi bi-arrow-clockwise me-2"></i>重新發送邀請
+                        </button>
+                        
+                        <button type="button" class="btn btn-outline-danger w-100" id="cancelInvitationBtn"
+                                data-invitation-id="{{ invitation.id }}">
+                            <i class="bi bi-x-circle me-2"></i>取消邀請
+                        </button>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-3">
+                        <a href="{% url 'invitation_list' %}" class="btn btn-secondary w-100">
+                            <i class="bi bi-arrow-left me-2"></i>返回邀請列表
+                        </a>
+                    </div>
+                    
+                    <!-- {% if invitation.test_project %}
+                    <div class="mt-2">
+                        <a href="{% url 'enterprise_test_project_stats' invitation.test_project.id %}" 
+                           class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-bar-chart me-2"></i>查看測驗統計
+                        </a>
+                    </div>
+                    {% endif %} -->
+                </div>
+            </div>
+            
+            <!-- 點數資訊 -->
+            <!-- <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-coin me-2"></i>點數資訊
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>此次邀請消費：</span>
+                        <span class="badge bg-danger fs-6">
+                            {{ invitation.points_consumed|default:1 }} 點
+                        </span>
+                    </div>
+                    {% if invitation.status == 'cancelled' %}
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <span>退款狀態：</span>
+                        <span class="badge bg-success fs-6">已退還</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div> -->
+            
+            <!-- 統計資訊 -->
+            <!-- <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">統計資訊</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h4 class="text-primary mb-0">{{ invitation.invitee.invited_count }}</h4>
+                                <small class="text-muted">累計邀請</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-success mb-0">{{ invitation.invitee.completed_count }}</h4>
+                            <small class="text-muted">完成測驗</small>
+                        </div>
+                    </div>
+                    
+                    {% if invitation.points_consumed %}
+                    <div class="mt-3 pt-3 border-top text-center">
+                        <h5 class="text-warning mb-0">{{ invitation.points_consumed }}</h5>
+                        <small class="text-muted">消耗點數</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div> -->
+            
+            <!-- 受測人員其他邀請 -->
+            {% if other_invitations %}
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">{{ invitation.invitee.name }} 的其他邀請</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for other in other_invitations %}
+                        <div class="list-group-item px-0">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ other.test_project.name }}</h6>
+                                    <small class="text-muted">{{ other.invited_at|date:"Y/m/d" }}</small>
+                                </div>
+                                <span class="badge bg-{% if other.status == 'completed' %}success{% elif other.status == 'pending' %}warning{% elif other.status == 'in_progress' %}info{% elif other.status == 'expired' %}danger{% else %}secondary{% endif %}">
+                                    {{ other.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 自訂樣式 -->
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: -22px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+}
+
+.timeline-content h6 {
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.timeline-content p {
+    font-size: 12px;
+}
+</style>
+
+<script>
+// 複製到剪貼簿功能
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        // 顯示成功提示
+        showAlert('success', '已複製到剪貼簿');
+    }, function(err) {
+        console.error('複製失敗: ', err);
+        // 降級方案
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showAlert('success', '已複製到剪貼簿');
+        } catch (err) {
+            showAlert('danger', '複製失敗，請手動複製');
+        }
+        document.body.removeChild(textArea);
+    });
+}
+
+// 顯示提示訊息
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // 自動移除
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// 表單提交處理
+document.addEventListener('DOMContentLoaded', function() {
+    // 重新發送邀請按鈕
+    const resendBtn = document.getElementById('resendInvitationBtn');
+    if (resendBtn) {
+        resendBtn.addEventListener('click', function() {
+            if (confirm('確定要重新發送邀請嗎？')) {
+                const invitationId = this.getAttribute('data-invitation-id');
+                resendInvitation(invitationId);
+            }
+        });
+    }
+    
+    // 取消邀請按鈕
+    const cancelBtn = document.getElementById('cancelInvitationBtn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+            if (confirm('確定要取消此邀請嗎？取消後將無法復原。')) {
+                const invitationId = this.getAttribute('data-invitation-id');
+                cancelInvitation(invitationId);
+            }
+        });
+    }
+});
+
+// 重新發送邀請AJAX請求
+function resendInvitation(invitationId) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const resendBtn = document.getElementById('resendInvitationBtn');
+    
+    // 顯示Loading狀態
+    if (typeof window.showLoading === 'function') {
+        window.showLoading('正在重新發送邀請...', '請稍候');
+    }
+    
+    // 禁用按鈕並顯示Loading圖標
+    if (resendBtn) {
+        resendBtn.disabled = true;
+        resendBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2 spinner-border spinner-border-sm" role="status"></i>重新發送中...';
+    }
+    
+    fetch(`/enterprise/invitations/${invitationId}/resend/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        // 隱藏Loading
+        if (typeof window.hideLoading === 'function') {
+            window.hideLoading();
+        }
+        
+        if (data.success) {
+            showAlert('success', data.message);
+            // 重新載入頁面以更新狀態
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showAlert('danger', data.message);
+            // 恢復按鈕狀態
+            if (resendBtn) {
+                resendBtn.disabled = false;
+                resendBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>重新發送邀請';
+            }
+        }
+    })
+    .catch(error => {
+        // 隱藏Loading
+        if (typeof window.hideLoading === 'function') {
+            window.hideLoading();
+        }
+        
+        console.error('重新發送邀請失敗:', error);
+        showAlert('danger', '重新發送邀請失敗，請稍後再試');
+        
+        // 恢復按鈕狀態
+        if (resendBtn) {
+            resendBtn.disabled = false;
+            resendBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>重新發送邀請';
+        }
+    });
+}
+
+// 取消邀請AJAX請求
+function cancelInvitation(invitationId) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const cancelBtn = document.getElementById('cancelInvitationBtn');
+    
+    // 顯示Loading狀態
+    if (typeof window.showLoading === 'function') {
+        window.showLoading('正在取消邀請...', '請稍候');
+    }
+    
+    // 禁用按鈕並顯示Loading圖標
+    if (cancelBtn) {
+        cancelBtn.disabled = true;
+        cancelBtn.innerHTML = '<i class="bi bi-x-circle me-2 spinner-border spinner-border-sm" role="status"></i>取消中...';
+    }
+    
+    fetch(`/enterprise/invitations/${invitationId}/cancel/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        // 隱藏Loading
+        if (typeof window.hideLoading === 'function') {
+            window.hideLoading();
+        }
+        
+        if (data.success) {
+            showAlert('success', data.message);
+            // 重新載入頁面以更新狀態
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showAlert('danger', data.message);
+            // 恢復按鈕狀態
+            if (cancelBtn) {
+                cancelBtn.disabled = false;
+                cancelBtn.innerHTML = '<i class="bi bi-x-circle me-2"></i>取消邀請';
+            }
+        }
+    })
+    .catch(error => {
+        // 隱藏Loading
+        if (typeof window.hideLoading === 'function') {
+            window.hideLoading();
+        }
+        
+        console.error('取消邀請失敗:', error);
+        showAlert('danger', '取消邀請失敗，請稍後再試');
+        
+        // 恢復按鈕狀態
+        if (cancelBtn) {
+            cancelBtn.disabled = false;
+            cancelBtn.innerHTML = '<i class="bi bi-x-circle me-2"></i>取消邀請';
+        }
+    });
+}
+</script>
+{% endblock %}

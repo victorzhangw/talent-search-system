@@ -1,0 +1,589 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ project.name }} - 測驗項目詳情 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'test_project_list' %}">測驗項目管理</a></li>
+<li class="breadcrumb-item active">{{ project.name }}</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* 主要區塊配色設計 */
+.section-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px 15px 0 0;
+    color: white;
+    padding: 1.5rem;
+    margin-bottom: 0;
+}
+
+.section-body {
+    background: white;
+    border-radius: 0 0 15px 15px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.1);
+    margin-bottom: 2rem;
+}
+
+.category-section {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(79, 172, 254, 0.2);
+}
+
+.category-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px 12px 0 0;
+    padding: 1.5rem;
+    border-bottom: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.category-body {
+    background: rgba(255, 255, 255, 0.98);
+    padding: 2rem;
+    border-radius: 0 0 12px 12px;
+}
+
+.assignment-section {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(67, 233, 123, 0.2);
+}
+
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.trait-item {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    transition: all 0.3s ease;
+}
+
+.trait-item:hover {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    transform: translateY(-2px);
+}
+
+.trait-header {
+    background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.analysis-content {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    border-left: 4px solid #3b82f6;
+}
+
+.advantage-content {
+    border-left-color: #10b981;
+}
+
+.disadvantage-content {
+    border-left-color: #f59e0b;
+}
+
+.enterprise-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.enterprise-item:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    transform: translateX(5px);
+}
+
+.action-buttons {
+    position: sticky;
+    top: 80px;
+    z-index: 10;
+}
+
+.action-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.field-mapping {
+    background: linear-gradient(135deg, #e0f1f7 0%, #f0f9ff 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #8b5cf6;
+}
+
+.badge-status {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+
+.test-link-display {
+    background: #f1f5f9;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.test-link-display a {
+    color: #3b82f6;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.test-link-display a:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        position: static;
+    }
+    
+    .section-body, .category-body {
+        padding: 1rem;
+    }
+    
+    .stats-card {
+        padding: 1rem;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 項目標題和狀態 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-clipboard-check me-2"></i>{{ project.name }}</h2>
+            <div class="d-flex align-items-center mt-2">
+                <span class="badge badge-status
+                    {% if project.assignment_type == 'all_open' %}bg-success
+                    {% elif project.assignment_type == 'enterprise_only' %}bg-info
+                    {% elif project.assignment_type == 'individual_only' %}bg-warning
+                    {% else %}bg-primary{% endif %} me-2">
+                    {{ project.get_assignment_type_display }}
+                </span>
+                <small class="text-muted">
+                    建立於 {{ project.created_at|date:"Y年m月d日" }} by {{ project.created_by.username }}
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 主要內容 -->
+        <div class="col-lg-8">
+            <!-- 基本資訊 -->
+            <div class="section-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>基本資訊
+                </h5>
+            </div>
+            <div class="section-body">
+                {% if project.description %}
+                <div class="mb-4">
+                    <h6 class="text-primary">項目描述</h6>
+                    <p class="mb-0">{{ project.description|linebreaks }}</p>
+                </div>
+                {% endif %}
+                
+                {% if project.test_link %}
+                <div class="mb-4">
+                    <h6 class="text-primary">測驗連結</h6>
+                    <div class="test-link-display">
+                        <i class="bi bi-link-45deg me-2"></i>
+                        <a href="{{ project.test_link }}" target="_blank">{{ project.test_link }}</a>
+                        <div class="small text-muted mt-1">點擊在新視窗開啟測驗</div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- 欄位對應 -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="field-mapping">
+                            <h6 class="text-primary mb-2">
+                                <i class="bi bi-graph-up me-2"></i>評分欄位對應
+                            </h6>
+                            <div class="small">
+                                <strong>中文名稱：</strong>{{ project.score_field_chinese }}<br>
+                                <strong>系統名稱：</strong><code>{{ project.score_field_system }}</code>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="field-mapping">
+                            <h6 class="text-success mb-2">
+                                <i class="bi bi-target me-2"></i>預測欄位對應
+                            </h6>
+                            <div class="small">
+                                <strong>中文名稱：</strong>{{ project.prediction_field_chinese }}<br>
+                                <strong>系統名稱：</strong><code>{{ project.prediction_field_system }}</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分類與特質 -->
+            <div class="category-section">
+                <div class="category-header">
+                    <h5 class="mb-0 text-primary">
+                        <i class="bi bi-list-check me-2"></i>分類與特質設定
+                    </h5>
+                </div>
+                <div class="category-body">
+                    {% if categories %}
+                        {% for category in categories %}
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-folder me-2"></i>{{ category.name }}
+                                    </h6>
+                                    
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- 優劣勢分析 -->
+                                {% if category.advantage_analysis or category.disadvantage_analysis %}
+                                <div class="row mb-3">
+                                    {% if category.advantage_analysis %}
+                                    <div class="col-md-6">
+                                        <h6 class="text-success">
+                                            <i class="bi bi-check-circle me-2"></i>優勢分析
+                                        </h6>
+                                        <div class="analysis-content advantage-content">
+                                            {{ category.advantage_analysis|safe }}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if category.disadvantage_analysis %}
+                                    <div class="col-md-6">
+                                        <h6 class="text-warning">
+                                            <i class="bi bi-exclamation-triangle me-2"></i>劣勢分析
+                                        </h6>
+                                        <div class="analysis-content disadvantage-content">
+                                            {{ category.disadvantage_analysis|safe }}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                <!-- 特質列表 -->
+                                {% if category.traits.all %}
+                                <h6 class="text-secondary mb-3">
+                                    <i class="bi bi-tags me-2"></i>特質設定 ({{ category.traits.count }} 個)
+                                </h6>
+                                <div class="row">
+                                    {% for trait in category.traits.all %}
+                                    <div class="col-md-6 col-lg-4 mb-3">
+                                        <div class="trait-item">
+                                            <div class="trait-header">
+                                                特質 {{ forloop.counter }}
+                                            </div>
+                                            <div>
+                                                <strong class="text-primary">{{ trait.chinese_name }}</strong>
+                                                <div class="small text-muted mb-2">
+                                                    <code>{{ trait.system_name }}</code>
+                                                </div>
+                                                {% if trait.description %}
+                                                <div class="small text-secondary">
+                                                    {{ trait.description|truncatechars:80 }}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>此分類暫無特質設定
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">暫無分類設定</h5>
+                            <p class="text-muted">此測驗項目尚未設定任何分類和特質</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 企業指派情況 -->
+            {% if project.assignment_type == 'specific_assignment' %}
+            <div class="assignment-section">
+                <div class="category-header">
+                    <h5 class="mb-0 text-success">
+                        <i class="bi bi-building me-2"></i>企業指派情況
+                    </h5>
+                </div>
+                <div class="category-body">
+                    {% if assigned_enterprises %}
+                        <div class="mb-3">
+                            <span class="badge bg-success">
+                                已指派 {{ assigned_enterprises.count }} 家企業
+                            </span>
+                        </div>
+                        
+                        <div class="row">
+                            {% for assignment in assigned_enterprises %}
+                            <div class="col-md-6 mb-3">
+                                <div class="enterprise-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="text-primary mb-1">
+                                                {{ assignment.enterprise_user.enterprise_profile.company_name }}
+                                            </h6>
+                                            <div class="small text-muted mb-2">
+                                                <i class="bi bi-person-badge me-1"></i>
+                                                {{ assignment.enterprise_user.enterprise_profile.contact_person }}
+                                            </div>
+                                            <div class="small text-muted mb-2">
+                                                <i class="bi bi-envelope me-1"></i>
+                                                {{ assignment.enterprise_user.email }}
+                                            </div>
+                                            <div class="small text-muted">
+                                                <i class="bi bi-calendar me-1"></i>
+                                                指派時間：{{ assignment.assigned_at|date:"Y/m/d H:i" }}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span class="badge {% if assignment.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                                                {{ assignment.is_active|yesno:'有效,無效' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-building-x fs-3 text-muted"></i>
+                            <h6 class="mt-2 text-muted">尚未指派給任何企業</h6>
+                            <a href="{% url 'test_project_assignments' project.id %}" class="btn btn-success mt-2">
+                                <i class="bi bi-plus-circle me-1"></i>立即指派企業
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 側邊欄 -->
+        <div class="col-lg-4">
+            <!-- 快速操作 -->
+            <div class="action-buttons">
+                <div class="action-card mb-4">
+                    <h6 class="mb-3">
+                        <i class="bi bi-lightning me-2"></i>快速操作
+                    </h6>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'test_project_edit' project.id %}" class="btn btn-primary">
+                            <i class="bi bi-pencil me-2"></i>編輯項目
+                        </a>
+                        
+                        {% if project.assignment_type == 'specific_assignment' %}
+                        <a href="{% url 'test_project_assignments' project.id %}" class="btn btn-warning">
+                            <i class="bi bi-people me-2"></i>管理指派
+                        </a>
+                        {% endif %}
+                        
+                        <button type="button" class="btn btn-info" onclick="exportConfig()">
+                            <i class="bi bi-download me-2"></i>匯出配置
+                        </button>
+                        
+                        <form method="post" action="{% url 'test_project_delete' project.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger w-100"
+                                    onclick="return confirm('確定要刪除「{{ project.name }}」嗎？\n\n此操作將：\n• 刪除所有分類和特質設定\n• 移除所有企業指派\n• 無法復原\n\n請確認您真的要刪除此測驗項目。')">
+                                <i class="bi bi-trash me-2"></i>刪除項目
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 統計資訊 -->
+            <div class="stats-card">
+                <h6 class="mb-3 text-center">
+                    <i class="bi bi-bar-chart me-2"></i>統計資訊
+                </h6>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ stats.categories_count }}</div>
+                            <div class="stat-label">分類數</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ stats.traits_count }}</div>
+                            <div class="stat-label">特質數</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ stats.assigned_enterprises_count }}</div>
+                            <div class="stat-label">指派企業</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 項目資訊 -->
+            <div class="action-card">
+                <h6 class="mb-3">
+                    <i class="bi bi-info-circle me-2"></i>項目資訊
+                </h6>
+                <table class="table table-borderless table-sm">
+                    <tr>
+                        <td class="fw-bold text-muted">項目ID：</td>
+                        <td><code>{{ project.id }}</code></td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold text-muted">建立者：</td>
+                        <td>{{ project.created_by.username }}</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold text-muted">建立時間：</td>
+                        <td>{{ project.created_at|date:"Y/m/d H:i" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold text-muted">最後更新：</td>
+                        <td>{{ project.updated_at|date:"Y/m/d H:i" }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 匯出配置功能
+function exportConfig() {
+    const config = {
+        project_name: "{{ project.name|escapejs }}",
+        description: "{{ project.description|escapejs }}",
+        test_link: "{{ project.test_link|escapejs }}",
+        score_field: {
+            chinese: "{{ project.score_field_chinese|escapejs }}",
+            system: "{{ project.score_field_system|escapejs }}"
+        },
+        prediction_field: {
+            chinese: "{{ project.prediction_field_chinese|escapejs }}",
+            system: "{{ project.prediction_field_system|escapejs }}"
+        },
+        assignment_type: "{{ project.assignment_type }}",
+        categories: [
+            {% for category in categories %}
+            {
+                name: "{{ category.name|escapejs }}",
+                test_link: "{{ category.test_link|escapejs }}",
+                advantage_analysis: "{{ category.advantage_analysis|escapejs }}",
+                disadvantage_analysis: "{{ category.disadvantage_analysis|escapejs }}",
+                traits: [
+                    {% for trait in category.traits.all %}
+                    {
+                        chinese_name: "{{ trait.chinese_name|escapejs }}",
+                        system_name: "{{ trait.system_name|escapejs }}",
+                        description: "{{ trait.description|escapejs }}"
+                    }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ]
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        {% if project.assignment_type == 'specific_assignment' %}
+        assigned_enterprises: [
+            {% for assignment in assigned_enterprises %}
+            {
+                company_name: "{{ assignment.enterprise_user.enterprise_profile.company_name|escapejs }}",
+                tax_id: "{{ assignment.enterprise_user.enterprise_profile.tax_id }}",
+                contact_person: "{{ assignment.enterprise_user.enterprise_profile.contact_person|escapejs }}",
+                assigned_at: "{{ assignment.assigned_at|date:'Y-m-d H:i:s' }}",
+                is_active: {{ assignment.is_active|yesno:'true,false' }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+        {% endif %}
+    };
+    
+    // 下載 JSON 文件
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "{{ project.name|slugify }}_config.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+    
+    // 顯示成功訊息
+    alert('配置文件已下載：{{ project.name|slugify }}_config.json');
+}
+</script>
+{% endblock %}

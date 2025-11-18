@@ -1,0 +1,342 @@
+{% extends 'auth/auth_base.html' %}
+{% load static %}
+
+{% block title %}企業用戶註冊 - 人才測驗分析平台{% endblock %}
+
+{% block extra_css %}
+<style>
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-card {
+    text-align: center;
+    padding: 30px 40px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.loading-spinner {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 16px;
+    border: 4px solid rgba(102, 126, 234, 0.3);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.password-hint {
+    background-color: #fcebec;
+    border: 1px solid #f5c2c7;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+.password-hint .hint-title {
+    font-weight: 600;
+    color: #c92a2a;
+}
+.password-hint .hint-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.password-hint .hint-item i {
+    font-size: 0.85rem;
+}
+.password-hint .hint-columns {
+    margin-top: 0.75rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div id="loading-overlay" class="loading-overlay" aria-hidden="true">
+        <div class="loading-card">
+            <div class="loading-spinner" role="status" aria-hidden="true"></div>
+            <div class="fw-semibold text-primary mb-2">正在送出企業註冊申請</div>
+            <div class="text-muted small">請稍候，系統正在建立帳號與資料</div>
+        </div>
+    </div>
+    <div class="col-md-10 col-lg-8">
+        <div class="auth-card">
+            <div class="auth-header">
+                <img src="{% static 'img/auth_logo.png' %}" alt="Traitty 特質評鑑" class="auth-logo">
+                <h3><i class="bi bi-building me-2"></i>企業用戶註冊</h3>
+            </div>
+            
+            <div class="auth-body">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.username }}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="text-primary mb-3"><i class="bi bi-person me-2"></i>帳號資訊</h5>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.email.id_for_label }}" class="form-label">{{ form.email.label }}</label>
+                                {{ form.email }}
+                                {% if form.email.errors %}
+                                    <div class="text-danger">{{ form.email.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.password1.id_for_label }}" class="form-label">{{ form.password1.label }}</label>
+                                {{ form.password1 }}
+                                {% if form.password1.errors %}
+                                    <div class="text-danger">{{ form.password1.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.password2.id_for_label }}" class="form-label">{{ form.password2.label }}</label>
+                                {{ form.password2 }}
+                                {% if form.password2.errors %}
+                                    <div class="text-danger">{{ form.password2.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="password-hint small text-muted mt-2">
+                                <div class="hint-title mb-1">
+                                    <i class="bi bi-shield-check me-2"></i>密碼安全要求：<span class="ms-1 text-muted">請確保密碼符合以下條件</span>
+                                </div>
+                                <div class="hint-columns row row-cols-1 row-cols-md-3 g-2 mt-2">
+                                    <div class="col">
+                                        <div class="hint-item">
+                                            <i class="bi bi-circle text-muted" id="length-check"></i>
+                                            至少 8 個字符
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="hint-item">
+                                            <i class="bi bi-circle text-muted" id="uppercase-check"></i>
+                                            包含大寫字母
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="hint-item">
+                                            <i class="bi bi-circle text-muted" id="lowercase-check"></i>
+                                            包含小寫字母
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="hint-item">
+                                            <i class="bi bi-circle text-muted" id="number-check"></i>
+                                            包含數字
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="hint-item">
+                                            <i class="bi bi-circle text-muted" id="special-check"></i>
+                                            包含特殊符號
+                                        </div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="hint-item">
+                                            <i class="bi bi-circle text-muted" id="similarity-check"></i>
+                                            不與帳號相似
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="text-success mb-3"><i class="bi bi-building me-2"></i>公司資訊</h5>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.tax_id.id_for_label }}" class="form-label">{{ form.tax_id.label }}</label>
+                                {{ form.tax_id }}
+                                {% if form.tax_id.errors %}
+                                    <div class="text-danger">{{ form.tax_id.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.company_name.id_for_label }}" class="form-label">{{ form.company_name.label }}</label>
+                                {{ form.company_name }}
+                                {% if form.company_name.errors %}
+                                    <div class="text-danger">{{ form.company_name.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.contact_person.id_for_label }}" class="form-label">{{ form.contact_person.label }}</label>
+                                {{ form.contact_person }}
+                                {% if form.contact_person.errors %}
+                                    <div class="text-danger">{{ form.contact_person.errors }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.contact_phone.id_for_label }}" class="form-label">{{ form.contact_phone.label }}</label>
+                                {{ form.contact_phone }}
+                                {% if form.contact_phone.errors %}
+                                    <div class="text-danger">{{ form.contact_phone.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 mt-4 mb-3">
+                        <i class="bi bi-check-circle me-2"></i>提交企業註冊申請
+                    </button>
+                </form>
+                
+                <div class="auth-links">
+                    <a href="{% url 'register_choice' %}">返回選擇頁面</a>
+                    <span class="mx-2">|</span>
+                    <a href="{% url 'login' %}">已有帳號？登入</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordInput = document.getElementById('id_password1');
+    const emailInput = document.getElementById('id_email');
+    const taxIdInput = document.getElementById('id_tax_id');
+    const companyNameInput = document.getElementById('id_company_name');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const submitButton = document.querySelector('button[type="submit"]');
+    const form = document.querySelector('form');
+    let currentRequest = null;
+    let lastQueriedTaxId = '';
+
+    const checks = {
+        'length-check': pwd => pwd.length >= 8,
+        'uppercase-check': pwd => /[A-Z]/.test(pwd),
+        'lowercase-check': pwd => /[a-z]/.test(pwd),
+        'number-check': pwd => /\d/.test(pwd),
+        'special-check': pwd => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd),
+        'similarity-check': (pwd, identifier) => {
+            if (!identifier) return true;
+            return !pwd.toLowerCase().includes(identifier.toLowerCase());
+        }
+    };
+
+    function updateIndicators(pwd, identifier) {
+        Object.entries(checks).forEach(([checkId, validator]) => {
+            const indicator = document.getElementById(checkId);
+            if (!indicator) return;
+            indicator.className = validator(pwd, identifier)
+                ? 'bi bi-check-circle-fill text-success me-1'
+                : 'bi bi-x-circle text-danger me-1';
+        });
+    }
+
+    if (passwordInput) {
+        passwordInput.addEventListener('input', () => {
+            updateIndicators(passwordInput.value, emailInput ? emailInput.value.split('@')[0] : '');
+        });
+    }
+
+    if (emailInput) {
+        emailInput.addEventListener('input', () => {
+            if (passwordInput) {
+                updateIndicators(passwordInput.value, emailInput.value.split('@')[0]);
+            }
+        });
+    }
+
+    function getCsrfToken() {
+        const match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    async function fetchCompanyName(taxId) {
+        if (!taxId || taxId === lastQueriedTaxId) {
+            return;
+        }
+        lastQueriedTaxId = taxId;
+
+        if (currentRequest) {
+            currentRequest.abort();
+        }
+        currentRequest = new AbortController();
+
+        try {
+            const response = await fetch('{% url "verify_tax_id" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({ tax_id: taxId }),
+                signal: currentRequest.signal
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || '統一編號查詢失敗，請手動填寫公司名稱');
+            }
+
+            const data = await response.json();
+            if (data.company_name) {
+                companyNameInput.value = data.company_name;
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                return;
+            }
+            if (!companyNameInput.value) {
+                companyNameInput.value = '';
+            }
+        } finally {
+            currentRequest = null;
+        }
+    }
+
+    if (taxIdInput && companyNameInput) {
+        taxIdInput.addEventListener('input', () => {
+            const value = taxIdInput.value.trim();
+            if (/^\d{8}$/.test(value)) {
+                fetchCompanyName(value);
+            }
+        });
+    }
+
+    if (form && loadingOverlay) {
+        form.addEventListener('submit', () => {
+            loadingOverlay.classList.add('active');
+            loadingOverlay.setAttribute('aria-hidden', 'false');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>送出中...';
+            }
+        });
+    }
+});
+</script>
+
+{% endblock %}

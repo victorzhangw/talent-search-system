@@ -1,0 +1,451 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}測驗邀請管理 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<!-- <li class="breadcrumb-item"><a href="{% url 'enterprise_dashboard' %}">企業測驗管理</a></li> -->
+<li class="breadcrumb-item active">邀請列表</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% csrf_token %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-envelope me-2"></i>邀請列表</h2>
+        <div class="btn-group">
+            <a href="{% url 'test_templates' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i>發送邀請
+            </a>
+            <a href="{% url 'bulk_invitation' %}" class="btn btn-outline-primary">
+                <i class="bi bi-upload me-1"></i>批量邀請
+            </a>
+        </div>
+    </div>
+
+    <!-- 過濾器 -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">搜尋受測人員</label>
+                    <input type="text" name="search" class="form-control" 
+                           placeholder="輸入姓名或 Email" value="{{ search }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">狀態篩選</label>
+                    <select name="status" class="form-select">
+                        <option value="">全部狀態</option>
+                        {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-funnel me-1"></i>篩選
+                        </button>
+                        <a href="{% url 'invitation_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise me-1"></i>重置
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 邀請列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                評鑑邀請列表
+                <small class="text-muted">（共 {{ page_obj.paginator.count }} 筆）</small>
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if page_obj.object_list %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>測驗名稱</th>
+                                <th>受測人員</th>
+                                <!-- <th>邀請時間</th>
+                                <th>過期時間</th>
+                                <th>點數</th> -->
+                                <th>狀態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invitation in page_obj.object_list %}
+                            <tr id="invitation-row-{{ invitation.id }}">
+                                <td>
+                                    {% if invitation.test_project %}
+                                        <strong>{{ invitation.test_project.name }}</strong>
+                                        <div class="small text-muted">測驗項目</div>
+                                    {% elif invitation.test_template %}
+                                        <strong>{{ invitation.test_template.name }}</strong>
+                                        <div class="small text-muted">{{ invitation.test_template.category.name }}</div>
+                                    {% else %}
+                                        <span class="text-muted">未知測驗</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ invitation.invitee.name }}</strong>
+                                    <div class="small text-muted">{{ invitation.invitee.email }}</div>
+                                    <div class="mt-1">
+                                        <span class="badge bg-{% if invitation.invitee.status == 'employed' %}primary{% else %}secondary{% endif %} me-1" style="font-size: 0.7rem;">
+                                            {{ invitation.invitee.get_status_display }}
+                                        </span>
+                                        {% if invitation.invitee.position %}
+                                            <span class="small text-info">{{ invitation.invitee.position }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <!-- <td>{{ invitation.invited_at|date:"Y/m/d H:i" }}</td>
+                                <td>
+                                    {{ invitation.expires_at|date:"Y/m/d H:i" }}
+                                    {% if invitation.is_expired %}
+                                    <span class="badge bg-danger ms-1">已過期</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if invitation.status == 'cancelled' %}
+                                        <span class="badge bg-success" title="已退還">
+                                            <i class="bi bi-arrow-return-left me-1"></i>{{ invitation.points_consumed|default:1 }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger" title="已消費">
+                                            -{{ invitation.points_consumed|default:1 }}
+                                        </span>
+                                    {% endif %}
+                                </td> -->
+                                <td>
+                                    <span class="badge 
+                                        {% if invitation.status == 'completed' %}bg-success
+                                        {% elif invitation.status == 'pending' %}bg-warning
+                                        {% elif invitation.status == 'in_progress' %}bg-info
+                                        {% elif invitation.status == 'expired' %}bg-danger
+                                        {% elif invitation.status == 'cancelled' %}bg-secondary
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ invitation.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <!-- 查看詳情 -->
+                                        <a href="{% url 'invitation_detail' invitation.id %}" 
+                                           class="btn btn-sm btn-outline-info" title="查看詳情">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        
+                                        {% if invitation.status == 'pending' %}
+                                        <!-- 重新發送 -->
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                title="重新發送邀請"
+                                                onclick="resendInvitation({{ invitation.id }}, '{{ invitation.invitee.name }}')"
+                                                data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="重新發送邀請">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                        
+                                        <!-- 取消邀請 -->
+                                        <!-- <button class="btn btn-sm btn-outline-danger" 
+                                                title="取消邀請"
+                                                onclick="cancelInvitation({{ invitation.id }}, '{{ invitation.invitee.name }}')">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button> -->
+                                        {% elif invitation.status == 'expired' %}
+                                        <!-- 重新邀請 -->
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                title="重新邀請"
+                                                onclick="resendInvitation({{ invitation.id }}, '{{ invitation.invitee.name }}')"
+                                                data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="重新邀請">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分頁 -->
+                {% if page_obj.has_other_pages %}
+                <nav aria-label="分頁導航" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">上一頁</a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">下一頁</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-envelope-x text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3 text-muted">暫無測驗邀請記錄</h5>
+                    <p class="text-muted">還沒有發送任何測驗邀請</p>
+                    <div class="btn-group">
+                        <a href="{% url 'test_templates' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-1"></i>發送第一個邀請
+                        </a>
+                        <a href="{% url 'bulk_invitation' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-upload me-1"></i>批量邀請
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// 重新發送邀請
+function resendInvitation(invitationId, inviteeName) {
+    if (confirm(`確定要重新發送邀請給「${inviteeName}」嗎？`)) {
+        // 找到對應的按鈕並添加 loading 效果
+        const resendBtn = document.querySelector(`button[onclick*="resendInvitation(${invitationId}"]`);
+        const originalBtnContent = resendBtn ? resendBtn.innerHTML : null;
+        
+        // 更新按鈕狀態
+        if (resendBtn) {
+            resendBtn.disabled = true;
+            resendBtn.innerHTML = '<i class="bi bi-arrow-repeat spinner-border spinner-border-sm me-1"></i>';
+            resendBtn.classList.add('btn-loading');
+        }
+        
+        // 顯示全域loading
+        window.showLoading('正在重新發送邀請...', `正在發送邀請給「${inviteeName}」，請稍候`);
+        
+        fetch(`/enterprise/invitations/${invitationId}/resend/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            window.hideLoading();
+            
+            // 恢復按鈕狀態
+            if (resendBtn && originalBtnContent) {
+                resendBtn.disabled = false;
+                resendBtn.innerHTML = originalBtnContent;
+                resendBtn.classList.remove('btn-loading');
+            }
+            
+            if (data.success) {
+                // 使用新的 toast 通知系統
+                window.showToast(data.message, 'success', 4000);
+                
+                // 更新行狀態為 pending（如果是從 expired 重新發送）
+                const row = document.getElementById(`invitation-row-${invitationId}`);
+                if (row) {
+                    const statusBadge = row.querySelector('.badge');
+                    if (statusBadge) {
+                        statusBadge.className = 'badge bg-warning';
+                        statusBadge.textContent = '待完成';
+                    }
+                }
+                
+                // 添加成功動畫效果
+                if (row) {
+                    row.style.backgroundColor = '#d4edda';
+                    setTimeout(() => {
+                        row.style.backgroundColor = '';
+                    }, 2000);
+                }
+            } else {
+                window.showToast(data.message || '重新發送失敗', 'error', 6000);
+            }
+        })
+        .catch(error => {
+            console.error('重新發送邀請錯誤:', error);
+            window.hideLoading();
+            
+            // 恢復按鈕狀態
+            if (resendBtn && originalBtnContent) {
+                resendBtn.disabled = false;
+                resendBtn.innerHTML = originalBtnContent;
+                resendBtn.classList.remove('btn-loading');
+            }
+            
+            window.showToast('網路連線錯誤，請檢查網路連線後重試', 'error', 6000);
+        });
+    }
+}
+
+// 取消邀請
+function cancelInvitation(invitationId, inviteeName) {
+    if (confirm(`確定要取消對「${inviteeName}」的邀請嗎？\n\n取消後無法復原，但可以重新邀請。`)) {
+        // 找到對應的按鈕並添加 loading 效果
+        const cancelBtn = document.querySelector(`button[onclick*="cancelInvitation(${invitationId}"]`);
+        const originalBtnContent = cancelBtn ? cancelBtn.innerHTML : null;
+        
+        // 更新按鈕狀態
+        if (cancelBtn) {
+            cancelBtn.disabled = true;
+            cancelBtn.innerHTML = '<i class="bi bi-x-circle spinner-border spinner-border-sm me-1"></i>';
+            cancelBtn.classList.add('btn-loading');
+        }
+        
+        window.showLoading('正在取消邀請...', `正在取消對「${inviteeName}」的邀請，請稍候`);
+        
+        fetch(`/enterprise/invitations/${invitationId}/cancel/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            window.hideLoading();
+            
+            // 恢復按鈕狀態
+            if (cancelBtn && originalBtnContent) {
+                cancelBtn.disabled = false;
+                cancelBtn.innerHTML = originalBtnContent;
+                cancelBtn.classList.remove('btn-loading');
+            }
+            
+            if (data.success) {
+                window.showToast(data.message, 'success', 4000);
+                
+                // 更新該行的狀態顯示
+                const row = document.getElementById(`invitation-row-${invitationId}`);
+                if (row) {
+                    const statusBadge = row.querySelector('.badge');
+                    if (statusBadge) {
+                        statusBadge.className = 'badge bg-secondary';
+                        statusBadge.textContent = '已取消';
+                    }
+                    
+                    // 更新點數顯示
+                    const pointsBadge = row.querySelector('.badge.bg-danger');
+                    if (pointsBadge) {
+                        pointsBadge.className = 'badge bg-success';
+                        pointsBadge.innerHTML = '<i class="bi bi-arrow-return-left me-1"></i>1';
+                        pointsBadge.title = '已退還';
+                    }
+                    
+                    // 移除操作按鈕
+                    const btnGroup = row.querySelector('.btn-group');
+                    if (btnGroup) {
+                        btnGroup.innerHTML = `
+                            <a href="/enterprise/invitations/${invitationId}/" 
+                               class="btn btn-sm btn-outline-info" title="查看詳情">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <span class="text-muted ms-2">已取消</span>
+                        `;
+                    }
+                    
+                    // 添加取消動畫效果
+                    row.style.backgroundColor = '#f8f9fa';
+                    setTimeout(() => {
+                        row.style.backgroundColor = '';
+                    }, 2000);
+                }
+            } else {
+                window.showToast(data.message || '取消失敗', 'error', 6000);
+            }
+        })
+        .catch(error => {
+            console.error('取消邀請錯誤:', error);
+            window.hideLoading();
+            
+            // 恢復按鈕狀態
+            if (cancelBtn && originalBtnContent) {
+                cancelBtn.disabled = false;
+                cancelBtn.innerHTML = originalBtnContent;
+                cancelBtn.classList.remove('btn-loading');
+            }
+            
+            window.showToast('網路連線錯誤，請檢查網路連線後重試', 'error', 6000);
+        });
+    }
+}
+
+// 查看測驗結果
+function viewTestResult(invitationId) {
+    // 跳轉到測驗結果詳情頁面
+    window.location.href = `/enterprise/test-results/${invitationId}/`;
+}
+
+// 下載測驗報告
+function downloadReport(resultId) {
+    // 跳轉到測驗結果PDF下載頁面
+    window.open(`/enterprise/test-results/${resultId}/pdf/`, '_blank');
+}
+
+// CSS for loading button effects and initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    // Add CSS for loading buttons
+    if (!document.getElementById('invitation-loading-styles')) {
+        const style = document.createElement('style');
+        style.id = 'invitation-loading-styles';
+        style.textContent = `
+            .btn-loading {
+                position: relative;
+                pointer-events: none;
+            }
+            
+            .btn-loading .spinner-border-sm {
+                animation: spin 1s linear infinite;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            .invitation-row-success {
+                background-color: #d4edda !important;
+                transition: background-color 0.3s ease;
+            }
+            
+            .invitation-row-cancelled {
+                background-color: #f8f9fa !important;
+                transition: background-color 0.3s ease;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Initialize Bootstrap tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}測驗結果處理中{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'individual_tests' %}">我的測驗</a></li>
+<li class="breadcrumb-item active">結果處理中</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .processing-container {
+        text-align: center;
+        padding: 4rem 2rem;
+    }
+    
+    .processing-icon {
+        font-size: 4rem;
+        color: #ffc107;
+        margin-bottom: 2rem;
+        animation: spin 2s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .processing-title {
+        color: #333;
+        margin-bottom: 1rem;
+    }
+    
+    .processing-description {
+        color: #666;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+    
+    .test-info-card {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin: 2rem auto;
+        max-width: 600px;
+    }
+    
+    .info-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .info-item:last-child {
+        border-bottom: none;
+    }
+    
+    .info-label {
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .info-value {
+        color: #666;
+    }
+    
+    .status-badge {
+        background: linear-gradient(135deg, #ffc107 0%, #ff8f00 100%);
+        color: #212529;
+        padding: 0.5rem 1rem;
+        border-radius: 25px;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="processing-container">
+        <div class="processing-icon">
+            <i class="bi bi-gear-fill"></i>
+        </div>
+        
+        <h1 class="processing-title">測驗結果處理中</h1>
+        
+        <p class="processing-description">
+            您的測驗已完成，我們正在分析您的答案並生成詳細報告。<br>
+            這個過程通常需要幾分鐘時間，請稍候。
+        </p>
+        
+        <div class="test-info-card">
+            <h5 class="mb-3">
+                <i class="bi bi-info-circle me-2"></i>測驗資訊
+            </h5>
+            
+            <div class="info-item">
+                <span class="info-label">測驗項目：</span>
+                <span class="info-value">{{ test_project.name }}</span>
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">測驗狀態：</span>
+                <span class="status-badge">
+                    <i class="bi bi-clock me-1"></i>處理中
+                </span>
+            </div>
+            
+            {% if result.test_completion_date %}
+            <div class="info-item">
+                <span class="info-label">完成時間：</span>
+                <span class="info-value">{{ result.test_completion_date|date:"Y年m月d日 H:i" }}</span>
+            </div>
+            {% endif %}
+            
+            {% if test_record.purchase_date %}
+            <div class="info-item">
+                <span class="info-label">購買時間：</span>
+                <span class="info-value">{{ test_record.purchase_date|date:"Y年m月d日" }}</span>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="alert alert-info">
+            <i class="bi bi-lightbulb me-2"></i>
+            <strong>小提示：</strong>結果準備好後，您會在「我的結果」頁面看到詳細的分析報告。
+        </div>
+        
+        <div class="mt-4">
+            <a href="{% url 'individual_tests' %}" class="btn btn-primary me-3">
+                <i class="bi bi-arrow-left me-2"></i>返回我的測驗
+            </a>
+            <a href="{% url 'individual_test_results_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-list-check me-2"></i>查看所有結果
+            </a>
+        </div>
+        
+        <div class="mt-4">
+            <button class="btn btn-outline-primary" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise me-2"></i>重新整理
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 每30秒自動重新整理一次，檢查結果是否準備好
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

@@ -1,0 +1,306 @@
+<!-- templates/components/data_table.html -->
+{% load custom_filters %}
+{% load static %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-0">{{ table_title }}</h5>
+            <!-- 調試輸出 -->
+            <small>
+                Items count: {{ items|length }}
+                Columns count: {{ columns|length }}
+            </small>
+            {% if selected_items %}
+            <span class="badge bg-info">已選擇 {{ selected_items }} 項</span>
+            {% endif %}
+        </div>
+        {% if items %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>
+                        <input type="checkbox" id="selectAll">
+                    </th>
+                    {% for column in columns %}
+                    <th>{{ column.title }}</th>
+                    {% endfor %}
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>
+                        <input type="checkbox" class="row-checkbox" value="{{ item.id }}">
+                    </td>
+                    {% for column in columns %}
+                    <td>
+                        <!-- 額外的調試輸出 -->
+                        <span title="Debug: {{ column.key }}">
+                            {{ item|get_attr:column.key }}
+                        </span>
+                    </td>
+                    {% endfor %}
+                    <td>
+                        <button class="btn btn-sm btn-info">查看</button>
+                        <button class="btn btn-sm btn-warning">編輯</button>
+                        <button class="btn btn-sm btn-danger">刪除</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-warning">
+            沒有數據可顯示
+        </div>
+        {% endif %}
+        <div class="d-flex gap-2">
+            <!-- 匯出按鈕 -->
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> 匯出
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportTable('excel')">Excel</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportTable('pdf')">PDF</a></li>
+                </ul>
+            </div>
+            
+            <!-- 欄位顯示設定 -->
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-gear"></i> 欄位設定
+                </button>
+                <ul class="dropdown-menu column-toggle">
+                    {% for column in columns %}
+                    <li>
+                        <label class="dropdown-item">
+                            <input type="checkbox" checked data-column="{{ column.key }}"> {{ column.title }}
+                        </label>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- 新增按鈕 -->
+            {% if can_add %}
+            <button class="btn btn-primary" onclick="showAddModal()">
+                <i class="bi bi-plus"></i> 新增
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 篩選區 -->
+    <div class="card-body border-bottom">
+        <form id="filterForm" class="row g-3">
+            {% for filter in filters %}
+            <div class="col-md-3">
+                <label class="form-label">{{ filter.label }}</label>
+                {% if filter.type == 'select' %}
+                <select class="form-select" name="{{ filter.name }}">
+                    <option value="">全部</option>
+                    {% for option in filter.options %}
+                    <option value="{{ option.value }}">{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <input type="{{ filter.type }}" class="form-control" name="{{ filter.name }}">
+                {% endif %}
+            </div>
+            {% endfor %}
+            <div class="col-md-12">
+                <button type="submit" class="btn btn-primary">搜尋</button>
+                <button type="reset" class="btn btn-outline-secondary">重置</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 表格區 -->
+    <div class="table-responsive">
+        <table class="table table-hover" id="dataTable">
+            <thead>
+                <tr>
+                    <th>
+                        <input type="checkbox" id="selectAll">
+                    </th>
+                    {% for column in columns %}
+                    <th data-column="{{ column.key }}" {% if column.sortable %}class="sortable"{% endif %}>
+                        {{ column.title }}
+                        {% if column.sortable %}
+                        <i class="bi bi-arrow-down-up"></i>
+                        {% endif %}
+                    </th>
+                    {% endfor %}
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>
+                        <input type="checkbox" class="row-checkbox" value="{{ item.id }}">
+                    </td>
+                    {% for column in columns %}
+                    <td data-column="{{ column.key }}">{{ item|get_attr:column.key }}</td>
+                    {% endfor %}
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="showViewModal('{{ item.id }}')">查看</button>
+                        {% if can_edit %}
+                        <button class="btn btn-sm btn-warning" onclick="showEditModal('{{ item.id }}')">編輯</button>
+                        {% endif %}
+                        {% if can_delete %}
+                        <button class="btn btn-sm btn-danger" onclick="confirmDelete('{{ item.id }}')">刪除</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分頁區 -->
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <div>
+            顯示 {{ page_start }} 至 {{ page_end }} 筆，共 {{ total_items }} 筆
+        </div>
+        <nav>
+            <ul class="pagination mb-0">
+                {% if has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ previous_page }}">上一頁</a>
+                </li>
+                {% endif %}
+                {% for page in page_range %}
+                <li class="page-item {% if page == current_page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+                </li>
+                {% endfor %}
+                {% if has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ next_page }}">下一頁</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<!-- 相關 JavaScript -->
+<script>
+// 表格列選擇
+document.getElementById('selectAll').addEventListener('change', function() {
+    document.querySelectorAll('.row-checkbox').forEach(checkbox => {
+        checkbox.checked = this.checked;
+    });
+    updateSelectedCount();
+});
+
+// 更新選中數量
+function updateSelectedCount() {
+    const count = document.querySelectorAll('.row-checkbox:checked').length;
+    // 更新顯示...
+}
+
+// 排序功能
+document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', function() {
+        const column = this.dataset.column;
+        const currentOrder = this.dataset.order || 'asc';
+        const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+        
+        // 更新排序圖標
+        this.dataset.order = newOrder;
+        
+        // 發送排序請求
+        reloadTable({
+            sort_by: column,
+            sort_order: newOrder
+        });
+    });
+});
+
+// 欄位顯示切換
+document.querySelectorAll('.column-toggle input').forEach(input => {
+    input.addEventListener('change', function() {
+        const column = this.dataset.column;
+        document.querySelectorAll(`[data-column="${column}"]`).forEach(el => {
+            el.style.display = this.checked ? '' : 'none';
+        });
+    });
+});
+
+function getFilterParams() {
+    const form = document.getElementById('filterForm');
+    const formData = new FormData(form);
+    return new URLSearchParams(formData).toString();
+}
+
+// 匯出功能
+async function exportTable(format) {
+    showLoading();
+    try {
+        const response = await fetch(`/api/export?format=${format}&${getFilterParams()}`);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export.${format}`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        showToast('匯出成功', 'success');
+    } catch (error) {
+        showToast('匯出失敗', 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+// 篩選表單處理
+document.getElementById('filterForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    await reloadTable(Object.fromEntries(new FormData(this)));
+});
+
+// 重新載入表格數據
+async function reloadTable(params = {}) {
+    showLoading();
+    try {
+        const queryString = new URLSearchParams(params).toString();
+        const response = await fetch(`?${queryString}`);
+        const html = await response.text();
+        document.getElementById('dataTable').innerHTML = html;
+    } catch (error) {
+        showToast('載入失敗', 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+function showLoading() {
+    // 可以创建一个加载中的遮罩层
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loading-overlay';
+    loadingOverlay.innerHTML = '載入中...';
+    document.body.appendChild(loadingOverlay);
+}
+
+function hideLoading() {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+        loadingOverlay.remove();
+    }
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+</script>

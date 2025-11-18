@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}編輯個人資料 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首頁</a></li>
+<li class="breadcrumb-item"><a href="{% url 'profile_view' %}">個人資料</a></li>
+<li class="breadcrumb-item active">編輯個人資料</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pencil me-2"></i>編輯個人資料
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 顯示錯誤訊息 -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <!-- 基本資料 -->
+                            <div class="col-md-6">
+                                <h6 class="text-primary mb-3">
+                                    <i class="bi bi-person me-2"></i>基本資料
+                                </h6>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ basic_form.username.id_for_label }}" class="form-label">
+                                        {{ basic_form.username.label }}
+                                    </label>
+                                    {{ basic_form.username }}
+                                    <div class="form-text">用戶名無法修改</div>
+                                    {% if basic_form.username.errors %}
+                                        <div class="text-danger">{{ basic_form.username.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ basic_form.email.id_for_label }}" class="form-label">
+                                        {{ basic_form.email.label }}
+                                        {% if user.is_email_verified %}
+                                            <span class="badge bg-success">已驗證</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">未驗證</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ basic_form.email }}
+                                    {% if basic_form.email.errors %}
+                                        <div class="text-danger">{{ basic_form.email.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ basic_form.phone.id_for_label }}" class="form-label">
+                                        {{ basic_form.phone.label }}
+                                    </label>
+                                    {{ basic_form.phone }}
+                                    {% if basic_form.phone.errors %}
+                                        <div class="text-danger">{{ basic_form.phone.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- 詳細資料 -->
+                            <div class="col-md-6">
+                                {% if user.user_type == 'individual' %}
+                                <h6 class="text-success mb-3">
+                                    <i class="bi bi-person-badge me-2"></i>個人詳細資料
+                                </h6>
+                                
+                                {% if profile_form %}
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.real_name.id_for_label }}" class="form-label">
+                                        {{ profile_form.real_name.label }}
+                                    </label>
+                                    {{ profile_form.real_name }}
+                                    {% if profile_form.real_name.errors %}
+                                        <div class="text-danger">{{ profile_form.real_name.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.id_number.id_for_label }}" class="form-label">
+                                        {{ profile_form.id_number.label }}
+                                    </label>
+                                    {{ profile_form.id_number }}
+                                    <div class="form-text">身分證字號為選填項目</div>
+                                    {% if profile_form.id_number.errors %}
+                                        <div class="text-danger">{{ profile_form.id_number.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.birth_date.id_for_label }}" class="form-label">
+                                        {{ profile_form.birth_date.label }}
+                                    </label>
+                                    {{ profile_form.birth_date }}
+                                    {% if profile_form.birth_date.errors %}
+                                        <div class="text-danger">{{ profile_form.birth_date.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- 測驗平台登入資訊 -->
+                                <h6 class="text-info mb-3 mt-4">
+                                    <i class="bi bi-shield-lock me-2"></i>測驗平台登入設定
+                                </h6>
+                                
+                                <!-- 顯示當前設定狀態 -->
+                                <div class="alert alert-info d-flex align-items-center mb-3">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <div>
+                                        <strong>當前設定狀態：</strong>
+                                        {% if user.individual_profile.test_platform_username and user.individual_profile.test_platform_password %}
+                                            <span class="badge bg-success ms-2">
+                                                <i class="bi bi-check-circle me-1"></i>已完整設定
+                                            </span>
+                                            <div class="mt-2">
+                                                <small>測驗平台帳號：{{ user.individual_profile.test_platform_username }}</small><br>
+                                                <small>測驗平台密碼：已設定 ({{ user.individual_profile.test_platform_password|length }} 字符)</small>
+                                            </div>
+                                        {% elif user.individual_profile.test_platform_username %}
+                                            <span class="badge bg-warning ms-2">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>僅設定帳號
+                                            </span>
+                                            <div class="mt-2">
+                                                <small>測驗平台帳號：{{ user.individual_profile.test_platform_username }}</small><br>
+                                                <small>測驗平台密碼：未設定</small>
+                                            </div>
+                                        {% elif user.individual_profile.test_platform_password %}
+                                            <span class="badge bg-warning ms-2">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>僅設定密碼
+                                            </span>
+                                            <div class="mt-2">
+                                                <small>測驗平台帳號：未設定</small><br>
+                                                <small>測驗平台密碼：已設定 ({{ user.individual_profile.test_platform_password|length }} 字符)</small>
+                                            </div>
+                                        {% else %}
+                                            <span class="badge bg-danger ms-2">
+                                                <i class="bi bi-x-circle me-1"></i>未設定
+                                            </span>
+                                            <div class="mt-2">
+                                                <small>尚未設定測驗平台登入資訊</small>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.test_platform_username.id_for_label }}" class="form-label">
+                                        {{ profile_form.test_platform_username.label }}
+                                    </label>
+                                    {{ profile_form.test_platform_username }}
+                                    <div class="form-text">設定後可在繼續測驗時自動登入</div>
+                                    {% if profile_form.test_platform_username.errors %}
+                                        <div class="text-danger">{{ profile_form.test_platform_username.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.test_platform_password.id_for_label }}" class="form-label">
+                                        {{ profile_form.test_platform_password.label }}
+                                    </label>
+                                    {{ profile_form.test_platform_password }}
+                                    <div class="form-text">
+                                        <i class="bi bi-shield-check me-1"></i>
+                                        基於安全考量，密碼欄位不會顯示現有值。如要修改密碼，請重新輸入新密碼。
+                                        {% if user.individual_profile.test_platform_password %}
+                                            <br><span class="text-success">✅ 目前已設定密碼</span>
+                                        {% else %}
+                                            <br><span class="text-warning">⚠️ 尚未設定密碼</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if profile_form.test_platform_password.errors %}
+                                        <div class="text-danger">{{ profile_form.test_platform_password.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                
+                                {% elif user.user_type == 'enterprise' %}
+                                <h6 class="text-success mb-3">
+                                    <i class="bi bi-building me-2"></i>企業資料
+                                </h6>
+                                
+                                {% if profile_form %}
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.company_name.id_for_label }}" class="form-label">
+                                        {{ profile_form.company_name.label }}
+                                    </label>
+                                    {{ profile_form.company_name }}
+                                    {% if profile_form.company_name.errors %}
+                                        <div class="text-danger">{{ profile_form.company_name.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.contact_person.id_for_label }}" class="form-label">
+                                        {{ profile_form.contact_person.label }}
+                                    </label>
+                                    {{ profile_form.contact_person }}
+                                    {% if profile_form.contact_person.errors %}
+                                        <div class="text-danger">{{ profile_form.contact_person.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ profile_form.contact_phone.id_for_label }}" class="form-label">
+                                        {{ profile_form.contact_phone.label }}
+                                    </label>
+                                    {{ profile_form.contact_phone }}
+                                    {% if profile_form.contact_phone.errors %}
+                                        <div class="text-danger">{{ profile_form.contact_phone.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        {% if user.user_type == 'enterprise' and profile_form %}
+                        <div class="mb-3">
+                            <label for="{{ profile_form.address.id_for_label }}" class="form-label">
+                                {{ profile_form.address.label }}
+                            </label>
+                            {{ profile_form.address }}
+                            {% if profile_form.address.errors %}
+                                <div class="text-danger">{{ profile_form.address.errors }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'profile_view' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>取消
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check me-1"></i>儲存變更
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

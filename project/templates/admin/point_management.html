@@ -1,0 +1,692 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}點數交易紀錄 - {{ block.super }}{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">儀表板</a></li>
+<li class="breadcrumb-item"><a href="{% url 'admin_point_overview' %}">點數交易管理</a></li>
+<li class="breadcrumb-item active">點數交易紀錄</li>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.stats-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stats-label {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.transaction-table {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.table th {
+    background-color: #f8f9fa;
+    border: none;
+    font-weight: 600;
+    color: #495057;
+    padding: 1rem;
+}
+
+.table td {
+    border: none;
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.8rem;
+    padding: 0.5rem 1rem;
+}
+
+.adjust-points-btn {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    border-radius: 25px;
+    padding: 0.5rem 1.5rem;
+    color: white;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.adjust-points-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.order-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-list-ul me-2"></i>點數交易紀錄</h2>
+        <span class="badge bg-info fs-6">顯示前 60 筆交易</span>
+    </div>
+
+    <!-- 統計數據 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stats-number">{{ stats.total_transactions }}</div>
+                <div class="stats-label">總交易數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stats-number">{{ stats.total_points_issued|floatformat:0 }}</div>
+                <div class="stats-label">已發放點數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stats-number">{{ stats.total_points_consumed|floatformat:0 }}</div>
+                <div class="stats-label">已消費點數</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stats-number">{{ stats.system_balance|floatformat:0 }}</div>
+                <div class="stats-label">系統餘額</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 篩選條件 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-funnel me-2"></i>篩選條件</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3" id="mainFilterForm">
+                <div class="col-md-3">
+                    <label class="form-label">類型</label>
+                    <select name="user_type" class="form-select" onchange="document.getElementById('mainFilterForm').submit()">
+                        {% for value, label in user_types %}
+                        <option value="{{ value }}" {% if current_filters.user_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">點數類型</label>
+                    <select name="transaction_type" class="form-select" onchange="document.getElementById('mainFilterForm').submit()">
+                        {% for value, label in transaction_types %}
+                        <option value="{{ value }}" {% if current_filters.transaction_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">交易類型</label>
+                    <select class="form-select">
+                        <option>全部交易</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">開始日期</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ current_filters.date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">結束日期</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ current_filters.date_to }}">
+                </div>
+            
+                <div class="col-md-9 mt-3">
+                    <input type="text" name="search" class="form-control" placeholder="姓名、公司名、信箱" value="{{ current_filters.search }}">
+                </div>
+                <div class="col-md-3 mt-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search me-2"></i>搜尋
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 交易記錄列表 -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>交易記錄列表</h5>
+            <small class="text-muted">第 1 - 20 筆，共 {{ page_obj.paginator.count }} 筆</small>
+        </div>
+        <div class="card-body p-0">
+            <div class="transaction-table">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>交易時間</th>
+                            <th>姓名/企業名</th>
+                            <th>點數類型</th>
+                            <th>交易類型</th>
+                            <th>點數異動</th>
+                            <th>餘額變化</th>
+                            <th>說明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in page_obj %}
+                        <tr>
+                            <td>
+                                <small class="text-muted">{{ transaction.created_at|date:"Y/m/d H:i" }}</small>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-person-circle me-2 text-muted"></i>
+                                    <div>
+                                        <div class="fw-bold">
+                                            {% if transaction.user.user_type == 'individual' and transaction.user.individual_profile.real_name %}
+                                                {{ transaction.user.individual_profile.real_name }}
+                                            {% elif transaction.user.user_type == 'enterprise' and transaction.user.enterprise_profile.company_name %}
+                                                {{ transaction.user.enterprise_profile.company_name }}
+                                            {% else %}
+                                                {{ transaction.user.username }}
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted">{{ transaction.user.user_type|default:"未知" }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if transaction.user.user_type == 'individual' %}
+                                    <span class="badge bg-success">個人用戶</span>
+                                {% elif transaction.user.user_type == 'enterprise' %}
+                                    <span class="badge bg-primary">企業用戶</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">其他</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if transaction.transaction_type == 'registration_bonus' %}
+                                    <span class="badge bg-info">註冊獎勵</span>
+                                {% elif transaction.transaction_type == 'consumption' %}
+                                    <span class="badge bg-warning">消費</span>
+                                {% elif transaction.transaction_type == 'purchase' %}
+                                    <span class="badge bg-success">購買</span>
+                                {% elif transaction.transaction_type == 'admin_adjust' %}
+                                    <span class="badge bg-info">管理員調整</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">其他</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if transaction.amount < 0 %}
+                                    <span class="text-danger fw-bold">{{ transaction.amount }}</span>
+                                {% else %}
+                                    <span class="text-success fw-bold">+{{ transaction.amount }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ transaction.balance_before }} → {{ transaction.balance_after }}</small>
+                            </td>
+                            <td>
+                                <span class="text-truncate" style="max-width: 200px;" title="{{ transaction.description }}">
+                                    {{ transaction.description|default:"無說明" }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                暫無交易記錄
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 分頁 -->
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer">
+            <nav aria-label="交易記錄分頁">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in current_filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 調整點數模態框 -->
+<div class="modal fade" id="adjustPointsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">調整用戶點數</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="adjustPointsForm">
+                    <input type="hidden" id="adjustUserId">
+                    <div class="mb-3">
+                        <label class="form-label">用戶名稱</label>
+                        <input type="text" id="adjustUserName" class="form-control" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">調整類型</label>
+                        <select id="adjustType" class="form-select" required>
+                            <option value="">請選擇調整類型</option>
+                            <option value="add">增加點數</option>
+                            <option value="subtract">扣除點數</option>
+                            <option value="set">設定點數</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">點數數量</label>
+                        <input type="number" id="adjustAmount" class="form-control" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">調整原因</label>
+                        <textarea id="adjustReason" class="form-control" rows="3" placeholder="請輸入調整原因..." required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="prepareConfirmation()">確認調整</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 錯誤提示模態框 -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                <h5 class="modal-title d-flex align-items-center" id="errorModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+                    輸入錯誤
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="bi bi-x-circle text-danger" style="font-size: 3rem;"></i>
+                </div>
+                <h6 class="mb-3 text-dark" id="errorMessage">請填寫所有必填欄位</h6>
+                <div class="alert alert-danger" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    請檢查表單內容後重新提交
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pb-4">
+                <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">
+                    <i class="bi bi-check-circle me-2"></i>我知道了
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 成功提示模態框 -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                <h5 class="modal-title d-flex align-items-center" id="successModalLabel">
+                    <i class="bi bi-check-circle-fill me-2 fs-4"></i>
+                    調整成功
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-3">
+                    <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+                </div>
+                <h5 class="mb-3 text-dark" id="successMessage">點數調整成功！</h5>
+                <div class="alert alert-success" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    點數已更新，頁面將自動重新載入
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pb-4">
+                <button type="button" class="btn px-4" data-bs-dismiss="modal" onclick="location.reload()"
+                        style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                               border: none; color: white; font-weight: 600;">
+                    <i class="bi bi-arrow-clockwise me-2"></i>重新載入頁面
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 確認調整點數模態框 -->
+<div class="modal fade" id="confirmAdjustModal" tabindex="-1" aria-labelledby="confirmAdjustModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient text-white" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+                <h5 class="modal-title d-flex align-items-center" id="confirmAdjustModalLabel">
+                    <i class="bi bi-question-circle-fill me-2 fs-4"></i>
+                    調整確認
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="mb-4">
+                    <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                </div>
+                <h5 class="mb-3 text-dark">確定要調整此用戶的點數嗎？</h5>
+                <div class="alert alert-info text-start" role="alert">
+                    <div class="mb-2">
+                        <strong>用戶：</strong><span id="confirmUserName"></span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>調整類型：</strong><span id="confirmAdjustType"></span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>點數數量：</strong><span id="confirmAmount" class="text-primary fw-bold"></span> 點
+                    </div>
+                    <div class="mb-0">
+                        <strong>調整原因：</strong><span id="confirmReason"></span>
+                    </div>
+                </div>
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>提醒：</strong>此操作將立即生效且無法撤銷，請確認資訊無誤
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pb-4">
+                <button type="button" class="btn btn-outline-secondary px-4 me-3" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>取消
+                </button>
+                <button type="button" class="btn px-4" id="confirmAdjustButton"
+                        style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                               border: none; color: white; font-weight: 600;">
+                    <i class="bi bi-check-circle me-2"></i>確定調整
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function adjustUserPoints(userId, userName) {
+    document.getElementById('adjustUserId').value = userId;
+    document.getElementById('adjustUserName').value = userName;
+    document.getElementById('adjustPointsForm').reset();
+    document.getElementById('adjustUserId').value = userId;
+    document.getElementById('adjustUserName').value = userName;
+    
+    var modal = new bootstrap.Modal(document.getElementById('adjustPointsModal'));
+    modal.show();
+}
+
+function showErrorModal(message) {
+    document.getElementById('errorMessage').textContent = message;
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    errorModal.show();
+}
+
+function showSuccessModal(message) {
+    document.getElementById('successMessage').textContent = message;
+    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+    successModal.show();
+}
+
+function prepareConfirmation() {
+    const form = document.getElementById('adjustPointsForm');
+    const userName = document.getElementById('adjustUserName').value;
+    const adjustType = document.getElementById('adjustType').value;
+    const amount = document.getElementById('adjustAmount').value;
+    const reason = document.getElementById('adjustReason').value;
+
+    // 表單驗證
+    if (!adjustType || !amount || !reason) {
+        showErrorModal('請填寫所有必填欄位');
+        return;
+    }
+    
+    if (amount <= 0) {
+        showErrorModal('點數數量必須大於0');
+        return;
+    }
+
+    // 轉換調整類型顯示文字
+    let adjustTypeText = '';
+    switch(adjustType) {
+        case 'add':
+            adjustTypeText = '增加點數';
+            break;
+        case 'subtract':
+            adjustTypeText = '扣除點數';
+            break;
+        case 'set':
+            adjustTypeText = '設定點數';
+            break;
+        default:
+            adjustTypeText = '未知類型';
+    }
+
+    // 填入確認框的資訊
+    document.getElementById('confirmUserName').textContent = userName;
+    document.getElementById('confirmAdjustType').textContent = adjustTypeText;
+    document.getElementById('confirmAmount').textContent = amount;
+    document.getElementById('confirmReason').textContent = reason;
+
+    // 隱藏第一個模態框
+    const adjustModal = bootstrap.Modal.getInstance(document.getElementById('adjustPointsModal'));
+    adjustModal.hide();
+    
+    // 延遲顯示確認模態框，避免動畫衝突
+    setTimeout(() => {
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmAdjustModal'));
+        confirmModal.show();
+    }, 300);
+}
+
+function submitAdjustment() {
+    const form = document.getElementById('adjustPointsForm');
+    const formData = {
+        user_id: document.getElementById('adjustUserId').value,
+        type: document.getElementById('adjustType').value,
+        amount: parseInt(document.getElementById('adjustAmount').value),
+        reason: document.getElementById('adjustReason').value
+    };
+
+    // 取得 CSRF token
+    let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]');
+    }
+    
+    if (!csrfToken) {
+        alert('CSRF token 未找到，請重新整理頁面');
+        return;
+    }
+
+    fetch('{% url "admin_adjust_points" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken.value
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            showSuccessModal(data.message || '點數調整成功！');
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('adjustPointsModal'));
+            if (modal) modal.hide();
+            const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmAdjustModal'));
+            if (confirmModal) confirmModal.hide();
+        } else {
+            showErrorModal('調整失敗：' + (data.message || '未知錯誤'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showErrorModal('操作失敗，請稍後重試：' + error.message);
+    });
+}
+
+// 確認調整按鈕點擊處理
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('confirmAdjustButton').addEventListener('click', function() {
+        // 關閉確認模態框
+        const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmAdjustModal'));
+        confirmModal.hide();
+        
+        // 更新按鈕狀態
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>處理中...';
+        
+        // 執行調整
+        submitAdjustment();
+    });
+    
+    // 模態框顯示時的動畫效果
+    document.getElementById('confirmAdjustModal').addEventListener('shown.bs.modal', function () {
+        // 添加彈跳動畫
+        const icon = this.querySelector('.bi-exclamation-triangle');
+        icon.style.animation = 'bounce 1s ease-in-out';
+    });
+    
+    // 錯誤模態框顯示時的動畫效果
+    document.getElementById('errorModal').addEventListener('shown.bs.modal', function () {
+        // 添加搖擺動畫
+        const icon = this.querySelector('.bi-x-circle');
+        icon.style.animation = 'shake 0.8s ease-in-out';
+    });
+    
+    // 成功模態框顯示時的動畫效果
+    document.getElementById('successModal').addEventListener('shown.bs.modal', function () {
+        // 添加縮放動畫
+        const icon = this.querySelector('.bi-check-circle');
+        icon.style.animation = 'zoomIn 0.6s ease-in-out';
+    });
+});
+
+// 添加 CSS 動畫
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+            transform: translateY(0);
+        }
+        40% {
+            transform: translateY(-10px);
+        }
+        60% {
+            transform: translateY(-5px);
+        }
+    }
+    
+    @keyframes shake {
+        0%, 100% {
+            transform: translateX(0);
+        }
+        10%, 30%, 50%, 70%, 90% {
+            transform: translateX(-8px);
+        }
+        20%, 40%, 60%, 80% {
+            transform: translateX(8px);
+        }
+    }
+    
+    @keyframes zoomIn {
+        0% {
+            transform: scale(0);
+            opacity: 0;
+        }
+        50% {
+            transform: scale(1.1);
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+    
+    .modal-content {
+        border-radius: 1rem;
+    }
+    
+    .modal-header {
+        border-radius: 1rem 1rem 0 0;
+    }
+    
+    #confirmAdjustButton:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .btn-outline-secondary:hover {
+        transform: translateY(-2px);
+        transition: all 0.3s ease;
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

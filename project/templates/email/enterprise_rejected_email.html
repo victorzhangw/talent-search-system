@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企業審核未通過通知</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        .content {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 0 0 10px 10px;
+        }
+        .warning-icon {
+            font-size: 48px;
+            color: #dc3545;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .company-info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #dc3545;
+        }
+        .reason-box {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .contact-button {
+            display: inline-block;
+            background: #6c757d;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 企業審核結果通知</h1>
+        <p>{{ site_name }}</p>
+    </div>
+    
+    <div class="content">
+        <div class="warning-icon">⚠️</div>
+        
+        <h2>親愛的 {{ enterprise_profile.contact_person }}，您好！</h2>
+        
+        <p>感謝您對 {{ site_name }} 的關注。很抱歉，您的企業註冊申請未能通過我們的審核。</p>
+        
+        <div class="company-info">
+            <h3>申請資訊</h3>
+            <p><strong>公司名稱：</strong>{{ enterprise_profile.company_name }}</p>
+            <p><strong>統一編號：</strong>{{ enterprise_profile.tax_id }}</p>
+            <p><strong>聯絡電話：</strong>{{ enterprise_profile.phone }}</p>
+            <p><strong>審核時間：</strong>{{ enterprise_profile.verified_at|date:"Y年m月d日 H:i" }}</p>
+        </div>
+        
+        {% if rejection_reason %}
+        <div class="reason-box">
+            <h3>📝 未通過原因</h3>
+            <p>{{ rejection_reason }}</p>
+        </div>
+        {% endif %}
+        
+        <h3>📞 如何處理</h3>
+        <p>如果您對審核結果有任何疑問，或希望了解更多詳細資訊，請聯繫我們的客服團隊：</p>
+        <ul>
+            <li>📧 客服信箱：service@traitty.com</li>
+            <li>📞 客服電話：（請洽客服）</li>
+        </ul>
+        
+        <div style="text-align: center;">
+            <a href="mailto:service@traitty.com" class="contact-button">聯繫客服團隊</a>
+        </div>
+        
+        <p>我們的客服團隊將協助您了解審核標準，並提供改善建議。</p>
+        
+        <p>再次感謝您對 {{ site_name }} 的支持！</p>
+    </div>
+    
+    <div class="footer">
+        <p>{{ site_name }} 客服團隊</p>
+        <p>此郵件為系統自動發送，請勿直接回覆。</p>
+    </div>
+</body>
+</html>

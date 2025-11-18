@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測驗完成通知</title>
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #ffffff;
+            text-align: center;
+        }
+        .header img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .content {
+            padding: 30px;
+            text-align: center;
+        }
+        .content h2 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 22px;
+            letter-spacing: 1px;
+        }
+        .content p {
+            margin: 12px 0;
+            font-size: 16px;
+        }
+        .cta {
+            margin-top: 24px;
+        }
+        .cta a {
+            display: inline-block;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="{{ header_image_url }}" alt="Traitty 特質評鑑">
+        </div>
+        <div class="content">
+            <h2>提醒您</h2>
+            <p><strong>{{ invitee_name }}</strong> 已完成測驗：<strong>{{ project_name }}</strong></p>
+            <p>請登入 Traitty 查看結果。</p>
+            <div class="cta">
+                <a href="{{ site_url }}" target="_blank" rel="noopener">前往 Traitty</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>此信件由系統自動發送，請勿直接回覆</p>
+            <p>客服信箱：service@traitty.com</p>
+            <p>© Copyright WePredict/Traitty</p>
+            <p>All rights reserved</p>
+        </div>
+    </div>
+</body>
+</html>
