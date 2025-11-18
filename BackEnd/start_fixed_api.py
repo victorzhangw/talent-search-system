@@ -51,7 +51,11 @@ app = FastAPI(title="人才聊天搜索 API (修正版)", version="2.0.0")
 # CORS 設定
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://talent-search-frontend-68e7.onrender.com",  # 你的前端 URL
+        "http://localhost:3000",  # 本地開發
+        "*"  # 暫時允許所有（測試用）
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
