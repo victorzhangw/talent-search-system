@@ -7,7 +7,7 @@ const config = {
   production: {
     apiBaseUrl:
       import.meta.env.VITE_API_BASE_URL ||
-      "https://talent-search-api.onrender.com",
+      "https://talent-search-system.onrender.com",
     timeout: 30000,
   },
 };
