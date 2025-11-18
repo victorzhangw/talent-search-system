@@ -1,13 +1,14 @@
 services:
   # 後端 API 服務
+  # Force rebuild: 2024-11-18 14:30 - Fix FastAPI installation
   - type: web
     name: talent-search-api
     runtime: python
-    buildCommand: pip install -r BackEnd/requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: cd BackEnd && python start_fixed_api.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10.0
+        value: "3.11"
       - key: DB_SSH_HOST
         sync: false
       - key: DB_SSH_PORT
