@@ -1,19 +1,21 @@
 services:
   # 後端 API 服務
-  # Force rebuild: 2024-11-18 15:30 - Force Python 3.11 for psycopg2 compatibility
+  # Force rebuild: 2024-11-18 16:00 - Use runtime.txt for Python 3.11
   - type: web
     name: talent-search-api
     runtime: python
     region: oregon
     plan: free
     buildCommand: |
+      echo "Checking Python version..."
       python --version
+      echo "Upgrading pip..."
       pip install --upgrade pip
+      echo "Installing dependencies..."
       pip install -r requirements.txt
+      echo "Build complete!"
     startCommand: cd BackEnd && python start_fixed_api.py
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
       - key: DB_SSH_HOST
         sync: false
       - key: DB_SSH_PORT
