@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>雲端 API 診斷工具</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .subtitle {
+        color: #666;
+        margin-bottom: 30px;
+      }
+
+      .api-input {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 30px;
+      }
+
+      .api-input input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .api-input input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .check-item {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 15px;
+        border-left: 4px solid #ddd;
+      }
+
+      .check-item.success {
+        border-left-color: #28a745;
+        background: #d4edda;
+      }
+
+      .check-item.error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+
+      .check-item.warning {
+        border-left-color: #ffc107;
+        background: #fff3cd;
+      }
+
+      .check-item.info {
+        border-left-color: #17a2b8;
+        background: #d1ecf1;
+      }
+
+      .check-title {
+        font-weight: 600;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+      }
+
+      .check-detail {
+        font-size: 13px;
+        color: #555;
+        font-family: "Courier New", monospace;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+
+      .btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: transform 0.2s;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        text-align: center;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .endpoint-section {
+        margin-top: 30px;
+      }
+
+      .endpoint-section h2 {
+        color: #667eea;
+        margin-bottom: 16px;
+        font-size: 20px;
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 20px;
+      }
+
+      .comparison-item {
+        background: #f8f9fa;
+        padding: 16px;
+        border-radius: 8px;
+      }
+
+      .comparison-item h3 {
+        color: #333;
+        margin-bottom: 12px;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔍 雲端 API 診斷工具</h1>
+      <p class="subtitle">診斷本地和雲端 API 的差異</p>
+
+      <div class="api-input">
+        <input
+          type="text"
+          id="localApi"
+          value="http://localhost:8000"
+          placeholder="本地 API URL"
+        />
+        <input
+          type="text"
+          id="cloudApi"
+          value="https://talent-search-api.onrender.com"
+          placeholder="雲端 API URL"
+        />
+        <button class="btn" onclick="runDiagnosis()" id="diagnosisBtn">
+          開始診斷
+        </button>
+      </div>
+
+      <div id="results"></div>
+    </div>
+
+    <script>
+      async function testEndpoint(
+        apiUrl,
+        endpoint,
+        method = "GET",
+        body = null
+      ) {
+        try {
+          const options = {
+            method: method,
+            mode: "cors",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          };
+
+          if (body) {
+            options.body = JSON.stringify(body);
+          }
+
+          const startTime = Date.now();
+          const response = await fetch(`${apiUrl}${endpoint}`, options);
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+
+          let data = null;
+          let contentType = response.headers.get("content-type");
+
+          if (contentType && contentType.includes("application/json")) {
+            data = await response.json();
+          } else {
+            data = await response.text();
+          }
+
+          return {
+            success: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            data: data,
+            duration: duration,
+            headers: Object.fromEntries(response.headers.entries()),
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+            duration: 0,
+          };
+        }
+      }
+
+      function addCheckItem(title, detail, status) {
+        const resultsDiv = document.getElementById("results");
+        const item = document.createElement("div");
+        item.className = `check-item ${status}`;
+
+        let icon = "⏳";
+        if (status === "success") icon = "✅";
+        if (status === "error") icon = "❌";
+        if (status === "warning") icon = "⚠️";
+        if (status === "info") icon = "ℹ️";
+
+        item.innerHTML = `
+                <div class="check-title">
+                    <span class="icon">${icon}</span>
+                    ${title}
+                </div>
+                <div class="check-detail">${detail}</div>
+            `;
+
+        resultsDiv.appendChild(item);
+      }
+
+      function addSection(title) {
+        const resultsDiv = document.getElementById("results");
+        const section = document.createElement("div");
+        section.className = "endpoint-section";
+        section.innerHTML = `<h2>${title}</h2>`;
+        resultsDiv.appendChild(section);
+      }
+
+      function formatJson(obj) {
+        return JSON.stringify(obj, null, 2);
+      }
+
+      async function runDiagnosis() {
+        const resultsDiv = document.getElementById("results");
+        const btn = document.getElementById("diagnosisBtn");
+        const localApi = document.getElementById("localApi").value;
+        const cloudApi = document.getElementById("cloudApi").value;
+
+        resultsDiv.innerHTML = "";
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span> 診斷中...';
+
+        // 測試端點列表
+        const endpoints = [
+          { path: "/", method: "GET", name: "根路徑" },
+          { path: "/health", method: "GET", name: "健康檢查" },
+          { path: "/api/traits", method: "GET", name: "特質定義" },
+          { path: "/api/candidates", method: "GET", name: "候選人列表" },
+          {
+            path: "/api/search",
+            method: "POST",
+            name: "搜索功能",
+            body: { query: "列出所有候選人", filters: null },
+          },
+        ];
+
+        // 測試每個端點
+        for (const endpoint of endpoints) {
+          addSection(`📍 測試端點: ${endpoint.name} (${endpoint.path})`);
+
+          // 測試本地 API
+          addCheckItem(
+            `本地 API: ${localApi}${endpoint.path}`,
+            "正在測試...",
+            "info"
+          );
+
+          const localResult = await testEndpoint(
+            localApi,
+            endpoint.path,
+            endpoint.method,
+            endpoint.body
+          );
+
+          if (localResult.success) {
+            addCheckItem(
+              `✅ 本地 API 成功`,
+              `狀態: ${localResult.status}\n` +
+                `響應時間: ${localResult.duration}ms\n` +
+                `數據: ${formatJson(localResult.data).substring(0, 500)}...`,
+              "success"
+            );
+          } else {
+            addCheckItem(
+              `❌ 本地 API 失敗`,
+              `錯誤: ${localResult.error || localResult.statusText}\n` +
+                `狀態碼: ${localResult.status || "N/A"}`,
+              "error"
+            );
+          }
+
+          // 測試雲端 API
+          addCheckItem(
+            `雲端 API: ${cloudApi}${endpoint.path}`,
+            "正在測試...",
+            "info"
+          );
+
+          const cloudResult = await testEndpoint(
+            cloudApi,
+            endpoint.path,
+            endpoint.method,
+            endpoint.body
+          );
+
+          if (cloudResult.success) {
+            addCheckItem(
+              `✅ 雲端 API 成功`,
+              `狀態: ${cloudResult.status}\n` +
+                `響應時間: ${cloudResult.duration}ms\n` +
+                `數據: ${formatJson(cloudResult.data).substring(0, 500)}...`,
+              "success"
+            );
+          } else {
+            addCheckItem(
+              `❌ 雲端 API 失敗`,
+              `錯誤: ${cloudResult.error || cloudResult.statusText}\n` +
+                `狀態碼: ${cloudResult.status || "N/A"}\n\n` +
+                `可能原因:\n` +
+                `1. API 服務未啟動或已崩潰\n` +
+                `2. 路由配置錯誤\n` +
+                `3. CORS 設定問題\n` +
+                `4. 環境變數未正確設定\n` +
+                `5. 資料庫連接失敗`,
+              "error"
+            );
+          }
+
+          // 比較結果
+          if (localResult.success && cloudResult.success) {
+            // 比較數據
+            const localData = JSON.stringify(localResult.data);
+            const cloudData = JSON.stringify(cloudResult.data);
+
+            if (localData === cloudData) {
+              addCheckItem(
+                "✅ 數據一致",
+                "本地和雲端返回的數據完全相同",
+                "success"
+              );
+            } else {
+              addCheckItem(
+                "⚠️ 數據不一致",
+                `本地數據長度: ${localData.length}\n` +
+                  `雲端數據長度: ${cloudData.length}\n\n` +
+                  `可能原因:\n` +
+                  `1. 資料庫數據不同步\n` +
+                  `2. API 版本不同\n` +
+                  `3. 環境配置差異`,
+                "warning"
+              );
+            }
+          } else if (!localResult.success && !cloudResult.success) {
+            addCheckItem(
+              "❌ 兩端都失敗",
+              "本地和雲端 API 都無法訪問此端點",
+              "error"
+            );
+          } else {
+            addCheckItem(
+              "⚠️ 行為不一致",
+              `本地: ${localResult.success ? "成功" : "失敗"}\n` +
+                `雲端: ${cloudResult.success ? "成功" : "失敗"}`,
+              "warning"
+            );
+          }
+        }
+
+        // 總結
+        addSection("📊 診斷總結");
+        addCheckItem(
+          "診斷完成",
+          "請查看上方的詳細結果，找出本地和雲端的差異。\n\n" +
+            "常見問題解決方案:\n" +
+            "1. 404 錯誤: 檢查 Render 的啟動命令和路由配置\n" +
+            "2. CORS 錯誤: 更新後端 CORS 設定\n" +
+            "3. 500 錯誤: 檢查後端日誌和環境變數\n" +
+            "4. 數據不一致: 確認資料庫連接和數據同步",
+          "info"
+        );
+
+        btn.disabled = false;
+        btn.innerHTML = "重新診斷";
+      }
+    </script>
+  </body>
+</html>
