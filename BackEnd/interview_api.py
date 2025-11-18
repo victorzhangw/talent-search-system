@@ -11,13 +11,29 @@ import asyncio
 
 router = APIRouter()
 
-# LLM 配置 - 從環境變數讀取
-LLM_CONFIG = {
-    'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
-    'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
-    'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
-    'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
-}
+# 判斷運行環境
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+IS_PRODUCTION = ENVIRONMENT == 'production'
+
+# LLM 配置 - 根據環境自動選擇
+if IS_PRODUCTION:
+    # 生產環境：使用 AkashML
+    LLM_CONFIG = {
+        'api_key': os.getenv('LLM_API_KEY', 'akml-RTl88SQKMDZFX2c43QslImWLO7DNUdee'),
+        'api_host': os.getenv('LLM_API_HOST', 'https://api.akashml.com'),
+        'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3.1'),
+        'endpoint': os.getenv('LLM_API_HOST', 'https://api.akashml.com') + '/v1/chat/completions'
+    }
+    print("🌐 面試 API 使用 AkashML")
+else:
+    # 開發環境：使用 SiliconFlow
+    LLM_CONFIG = {
+        'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
+        'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
+        'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
+        'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
+    }
+    print("🌐 面試 API 使用 SiliconFlow")
 
 class InterviewRequest(BaseModel):
     candidates: List[Dict[str, Any]]

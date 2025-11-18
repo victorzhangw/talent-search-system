@@ -58,13 +58,25 @@ DB_CONFIG = {
     'db_password': os.getenv('DB_PASSWORD', 'projectpass')
 }
 
-# LLM API 配置
-LLM_CONFIG = {
-    'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
-    'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
-    'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
-    'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
-}
+# LLM API 配置 - 根據環境自動選擇
+if IS_PRODUCTION:
+    # 生產環境：使用 AkashML
+    LLM_CONFIG = {
+        'api_key': os.getenv('LLM_API_KEY', 'akml-RTl88SQKMDZFX2c43QslImWLO7DNUdee'),
+        'api_host': os.getenv('LLM_API_HOST', 'https://api.akashml.com'),
+        'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3.1'),
+        'endpoint': os.getenv('LLM_API_HOST', 'https://api.akashml.com') + '/v1/chat/completions'
+    }
+    print("🌐 使用 AkashML API")
+else:
+    # 開發環境：使用 SiliconFlow
+    LLM_CONFIG = {
+        'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
+        'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
+        'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
+        'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
+    }
+    print("🌐 使用 SiliconFlow API")
 
 # FastAPI 應用
 app = FastAPI(
