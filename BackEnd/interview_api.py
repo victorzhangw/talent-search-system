@@ -6,15 +6,17 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import httpx
 import json
+import os
+import asyncio
 
 router = APIRouter()
 
-# LLM 配置
+# LLM 配置 - 從環境變數讀取
 LLM_CONFIG = {
-    'api_key': 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff',
-    'api_host': 'https://api.siliconflow.cn',
-    'model': 'deepseek-ai/DeepSeek-V3',
-    'endpoint': 'https://api.siliconflow.cn/v1/chat/completions'
+    'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
+    'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
+    'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
+    'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
 }
 
 class InterviewRequest(BaseModel):
@@ -100,31 +102,65 @@ async def generate_interview_questions(request: InterviewRequest):
                 'content': prompt
             })
         
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                LLM_CONFIG['endpoint'],
-                headers={
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {LLM_CONFIG["api_key"]}'
-                },
-                json={
-                    'model': LLM_CONFIG['model'],
-                    'messages': messages,
-                    'temperature': 0.7,
-                    'max_tokens': 2000
-                }
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                questions = result['choices'][0]['message']['content']
-                
-                return InterviewResponse(
-                    questions=questions,
-                    conversation_id=str(hash(questions))
-                )
-            else:
-                raise HTTPException(status_code=500, detail=f"LLM API 錯誤: {response.status_code}")
+        # 重試機制
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        LLM_CONFIG['endpoint'],
+                        headers={
+                            'Content-Type': 'application/json',
+                            'Authorization': f'Bearer {LLM_CONFIG["api_key"]}'
+                        },
+                        json={
+                            'model': LLM_CONFIG['model'],
+                            'messages': messages,
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        questions = result['choices'][0]['message']['content']
+                        
+                        return InterviewResponse(
+                            questions=questions,
+                            conversation_id=str(hash(questions))
+                        )
+                    elif response.status_code == 503 and attempt < max_retries - 1:
+                        # 503 錯誤且還有重試機會，等待後重試
+                        print(f"⚠️ LLM API 503 錯誤，{retry_delay} 秒後重試 (嘗試 {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # 指數退避
+                        continue
+                    else:
+                        error_detail = f"LLM API 錯誤: {response.status_code}"
+                        try:
+                            error_body = response.json()
+                            error_detail += f" - {error_body}"
+                        except:
+                            pass
+                        raise HTTPException(status_code=500, detail=error_detail)
+            except httpx.TimeoutException:
+                if attempt < max_retries - 1:
+                    print(f"⚠️ LLM API 超時，{retry_delay} 秒後重試 (嘗試 {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    raise HTTPException(status_code=504, detail="LLM API 請求超時")
+            except httpx.RequestError as e:
+                if attempt < max_retries - 1:
+                    print(f"⚠️ LLM API 連線錯誤: {e}，{retry_delay} 秒後重試")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    raise HTTPException(status_code=503, detail=f"LLM API 連線失敗: {str(e)}")
     
     except Exception as e:
         print(f"生成面試問題錯誤: {str(e)}")
