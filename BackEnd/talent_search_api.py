@@ -23,6 +23,15 @@ import asyncio
 # 確保可以導入本地模塊
 sys.path.insert(0, os.path.dirname(__file__))
 
+# 導入面試 API router
+try:
+    from interview_api import router as interview_router
+    INTERVIEW_API_AVAILABLE = True
+    print("✅ 面試 API 模組已載入")
+except ImportError as e:
+    INTERVIEW_API_AVAILABLE = False
+    print(f"⚠️ 面試 API 模組未找到: {e}")
+
 # ============================================
 # 環境配置
 # ============================================
@@ -80,6 +89,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 包含面試 API router
+if INTERVIEW_API_AVAILABLE:
+    app.include_router(interview_router)
+    print("✅ 面試 API 端點已註冊")
 
 # 全域變數
 tunnel = None
