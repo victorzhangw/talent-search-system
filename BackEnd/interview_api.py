@@ -31,6 +31,15 @@ class InterviewResponse(BaseModel):
 async def generate_interview_questions(request: InterviewRequest):
     """生成面試問題"""
     try:
+        # 診斷資訊
+        print(f"\n{'='*60}")
+        print(f"🔍 面試問題生成請求")
+        print(f"{'='*60}")
+        print(f"候選人數量: {len(request.candidates)}")
+        print(f"LLM API 端點: {LLM_CONFIG['endpoint']}")
+        print(f"LLM 模型: {LLM_CONFIG['model']}")
+        print(f"API Key (前10字): {LLM_CONFIG['api_key'][:10]}...")
+        print(f"{'='*60}\n")
         # 構建候選人信息摘要
         candidates_summary = []
         for candidate in request.candidates:
@@ -108,20 +117,28 @@ async def generate_interview_questions(request: InterviewRequest):
         
         for attempt in range(max_retries):
             try:
+                print(f"📡 嘗試調用 LLM API (第 {attempt + 1} 次)")
+                
                 async with httpx.AsyncClient(timeout=60.0) as client:
+                    request_data = {
+                        'model': LLM_CONFIG['model'],
+                        'messages': messages,
+                        'temperature': 0.7,
+                        'max_tokens': 2000
+                    }
+                    
+                    print(f"請求資料大小: {len(str(request_data))} 字元")
+                    
                     response = await client.post(
                         LLM_CONFIG['endpoint'],
                         headers={
                             'Content-Type': 'application/json',
                             'Authorization': f'Bearer {LLM_CONFIG["api_key"]}'
                         },
-                        json={
-                            'model': LLM_CONFIG['model'],
-                            'messages': messages,
-                            'temperature': 0.7,
-                            'max_tokens': 2000
-                        }
+                        json=request_data
                     )
+                    
+                    print(f"📥 收到回應: 狀態碼 {response.status_code}")
                     
                     if response.status_code == 200:
                         result = response.json()
@@ -142,8 +159,14 @@ async def generate_interview_questions(request: InterviewRequest):
                         try:
                             error_body = response.json()
                             error_detail += f" - {error_body}"
+                            print(f"❌ API 錯誤詳情: {error_body}")
                         except:
-                            pass
+                            try:
+                                error_text = response.text
+                                print(f"❌ API 錯誤文本: {error_text[:500]}")
+                                error_detail += f" - {error_text[:200]}"
+                            except:
+                                pass
                         raise HTTPException(status_code=500, detail=error_detail)
             except httpx.TimeoutException:
                 if attempt < max_retries - 1:
