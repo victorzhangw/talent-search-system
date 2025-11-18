@@ -6,6 +6,7 @@
 
 import sys
 import os
+import tempfile
 
 # 確保可以導入本地模塊
 sys.path.insert(0, os.path.dirname(__file__))
@@ -23,17 +24,17 @@ import httpx
 # 導入修正後的搜索引擎
 from talent_search_engine_fixed import TalentSearchEngineFixed
 
-# 資料庫連接配置
+# 從環境變數讀取配置
 DB_CONFIG = {
-    'ssh_host': '54.199.255.239',
-    'ssh_port': 22,
-    'ssh_username': 'victor_cheng',
-    'ssh_private_key': 'private-key-openssh.pem',
-    'db_host': 'localhost',
-    'db_port': 5432,
-    'db_name': 'projectdb',
-    'db_user': 'projectuser',
-    'db_password': 'projectpass'
+    'ssh_host': os.getenv('DB_SSH_HOST', '54.199.255.239'),
+    'ssh_port': int(os.getenv('DB_SSH_PORT', '22')),
+    'ssh_username': os.getenv('DB_SSH_USERNAME', 'victor_cheng'),
+    'ssh_private_key': os.getenv('DB_SSH_PRIVATE_KEY'),  # 從環境變數讀取 key 內容
+    'db_host': os.getenv('DB_HOST', 'localhost'),
+    'db_port': int(os.getenv('DB_PORT', '5432')),
+    'db_name': os.getenv('DB_NAME', 'projectdb'),
+    'db_user': os.getenv('DB_USER', 'projectuser'),
+    'db_password': os.getenv('DB_PASSWORD', 'projectpass')
 }
 
 # LLM API 配置
@@ -87,10 +88,27 @@ def get_db_connection():
     if db_conn is None or db_conn.closed:
         if tunnel is None or not tunnel.is_active:
             print("正在建立 SSH 隧道...")
+            
+            # 處理 SSH private key
+            ssh_key = DB_CONFIG['ssh_private_key']
+            if not ssh_key:
+                raise ValueError("DB_SSH_PRIVATE_KEY 環境變數未設定")
+            
+            # 如果是檔案路徑，直接使用
+            if os.path.isfile(ssh_key):
+                ssh_pkey = ssh_key
+            else:
+                # 如果是 key 內容，寫入臨時檔案
+                temp_key_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pem')
+                temp_key_file.write(ssh_key)
+                temp_key_file.close()
+                ssh_pkey = temp_key_file.name
+                print(f"✅ SSH key 已寫入臨時檔案: {ssh_pkey}")
+            
             tunnel = SSHTunnelForwarder(
                 (DB_CONFIG['ssh_host'], DB_CONFIG['ssh_port']),
                 ssh_username=DB_CONFIG['ssh_username'],
-                ssh_pkey=DB_CONFIG['ssh_private_key'],
+                ssh_pkey=ssh_pkey,
                 remote_bind_address=(DB_CONFIG['db_host'], DB_CONFIG['db_port'])
             )
             tunnel.start()
