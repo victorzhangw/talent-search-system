@@ -234,6 +234,15 @@
         background: #adb5bd;
       }
 
+      .restart-btn {
+        background: linear-gradient(135deg, #f59e0b, #f97316) !important;
+        padding: 14px 24px !important;
+      }
+
+      .restart-btn:hover {
+        background: linear-gradient(135deg, #f97316, #ea580c) !important;
+      }
+
       /* 建議標籤 */
       .suggestions {
         display: flex;
@@ -982,6 +991,13 @@
               >
                 <i class="fas fa-paper-plane"></i> 發送
               </button>
+              <button
+                @click="restartConversation"
+                class="restart-btn"
+                title="重新開始對話"
+              >
+                <i class="fas fa-redo"></i> 重新開始
+              </button>
             </div>
             <div class="suggestions" v-if="suggestions.length > 0">
               <span
@@ -1150,6 +1166,24 @@
 
       createApp({
         data() {
+          // 自動檢測 API 基礎 URL
+          const hostname = window.location.hostname;
+          let apiBaseUrl = "http://localhost:8000";
+
+          if (
+            hostname.includes("render.com") ||
+            hostname.includes("onrender.com")
+          ) {
+            apiBaseUrl = "https://talent-search-api.onrender.com";
+          } else if (hostname.includes("vercel.app")) {
+            apiBaseUrl = "https://talent-search-api.onrender.com";
+          } else if (hostname.includes("netlify.app")) {
+            apiBaseUrl = "https://talent-search-api.onrender.com";
+          }
+
+          console.log(`🌐 檢測到環境: ${hostname}`);
+          console.log(`🔗 API 基礎 URL: ${apiBaseUrl}`);
+
           return {
             messages: [
               {
@@ -1168,8 +1202,8 @@
               "有創造力的設計師",
               "分析能力強的數據分析師",
             ],
-            connectionStatus: "已連線",
-            apiBaseUrl: "http://localhost:8000",
+            connectionStatus: "連接中...",
+            apiBaseUrl: apiBaseUrl,
             showInterviewDialog: false,
             interviewMessages: [],
             interviewInput: "",
@@ -1539,6 +1573,48 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+          },
+          restartConversation() {
+            // 確認是否要重新開始
+            if (this.messages.length > 1 || this.candidates.length > 0) {
+              if (
+                !confirm(
+                  "確定要重新開始對話嗎？這將清除所有對話記錄和搜索結果。"
+                )
+              ) {
+                return;
+              }
+            }
+
+            // 重置所有狀態
+            this.messages = [
+              {
+                id: 1,
+                type: "system",
+                content:
+                  '👋 歡迎使用 AI 人才搜索系統！\n\n您可以用自然語言描述您需要的人才，例如：\n• "列出所有候選人"\n• "找一個溝通能力強的銷售人員"\n• "搜索具有領導力的管理人才"\n\n我會為您找到最匹配的候選人！',
+              },
+            ];
+            this.userInput = "";
+            this.isTyping = false;
+            this.candidates = [];
+            this.selectedCandidates = [];
+            this.suggestions = [
+              "善於溝通的銷售人員",
+              "有創造力的設計師",
+              "分析能力強的數據分析師",
+            ];
+
+            // 關閉面試對話框（如果開啟）
+            if (this.showInterviewDialog) {
+              this.closeInterviewDialog();
+            }
+
+            // 滾動到頂部
+            this.$nextTick(() => {
+              const container = this.$refs.messagesContainer;
+              container.scrollTop = 0;
+            });
           },
         },
         mounted() {

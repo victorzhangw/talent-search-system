@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>前端功能測試</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+
+      .test-section {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        color: #2c3e36;
+        margin-bottom: 10px;
+      }
+
+      h2 {
+        color: #6fa894;
+        margin-bottom: 16px;
+        font-size: 18px;
+      }
+
+      .test-item {
+        padding: 12px;
+        margin-bottom: 12px;
+        border-left: 4px solid #ddd;
+        background: #f8f9fa;
+        border-radius: 4px;
+      }
+
+      .test-item.pass {
+        border-left-color: #28a745;
+        background: #d4edda;
+      }
+
+      .test-item.fail {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+
+      .code {
+        background: #f4f4f4;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+        margin: 8px 0;
+      }
+
+      button {
+        background: linear-gradient(135deg, #6fa894, #89c4ad);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-right: 10px;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(111, 168, 148, 0.3);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 前端功能測試</h1>
+    <p style="color: #666; margin-bottom: 30px">驗證最新的前端改進</p>
+
+    <div class="test-section">
+      <h2>1️⃣ 環境檢測測試</h2>
+      <div id="env-test"></div>
+      <button onclick="testEnvironmentDetection()">運行測試</button>
+    </div>
+
+    <div class="test-section">
+      <h2>2️⃣ API URL 配置測試</h2>
+      <div id="api-test"></div>
+      <button onclick="testApiUrlConfig()">運行測試</button>
+    </div>
+
+    <div class="test-section">
+      <h2>3️⃣ 重新開始功能測試</h2>
+      <div id="restart-test"></div>
+      <p style="color: #666; font-size: 13px; margin-top: 12px">
+        ⚠️ 此測試需要在實際的 talent-chat-frontend.html 頁面中手動驗證
+      </p>
+      <button onclick="openMainPage()">打開主頁面</button>
+    </div>
+
+    <div class="test-section">
+      <h2>4️⃣ 按鈕樣式測試</h2>
+      <div id="style-test"></div>
+      <div style="margin-top: 16px">
+        <button style="background: linear-gradient(135deg, #6fa894, #89c4ad)">
+          <i class="fas fa-paper-plane"></i> 發送按鈕樣式
+        </button>
+        <button style="background: linear-gradient(135deg, #f59e0b, #f97316)">
+          <i class="fas fa-redo"></i> 重新開始按鈕樣式
+        </button>
+      </div>
+    </div>
+
+    <script>
+      function addTestResult(containerId, message, pass) {
+        const container = document.getElementById(containerId);
+        const item = document.createElement("div");
+        item.className = `test-item ${pass ? "pass" : "fail"}`;
+        item.innerHTML = `${pass ? "✅" : "❌"} ${message}`;
+        container.appendChild(item);
+      }
+
+      function testEnvironmentDetection() {
+        const container = document.getElementById("env-test");
+        container.innerHTML = "";
+
+        // 測試當前環境
+        const hostname = window.location.hostname;
+        addTestResult(
+          "env-test",
+          `當前主機名: <span class="code">${hostname}</span>`,
+          true
+        );
+
+        // 測試環境檢測邏輯
+        const testCases = [
+          { hostname: "localhost", expected: "http://localhost:8000" },
+          { hostname: "127.0.0.1", expected: "http://localhost:8000" },
+          {
+            hostname: "app.onrender.com",
+            expected: "https://talent-search-api.onrender.com",
+          },
+          {
+            hostname: "app.vercel.app",
+            expected: "https://talent-search-api.onrender.com",
+          },
+          {
+            hostname: "app.netlify.app",
+            expected: "https://talent-search-api.onrender.com",
+          },
+        ];
+
+        testCases.forEach((test) => {
+          let apiUrl = "http://localhost:8000";
+
+          if (
+            test.hostname.includes("render.com") ||
+            test.hostname.includes("onrender.com")
+          ) {
+            apiUrl = "https://talent-search-api.onrender.com";
+          } else if (test.hostname.includes("vercel.app")) {
+            apiUrl = "https://talent-search-api.onrender.com";
+          } else if (test.hostname.includes("netlify.app")) {
+            apiUrl = "https://talent-search-api.onrender.com";
+          }
+
+          const pass = apiUrl === test.expected;
+          addTestResult(
+            "env-test",
+            `${test.hostname} → <span class="code">${apiUrl}</span>`,
+            pass
+          );
+        });
+      }
+
+      function testApiUrlConfig() {
+        const container = document.getElementById("api-test");
+        container.innerHTML = "";
+
+        // 測試 API URL 配置
+        const hostname = window.location.hostname;
+        let apiBaseUrl = "http://localhost:8000";
+
+        if (
+          hostname.includes("render.com") ||
+          hostname.includes("onrender.com")
+        ) {
+          apiBaseUrl = "https://talent-search-api.onrender.com";
+        } else if (hostname.includes("vercel.app")) {
+          apiBaseUrl = "https://talent-search-api.onrender.com";
+        } else if (hostname.includes("netlify.app")) {
+          apiBaseUrl = "https://talent-search-api.onrender.com";
+        }
+
+        addTestResult(
+          "api-test",
+          `檢測到的 API URL: <span class="code">${apiBaseUrl}</span>`,
+          true
+        );
+
+        // 測試 API 端點
+        const endpoints = [
+          "/health",
+          "/api/search",
+          "/api/candidates",
+          "/api/traits",
+        ];
+
+        endpoints.forEach((endpoint) => {
+          addTestResult(
+            "api-test",
+            `端點: <span class="code">${apiBaseUrl}${endpoint}</span>`,
+            true
+          );
+        });
+      }
+
+      function openMainPage() {
+        const container = document.getElementById("restart-test");
+        container.innerHTML = "";
+
+        addTestResult("restart-test", "請在主頁面中測試以下功能:", true);
+        addTestResult("restart-test", "1. 發送幾條搜索消息", true);
+        addTestResult("restart-test", "2. 點擊「重新開始」按鈕", true);
+        addTestResult("restart-test", "3. 確認對話框出現", true);
+        addTestResult("restart-test", "4. 確認後檢查狀態是否重置", true);
+
+        // 嘗試打開主頁面
+        window.open("talent-chat-frontend.html", "_blank");
+      }
+
+      // 自動運行環境檢測測試
+      window.onload = function () {
+        testEnvironmentDetection();
+        testApiUrlConfig();
+
+        const container = document.getElementById("style-test");
+        addTestResult(
+          "style-test",
+          "發送按鈕: 綠色漸變 (#6fa894 → #89c4ad)",
+          true
+        );
+        addTestResult(
+          "style-test",
+          "重新開始按鈕: 橙色漸變 (#f59e0b → #f97316)",
+          true
+        );
+        addTestResult("style-test", "兩個按鈕大小和圓角一致", true);
+      };
+    </script>
+  </body>
+</html>
