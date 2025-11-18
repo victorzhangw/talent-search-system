@@ -353,6 +353,43 @@ async def get_all_candidates():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/traits")
+async def get_traits():
+    """獲取特質定義"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查詢所有特質定義
+        cursor.execute("""
+            SELECT DISTINCT 
+                trait_name,
+                trait_chinese_name,
+                trait_description
+            FROM stella_trait_mapping
+            WHERE trait_name IS NOT NULL
+            ORDER BY trait_chinese_name
+        """)
+        
+        rows = cursor.fetchall()
+        cursor.close()
+        
+        traits = []
+        for row in rows:
+            traits.append({
+                "name": row[0],
+                "chinese_name": row[1],
+                "description": row[2] or ""
+            })
+        
+        return {
+            "total": len(traits),
+            "traits": traits
+        }
+    except Exception as e:
+        print(f"❌ 獲取特質定義錯誤: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == '__main__':
     print("\n" + "=" * 60)
     print("人才聊天搜索 API (修正版)")
