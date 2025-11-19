@@ -2,7 +2,6 @@
 """
 人才聊天搜索 API v2.0
 修正版：使用正確的 test_project_result 表
-支援環境變數配置（本地開發 + 雲端部署）
 """
 
 from fastapi import FastAPI, HTTPException
@@ -14,8 +13,6 @@ from sshtunnel import SSHTunnelForwarder
 import json
 from datetime import datetime
 import os
-import sys
-import tempfile
 import uvicorn
 import httpx
 import asyncio
@@ -23,54 +20,29 @@ from interview_api import router as interview_router
 from talent_analysis_service import TalentAnalysisService
 from conversation_manager import conversation_manager
 
-# ============================================
-# 環境配置
-# ============================================
-
-# 判斷運行環境
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
-IS_PRODUCTION = ENVIRONMENT == 'production'
-
-print(f"\n{'='*60}")
-print(f"🚀 運行環境: {ENVIRONMENT.upper()}")
-print(f"{'='*60}\n")
-
-# 資料庫連接配置 - 從環境變數讀取
+# 資料庫連接配置
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PRIVATE_KEY_PATH = os.path.join(SCRIPT_DIR, 'private-key-openssh.pem')
 
 DB_CONFIG = {
-    'ssh_host': os.getenv('DB_SSH_HOST', '54.199.255.239'),
-    'ssh_port': int(os.getenv('DB_SSH_PORT', '22')),
-    'ssh_username': os.getenv('DB_SSH_USERNAME', 'victor_cheng'),
-    'ssh_private_key': os.getenv('DB_SSH_PRIVATE_KEY'),  # 生產環境：key 內容
-    'ssh_private_key_file': os.getenv('DB_SSH_PRIVATE_KEY_FILE', PRIVATE_KEY_PATH),  # 本地：檔案路徑
-    'db_host': os.getenv('DB_HOST', 'localhost'),
-    'db_port': int(os.getenv('DB_PORT', '5432')),
-    'db_name': os.getenv('DB_NAME', 'projectdb'),
-    'db_user': os.getenv('DB_USER', 'projectuser'),
-    'db_password': os.getenv('DB_PASSWORD', 'projectpass')
+    'ssh_host': '54.199.255.239',
+    'ssh_port': 22,
+    'ssh_username': 'victor_cheng',
+    'ssh_private_key': PRIVATE_KEY_PATH,
+    'db_host': 'localhost',
+    'db_port': 5432,
+    'db_name': 'projectdb',
+    'db_user': 'projectuser',
+    'db_password': 'projectpass'
 }
 
-# LLM API 配置 - 根據環境自動選擇
-if IS_PRODUCTION:
-    # 生產環境：使用 AkashML
-    LLM_CONFIG = {
-        'api_key': os.getenv('LLM_API_KEY', 'akml-RTl88SQKMDZFX2c43QslImWLO7DNUdee'),
-        'api_host': os.getenv('LLM_API_HOST', 'https://api.akashml.com'),
-        'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3.1'),
-        'endpoint': os.getenv('LLM_API_HOST', 'https://api.akashml.com') + '/v1/chat/completions'
-    }
-    print("🌐 使用 AkashML API")
-else:
-    # 開發環境：使用 SiliconFlow
-    LLM_CONFIG = {
-        'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
-        'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
-        'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
-        'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
-    }
-    print("🌐 使用 SiliconFlow API")
+# LLM API 配置
+LLM_CONFIG = {
+    'api_key': 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff',
+    'api_host': 'https://api.siliconflow.cn',
+    'model': 'deepseek-ai/DeepSeek-V3',
+    'endpoint': 'https://api.siliconflow.cn/v1/chat/completions'
+}
 
 # FastAPI 應用
 app = FastAPI(title="人才聊天搜索 API v2.0", version="2.0.0")
@@ -120,43 +92,19 @@ class SearchResponse(BaseModel):
 
 # 資料庫連接管理
 def get_db_connection():
-    """取得資料庫連接 - 支援本地和雲端環境"""
+    """取得資料庫連接"""
     global tunnel, db_conn
     
     if db_conn is None or db_conn.closed:
         if tunnel is None or not tunnel.is_active:
-            print("🔌 正在建立 SSH 隧道...")
-            
-            # 處理 SSH private key
-            ssh_key = DB_CONFIG['ssh_private_key']
-            
-            if ssh_key:
-                # 生產環境：從環境變數讀取 key 內容
-                print("✅ 使用環境變數中的 SSH key")
-                temp_key_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pem')
-                temp_key_file.write(ssh_key)
-                temp_key_file.close()
-                ssh_pkey = temp_key_file.name
-            else:
-                # 開發環境：使用本地檔案
-                ssh_key_file = DB_CONFIG['ssh_private_key_file']
-                if os.path.isfile(ssh_key_file):
-                    print(f"✅ 使用本地 SSH key 檔案: {ssh_key_file}")
-                    ssh_pkey = ssh_key_file
-                else:
-                    raise ValueError(f"❌ 找不到 SSH key 檔案: {ssh_key_file}")
-            
             tunnel = SSHTunnelForwarder(
                 (DB_CONFIG['ssh_host'], DB_CONFIG['ssh_port']),
                 ssh_username=DB_CONFIG['ssh_username'],
-                ssh_pkey=ssh_pkey,
-                remote_bind_address=(DB_CONFIG['db_host'], DB_CONFIG['db_port']),
-                set_keepalive=10.0
+                ssh_pkey=DB_CONFIG['ssh_private_key'],
+                remote_bind_address=(DB_CONFIG['db_host'], DB_CONFIG['db_port'])
             )
             tunnel.start()
-            print(f"✅ SSH 隧道已建立，本地端口: {tunnel.local_bind_port}")
         
-        print("🔌 正在連接資料庫...")
         db_conn = psycopg2.connect(
             host='localhost',
             port=tunnel.local_bind_port,
@@ -164,7 +112,6 @@ def get_db_connection():
             user=DB_CONFIG['db_user'],
             password=DB_CONFIG['db_password']
         )
-        print("✅ 資料庫連接成功")
     
     return db_conn
 
