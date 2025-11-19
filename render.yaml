@@ -37,7 +37,9 @@ services:
       - key: LLM_API_KEY
         sync: false
       - key: LLM_API_HOST
-        value: https://api.siliconflow.cn
+        value: https://api.akashml.com
       - key: LLM_MODEL
-        value: deepseek-ai/DeepSeek-V3
+        value: deepseek-ai/DeepSeek-V3.1
+      - key: ENVIRONMENT
+        value: production
     healthCheckPath: /health
