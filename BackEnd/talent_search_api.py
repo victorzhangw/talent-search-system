@@ -306,15 +306,20 @@ class LLMService:
                     content = result['choices'][0]['message']['content']
                     
                     # 詳細日誌：顯示 LLM 原始返回
-                    print(f"\n📥 LLM 原始返回內容:")
-                    print(f"   API: {self.api_endpoint}")
-                    print(f"   Model: {self.model}")
-                    print(f"   內容長度: {len(content)} 字符")
-                    print(f"   前 200 字符: {content[:200]}")
-                    if len(content) > 200:
-                        print(f"   後 100 字符: ...{content[-100:]}")
-                    print(f"   完整內容:\n{content}")
-                    print(f"{'='*60}")
+                    print(f"\n{'='*80}")
+                    print(f"📥 LLM 原始返回內容")
+                    print(f"{'='*80}")
+                    print(f"API: {self.api_endpoint}")
+                    print(f"Model: {self.model}")
+                    print(f"內容長度: {len(content)} 字符")
+                    print(f"\n--- 開始完整內容 ---")
+                    print(content)
+                    print(f"--- 結束完整內容 ---\n")
+                    
+                    # 顯示每個字符的 repr（用於檢查隱藏字符）
+                    print(f"前 100 字符的 repr:")
+                    print(repr(content[:100]))
+                    print(f"\n{'='*80}")
                     
                     # 嘗試解析 JSON
                     try:
@@ -332,10 +337,22 @@ class LLMService:
                             'analysis': analysis
                         }
                     except json.JSONDecodeError as json_err:
-                        print(f"\n❌ JSON 解析失敗:")
-                        print(f"   錯誤: {str(json_err)}")
-                        print(f"   位置: line {json_err.lineno}, column {json_err.colno}")
-                        print(f"   問題字符附近: {content[max(0, json_err.pos-50):json_err.pos+50]}")
+                        print(f"\n{'='*80}")
+                        print(f"❌ JSON 解析失敗")
+                        print(f"{'='*80}")
+                        print(f"錯誤訊息: {str(json_err)}")
+                        print(f"錯誤位置: line {json_err.lineno}, column {json_err.colno}, pos {json_err.pos}")
+                        print(f"\n問題字符附近 (pos-100 到 pos+100):")
+                        start = max(0, json_err.pos - 100)
+                        end = min(len(content), json_err.pos + 100)
+                        problem_area = content[start:end]
+                        print(f"--- 開始 ---")
+                        print(problem_area)
+                        print(f"--- 結束 ---")
+                        print(f"\n問題字符的 repr:")
+                        print(repr(problem_area))
+                        print(f"\n錯誤位置的字符: {repr(content[json_err.pos:json_err.pos+10])}")
+                        print(f"{'='*80}")
                         return {'success': False, 'error': f'JSON 解析失敗: {str(json_err)}'}
                 else:
                     print(f"❌ LLM API 錯誤: {response.status_code}")
