@@ -24,6 +24,7 @@
             <div class="typing-dot"></div>
             <div class="typing-dot"></div>
           </div>
+          <div class="loading-text">{{ loadingMessage }}</div>
         </div>
       </div>
     </div>
@@ -68,6 +69,7 @@ const messagesContainer = ref(null);
 
 const messages = computed(() => talentStore.messages);
 const isTyping = computed(() => talentStore.isTyping);
+const loadingMessage = computed(() => talentStore.loadingMessage);
 const suggestions = computed(() => talentStore.suggestions);
 
 async function handleSendMessage() {

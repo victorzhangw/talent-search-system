@@ -23,6 +23,7 @@ export const useTalentStore = defineStore("talent", () => {
   ]);
   const connectionStatus = ref("已連線");
   const isTyping = ref(false);
+  const loadingMessage = ref("正在搜索...");
   const traitDefinitions = ref({});
 
   // 生成會話 ID
@@ -46,6 +47,14 @@ export const useTalentStore = defineStore("talent", () => {
 
     messages.value.push(userMessage);
     isTyping.value = true;
+    loadingMessage.value = "正在分析您的需求...";
+
+    // 如果超過 5 秒，更新提示訊息
+    const slowLoadingTimer = setTimeout(() => {
+      if (isTyping.value) {
+        loadingMessage.value = "服務正在啟動中，請稍候（約 30-60 秒）...";
+      }
+    }, 5000);
 
     try {
       // 傳遞會話 ID
@@ -53,6 +62,8 @@ export const useTalentStore = defineStore("talent", () => {
         userInput,
         sessionId.value
       );
+
+      clearTimeout(slowLoadingTimer);
 
       const systemMessage = {
         id: Date.now() + 1,
@@ -69,13 +80,26 @@ export const useTalentStore = defineStore("talent", () => {
     } catch (error) {
       console.error("搜索錯誤:", error);
 
+      // 使用更友好的錯誤訊息
+      let errorContent = "抱歉，搜索時發生錯誤。";
+
+      if (error.code === "ECONNABORTED") {
+        errorContent = `⏱️ 請求超時\n\n服務可能正在啟動中（冷啟動需要 30-60 秒）。\n\n請稍等片刻後再試，或重新整理頁面。`;
+        connectionStatus.value = "服務啟動中";
+      } else if (error.userMessage) {
+        errorContent = `❌ ${error.userMessage}`;
+        connectionStatus.value = "連接失敗";
+      } else {
+        errorContent = "抱歉，搜索時發生錯誤。請確認 API 服務是否正在運行。";
+        connectionStatus.value = "連接失敗";
+      }
+
       const errorMessage = {
         id: Date.now() + 1,
         type: "system",
-        content: "抱歉，搜索時發生錯誤。請確認 API 服務是否正在運行。",
+        content: errorContent,
       };
       messages.value.push(errorMessage);
-      connectionStatus.value = "連接失敗";
     } finally {
       isTyping.value = false;
     }
@@ -163,6 +187,7 @@ export const useTalentStore = defineStore("talent", () => {
     suggestions,
     connectionStatus,
     isTyping,
+    loadingMessage,
     traitDefinitions,
     // Getters
     selectedCount,

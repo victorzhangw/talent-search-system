@@ -2,13 +2,13 @@
 const config = {
   development: {
     apiBaseUrl: "http://localhost:8000",
-    timeout: 30000,
+    timeout: 30000, // 本地開發 30 秒
   },
   production: {
     apiBaseUrl:
       import.meta.env.VITE_API_BASE_URL ||
       "https://talent-search-system.onrender.com",
-    timeout: 30000,
+    timeout: 90000, // 生產環境 90 秒（考慮冷啟動時間）
   },
 };
 
