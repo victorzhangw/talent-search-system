@@ -77,7 +77,7 @@ echo.
 echo ========================================
 echo   Starting Backend (Port 8000)...
 echo ========================================
-start "Backend - FastAPI" cmd /k "cd /d "%~dp0BackEnd" && venv\Scripts\python.exe talent_search_api_v2.py"
+start "Backend - FastAPI" cmd /k "cd /d "%~dp0BackEnd" && venv\Scripts\python.exe talent_search_api.py"
 
 :: Wait for backend to start
 echo Waiting for backend to initialize...

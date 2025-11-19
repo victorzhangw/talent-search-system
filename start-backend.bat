@@ -12,6 +12,6 @@ echo Port: 8000
 echo API Docs: http://localhost:8000/docs
 echo.
 
-venv\Scripts\python.exe talent_search_api_v2.py
+venv\Scripts\python.exe talent_search_api.py
 
 pause

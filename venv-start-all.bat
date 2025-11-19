@@ -12,7 +12,7 @@ cd /d "%~dp0"
 
 :: Start Backend
 echo [1/2] Starting Backend (Port 8000)...
-start "Backend API" cmd /k "cd /d "%~dp0BackEnd" && venv\Scripts\python.exe talent_search_api_v2.py"
+start "Backend API" cmd /k "cd /d "%~dp0BackEnd" && venv\Scripts\python.exe talent_search_api.py"
 timeout /t 3 /nobreak >nul
 echo ✓ Backend started
 
