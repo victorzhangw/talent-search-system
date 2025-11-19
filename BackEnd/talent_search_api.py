@@ -247,7 +247,7 @@ class LLMService:
 **可用的特質列表**：
 {traits_text}
 
-請以 JSON 格式輸出：
+**JSON 輸出格式（必須嚴格遵守）**：
 {{
   "matched_traits": [
     {{
@@ -261,11 +261,17 @@ class LLMService:
   "understanding": "對用戶需求的理解"
 }}
 
-**重要規則**：
+**格式要求（必須遵守）**：
+1. 只輸出純 JSON，不要有任何其他文字
+2. 不要使用 markdown 代碼塊（```json）
+3. 所有字串必須使用雙引號 "，不要使用單引號 '
+4. min_score 必須是數字，不要加引號
+5. 確保 JSON 格式完全正確，可以被 json.loads() 解析
+
+**業務規則**：
 1. 只選擇 1-3 個最相關的特質
 2. min_score 通常設定為 70-80 分
-3. 如果用戶需求模糊，選擇最可能的特質
-4. 只輸出 JSON，不要有其他文字"""
+3. 如果用戶需求模糊，選擇最可能的特質"""
     
     async def analyze_query(self, query: str) -> Dict[str, Any]:
         """使用 LLM 分析查詢"""
