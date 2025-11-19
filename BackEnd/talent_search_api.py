@@ -277,28 +277,37 @@ class LLMService:
         """使用 LLM 分析查詢"""
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
+                # 準備請求參數
+                request_params = {
+                    'model': self.model,
+                    'messages': [
+                        {
+                            'role': 'system',
+                            'content': self.get_trait_analysis_prompt()
+                        },
+                        {
+                            'role': 'user',
+                            'content': f'請分析以下人才需求：\n\n{query}'
+                        }
+                    ],
+                    'temperature': 0.3,
+                    'max_tokens': 2000  # 增加到 2000，避免 JSON 被截斷
+                }
+                
+                # 只有 SiliconFlow 支持 response_format，AkashML 不支持
+                if 'siliconflow' in self.api_endpoint.lower():
+                    request_params['response_format'] = {'type': 'json_object'}
+                    print("   使用 response_format: json_object")
+                else:
+                    print("   不使用 response_format（AkashML 不支持）")
+                
                 response = await client.post(
                     self.api_endpoint,
                     headers={
                         'Content-Type': 'application/json',
                         'Authorization': f'Bearer {self.api_key}'
                     },
-                    json={
-                        'model': self.model,
-                        'messages': [
-                            {
-                                'role': 'system',
-                                'content': self.get_trait_analysis_prompt()
-                            },
-                            {
-                                'role': 'user',
-                                'content': f'請分析以下人才需求：\n\n{query}'
-                            }
-                        ],
-                        'temperature': 0.3,
-                        'max_tokens': 1000,
-                        'response_format': {'type': 'json_object'}
-                    }
+                    json=request_params
                 )
                 
                 if response.status_code == 200:
