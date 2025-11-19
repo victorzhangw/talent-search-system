@@ -296,6 +296,54 @@ class LLMService:
             }
         }
     
+    def _clean_json_response(self, content: str) -> str:
+        """清理 LLM 返回的 JSON 內容，確保格式正確"""
+        import re
+        
+        # 1. 移除 markdown 代碼塊標記
+        if '```' in content:
+            # 提取代碼塊中的內容
+            match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', content, re.DOTALL)
+            if match:
+                content = match.group(1)
+        
+        # 2. 移除開頭和結尾的空白字符
+        content = content.strip()
+        
+        # 3. 移除可能的前導文字（如 "這是 JSON："）
+        # 找到第一個 { 或 [
+        json_start = -1
+        for i, char in enumerate(content):
+            if char in ['{', '[']:
+                json_start = i
+                break
+        
+        if json_start > 0:
+            content = content[json_start:]
+        
+        # 4. 找到最後一個 } 或 ]，移除後面的文字
+        json_end = -1
+        for i in range(len(content) - 1, -1, -1):
+            if content[i] in ['}', ']']:
+                json_end = i + 1
+                break
+        
+        if json_end > 0:
+            content = content[:json_end]
+        
+        # 5. 替換單引號為雙引號（但要小心字串內容中的單引號）
+        # 這是一個簡化版本，只處理屬性名稱的單引號
+        content = re.sub(r"'([^']*?)'(\s*:)", r'"\1"\2', content)
+        
+        # 6. 移除 JSON 中的註釋（// 和 /* */）
+        content = re.sub(r'//.*?$', '', content, flags=re.MULTILINE)
+        content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
+        
+        # 7. 移除多餘的逗號（在 } 或 ] 前面的逗號）
+        content = re.sub(r',(\s*[}\]])', r'\1', content)
+        
+        return content.strip()
+    
     def _load_traits_from_db(self) -> List[Dict]:
         """從資料庫載入所有可用的特質"""
         cursor = self.db_conn.cursor()
@@ -318,7 +366,7 @@ class LLMService:
         return traits
     
     def get_system_prompt(self, available_traits: List[Dict]) -> str:
-        """系統 Prompt - 使用資料庫中的實際特質"""
+        """系統 Prompt - 使用資料庫中的實際特質，改進版確保 JSON 格式正確"""
         
         # 將資料庫特質格式化為 Prompt
         traits_list = []
@@ -327,44 +375,54 @@ class LLMService:
         
         traits_text = "\n".join(traits_list[:30])  # 限制數量避免 Prompt 過長
         
-        return f"""你是一個專業的人才搜索助手，專門幫助 HR 和招聘人員理解和分析人才需求。
+        return f"""你是一個專業的人才搜索助手，專門幫助 HR 和招聘人員理解和分析人才需求。你必須嚴格按照 JSON 格式回覆。
 
-你的任務是：
+**你的任務**：
 1. 理解用戶用自然語言描述的人才需求
-2. 從以下資料庫中的特質列表中，選擇最匹配的特質
+2. 從資料庫的特質列表中，選擇最匹配的特質
 3. 生成 SQL WHERE 條件來查詢符合條件的候選人
 
 **資料庫中可用的特質列表**：
 {traits_text}
 
-請以 JSON 格式輸出分析結果：
+**JSON 輸出格式規範**：
+1. 必須是有效的 JSON 格式
+2. 所有字串必須使用雙引號 "
+3. 不要使用單引號 '
+4. 不要包含註釋或說明文字
+5. 不要包含 markdown 代碼塊標記
+6. 數字類型不要加引號
+
+**輸出範例**：
 {{
   "matched_traits": [
     {{
-      "chinese_name": "特質中文名",
-      "system_name": "特質系統名",
+      "chinese_name": "協調溝通",
+      "system_name": "communication",
       "min_score": 70
     }}
   ],
   "sql_conditions": [
-    "jsonb_extract_path_text(trait_results, '特質名稱', 'score')::int >= 70"
+    "jsonb_extract_path_text(trait_results, '協調溝通', 'score')::int >= 70"
   ],
-  "summary": "需求摘要",
-  "clarification": "如果需要澄清的問題（可選）"
+  "summary": "搜索協調溝通能力強的銷售人員",
+  "clarification": null
 }}
 
-**重要規則**：
-1. 只能使用上述列表中的特質
-2. sql_conditions 必須是有效的 PostgreSQL JSONB 查詢語法
-3. min_score 範圍是 0-100
-4. 如果用戶需求模糊，在 clarification 中提出問題
-5. **如果用戶只是要找特定候選人（如「找到 Howard」），不要生成 sql_conditions，返回空陣列即可**
-6. sql_conditions 只用於查詢特質分數，不要包含候選人姓名、email 等個人資訊
+**必須遵守的規則**：
+1. 只輸出純 JSON，不要有任何其他文字
+2. 只能使用上述特質列表中的特質
+3. sql_conditions 必須是有效的 PostgreSQL JSONB 查詢語法
+4. min_score 範圍是 0-100 的整數
+5. 如果用戶需求模糊，在 clarification 中提出問題（字串或 null）
+6. 如果用戶只是要找特定候選人（如「找到 Howard」），sql_conditions 返回空陣列 []
+7. sql_conditions 只用於查詢特質分數，不要包含候選人姓名、email 等個人資訊
+8. 確保所有 JSON 屬性名稱使用雙引號
 
-請確保輸出的是有效的 JSON 格式。"""
+現在請分析用戶需求並輸出 JSON。"""
     
     def _get_intent_detection_prompt(self) -> str:
-        """生成意圖識別的 Prompt"""
+        """生成意圖識別的 Prompt - 改進版，確保 JSON 格式正確"""
         
         # 只包含啟用的意圖
         intent_list = []
@@ -389,7 +447,7 @@ class LLMService:
         
         entities_text = '\n'.join(entity_list) if entity_list else '   (無特定實體)'
         
-        return f"""你是一個人才管理系統的意圖識別助手。
+        return f"""你是一個人才管理系統的意圖識別助手。你必須嚴格按照 JSON 格式回覆。
 
 請分析用戶查詢，識別其意圖並提取關鍵資訊。
 
@@ -399,27 +457,32 @@ class LLMService:
 **可提取的實體**:
 {entities_text}
 
-**重要規則**:
-1. 仔細分析用戶的真實意圖
-2. 提取所有相關的實體資訊
-3. 如果查詢模糊，選擇最可能的意圖
-4. 信心度應該反映判斷的確定性（0.0-1.0）
+**JSON 輸出格式規範**:
+1. 必須是有效的 JSON 格式
+2. 所有字串必須使用雙引號 "
+3. 不要使用單引號 '
+4. 不要包含註釋
+5. 不要包含 markdown 代碼塊標記
+6. 數字類型的 confidence 不要加引號
 
-請以 JSON 格式輸出：
+**輸出範例**:
 {{
-  "intent": "意圖代碼",
+  "intent": "search",
   "entities": {{
-    "candidate_name": "候選人姓名（如果有）",
-    "candidate_names": ["候選人1", "候選人2"],
-    "traits": ["特質名稱"],
-    "trait_name": "特質名稱",
-    "topic": "諮詢主題"
+    "traits": ["溝通", "領導力"]
   }},
   "confidence": 0.95,
-  "reasoning": "判斷理由"
+  "reasoning": "用戶明確要求搜索具有特定特質的人才"
 }}
 
-**注意**: 只輸出 JSON，不要有其他文字。"""
+**必須遵守的規則**:
+1. 只輸出純 JSON，不要有任何其他文字
+2. 不要在 JSON 前後添加說明文字
+3. 確保所有屬性名稱使用雙引號
+4. entities 中沒有的欄位可以省略或設為 null
+5. confidence 必須是 0.0 到 1.0 之間的數字
+
+現在請分析用戶查詢並輸出 JSON。"""
     
     async def _detect_query_intent_with_llm(self, query: str) -> tuple[str, dict, float]:
         """使用 LLM 檢測查詢意圖"""
@@ -453,15 +516,17 @@ class LLMService:
                     result = response.json()
                     content = result['choices'][0]['message']['content'].strip()
                     
-                    # 移除可能的 markdown 代碼塊標記
-                    if content.startswith('```'):
-                        content = content.split('```')[1]
-                        if content.startswith('json'):
-                            content = content[4:]
-                        content = content.strip()
+                    # 清理 JSON 內容
+                    content = self._clean_json_response(content)
                     
                     # 解析 JSON
-                    intent_result = json.loads(content)
+                    try:
+                        intent_result = json.loads(content)
+                    except json.JSONDecodeError as e:
+                        print(f"❌ JSON 解析失敗: {str(e)}")
+                        print(f"   原始內容: {content[:200]}")
+                        # 降級到預設意圖
+                        return 'search', {}, 0.0
                     
                     intent = intent_result.get('intent', 'search')
                     entities = intent_result.get('entities', {})
@@ -623,18 +688,53 @@ class LLMService:
                 
                 data = response.json()
                 content = data['choices'][0]['message']['content']
-                analysis = json.loads(content)
+                
+                # 清理 JSON 內容
+                content = self._clean_json_response(content)
+                
+                # 解析 JSON，帶錯誤處理
+                try:
+                    analysis = json.loads(content)
+                except json.JSONDecodeError as e:
+                    print(f"❌ 搜索分析 JSON 解析失敗: {str(e)}")
+                    print(f"   原始內容: {content[:300]}")
+                    # 返回降級結果
+                    return {
+                        'success': False,
+                        'error': f'JSON 解析失敗: {str(e)}',
+                        'fallback': True
+                    }
+                
+                # 驗證必要欄位
+                if 'matched_traits' not in analysis:
+                    analysis['matched_traits'] = []
+                if 'sql_conditions' not in analysis:
+                    analysis['sql_conditions'] = []
+                if 'summary' not in analysis:
+                    analysis['summary'] = f'搜索：{query}'
+                
                 analysis['intent'] = 'search'
                 analysis['entities'] = entities  # 添加意圖識別提取的實體
                 analysis['confidence'] = confidence  # 添加信心度
+                
+                print(f"\n✅ 搜索分析成功:")
+                print(f"   匹配特質: {len(analysis['matched_traits'])} 個")
+                print(f"   SQL 條件: {len(analysis['sql_conditions'])} 個")
                 
                 return {
                     'success': True,
                     'analysis': analysis
                 }
         
+        except json.JSONDecodeError as e:
+            print(f"❌ LLM 返回的 JSON 格式錯誤: {str(e)}")
+            return {
+                'success': False,
+                'error': f'JSON 格式錯誤: {str(e)}',
+                'fallback': True
+            }
         except Exception as e:
-            print(f"LLM 分析錯誤: {str(e)}")
+            print(f"❌ LLM 分析錯誤: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),
