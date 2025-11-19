@@ -1,3 +1,0 @@
-API Key：sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff 
-API Host:https://api.siliconflow.cn
-Model:Pro/deepseek-ai/DeepSeek-V3
