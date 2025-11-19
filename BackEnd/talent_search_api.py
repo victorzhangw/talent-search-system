@@ -141,53 +141,96 @@ class SearchResponse(BaseModel):
     suggestions: List[str]
 
 # 資料庫連接管理
-def get_db_connection():
-    """取得資料庫連接 - 支援本地和雲端環境"""
+def get_db_connection(max_retries=3):
+    """取得資料庫連接 - 支援本地和雲端環境，帶錯誤處理和重試機制"""
     global tunnel, db_conn
     
-    if db_conn is None or db_conn.closed:
-        if tunnel is None or not tunnel.is_active:
-            print("正在建立 SSH 隧道...")
+    for attempt in range(max_retries):
+        try:
+            if db_conn is None or db_conn.closed:
+                if tunnel is None or not tunnel.is_active:
+                    print(f"🔌 正在建立 SSH 隧道... (嘗試 {attempt + 1}/{max_retries})")
+                    print(f"   SSH 主機: {DB_CONFIG['ssh_host']}:{DB_CONFIG['ssh_port']}")
+                    print(f"   SSH 用戶: {DB_CONFIG['ssh_username']}")
+                    
+                    # 處理 SSH private key
+                    ssh_key = DB_CONFIG['ssh_private_key']
+                    
+                    if ssh_key:
+                        # 生產環境：從環境變數讀取 key 內容
+                        print("✅ 使用環境變數中的 SSH key")
+                        # 檢查 key 格式
+                        if not ssh_key.startswith('-----BEGIN'):
+                            print("⚠️ SSH key 格式可能不正確")
+                        temp_key_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pem')
+                        temp_key_file.write(ssh_key)
+                        temp_key_file.close()
+                        ssh_pkey = temp_key_file.name
+                        print(f"   臨時 key 檔案: {ssh_pkey}")
+                    else:
+                        # 開發環境：使用本地檔案
+                        ssh_key_file = DB_CONFIG['ssh_private_key_file']
+                        if os.path.isfile(ssh_key_file):
+                            print(f"✅ 使用本地 SSH key 檔案: {ssh_key_file}")
+                            ssh_pkey = ssh_key_file
+                        else:
+                            raise ValueError(f"❌ 找不到 SSH key 檔案: {ssh_key_file}")
+                    
+                    # 建立 SSH 隧道，增加超時設定
+                    print("   正在連接 SSH...")
+                    tunnel = SSHTunnelForwarder(
+                        (DB_CONFIG['ssh_host'], DB_CONFIG['ssh_port']),
+                        ssh_username=DB_CONFIG['ssh_username'],
+                        ssh_pkey=ssh_pkey,
+                        remote_bind_address=(DB_CONFIG['db_host'], DB_CONFIG['db_port']),
+                        set_keepalive=10.0,  # 保持連接活躍
+                        compression=True
+                    )
+                    tunnel.start()
+                    print(f"✅ SSH 隧道已建立，本地端口: {tunnel.local_bind_port}")
+                
+                print(f"🔌 正在連接資料庫... (嘗試 {attempt + 1}/{max_retries})")
+                print(f"   資料庫: {DB_CONFIG['db_name']}")
+                print(f"   用戶: {DB_CONFIG['db_user']}")
+                db_conn = psycopg2.connect(
+                    host='localhost',
+                    port=tunnel.local_bind_port,
+                    database=DB_CONFIG['db_name'],
+                    user=DB_CONFIG['db_user'],
+                    password=DB_CONFIG['db_password'],
+                    connect_timeout=30  # 30 秒超時
+                )
+                print("✅ 資料庫連接成功")
             
-            # 處理 SSH private key
-            ssh_key = DB_CONFIG['ssh_private_key']
-            
-            if ssh_key:
-                # 生產環境：從環境變數讀取 key 內容
-                print("✅ 使用環境變數中的 SSH key")
-                temp_key_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pem')
-                temp_key_file.write(ssh_key)
-                temp_key_file.close()
-                ssh_pkey = temp_key_file.name
-            else:
-                # 開發環境：使用本地檔案
-                ssh_key_file = DB_CONFIG['ssh_private_key_file']
-                if os.path.isfile(ssh_key_file):
-                    print(f"✅ 使用本地 SSH key 檔案: {ssh_key_file}")
-                    ssh_pkey = ssh_key_file
-                else:
-                    raise ValueError(f"找不到 SSH key 檔案: {ssh_key_file}")
-            
-            tunnel = SSHTunnelForwarder(
-                (DB_CONFIG['ssh_host'], DB_CONFIG['ssh_port']),
-                ssh_username=DB_CONFIG['ssh_username'],
-                ssh_pkey=ssh_pkey,
-                remote_bind_address=(DB_CONFIG['db_host'], DB_CONFIG['db_port'])
-            )
-            tunnel.start()
-            print(f"✅ SSH 隧道已建立，本地端口: {tunnel.local_bind_port}")
+            return db_conn
         
-        print("正在連接資料庫...")
-        db_conn = psycopg2.connect(
-            host='localhost',
-            port=tunnel.local_bind_port,
-            database=DB_CONFIG['db_name'],
-            user=DB_CONFIG['db_user'],
-            password=DB_CONFIG['db_password']
-        )
-        print("✅ 資料庫連接成功")
-    
-    return db_conn
+        except Exception as e:
+            print(f"❌ 連接失敗 (嘗試 {attempt + 1}/{max_retries}): {str(e)}")
+            print(f"   錯誤類型: {type(e).__name__}")
+            
+            # 清理失敗的連接
+            if tunnel and tunnel.is_active:
+                try:
+                    tunnel.stop()
+                    print("   已清理 SSH 隧道")
+                except Exception as cleanup_error:
+                    print(f"   清理隧道時出錯: {cleanup_error}")
+            tunnel = None
+            db_conn = None
+            
+            # 如果還有重試機會，等待後重試
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 2  # 遞增等待時間
+                print(f"   等待 {wait_time} 秒後重試...")
+                import time
+                time.sleep(wait_time)
+            else:
+                # 最後一次嘗試失敗，拋出異常
+                print("❌ 所有連接嘗試均失敗")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"資料庫連接失敗（已重試 {max_retries} 次）: {str(e)}"
+                )
 
 # LLM 服務類
 class LLMService:
@@ -1272,33 +1315,68 @@ class TalentSearchEngine:
 # API 端點
 @app.on_event("startup")
 async def startup_event():
-    """應用啟動時初始化資料庫連接"""
-    print("正在初始化資料庫連接...")
-    get_db_connection()
-    print("資料庫連接成功！")
+    """應用啟動事件 - 不在此建立資料庫連接，改為延遲連接"""
+    print("✅ 應用程式已啟動")
+    print("📌 資料庫連接將在首次請求時建立（延遲連接策略）")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """應用關閉時清理資源"""
     global tunnel, db_conn
-    if db_conn:
-        db_conn.close()
-    if tunnel:
-        tunnel.stop()
-    print("資源已清理")
+    try:
+        if db_conn and not db_conn.closed:
+            db_conn.close()
+            print("✅ 資料庫連接已關閉")
+        if tunnel and tunnel.is_active:
+            tunnel.stop()
+            print("✅ SSH 隧道已關閉")
+    except Exception as e:
+        print(f"⚠️ 清理資源時發生錯誤: {str(e)}")
+    print("✅ 資源清理完成")
 
 @app.get("/")
 async def root():
     """根路徑"""
     return {
         "message": "人才聊天搜索 API",
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "status": "running",
+        "environment": ENVIRONMENT,
         "endpoints": {
             "search": "/api/search",
             "candidates": "/api/candidates",
-            "websocket": "/ws"
+            "websocket": "/ws",
+            "health": "/health"
         }
     }
+
+@app.get("/health")
+async def health_check():
+    """健康檢查端點 - 用於 Render 監控"""
+    global db_conn, tunnel
+    
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "environment": ENVIRONMENT,
+        "checks": {
+            "api": "ok"
+        }
+    }
+    
+    # 檢查資料庫連接（不強制建立）
+    if db_conn and not db_conn.closed:
+        health_status["checks"]["database"] = "connected"
+    else:
+        health_status["checks"]["database"] = "not_connected"
+    
+    # 檢查 SSH 隧道
+    if tunnel and tunnel.is_active:
+        health_status["checks"]["ssh_tunnel"] = "active"
+    else:
+        health_status["checks"]["ssh_tunnel"] = "inactive"
+    
+    return health_status
 
 @app.post("/api/search", response_model=SearchResponse)
 async def search_talents(query: SearchQuery):
