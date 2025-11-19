@@ -291,7 +291,7 @@ class LLMService:
                         }
                     ],
                     'temperature': 0.3,
-                    'max_tokens': 2000  # 增加到 2000，避免 JSON 被截斷
+                    'max_tokens': 3000  # 增加到 3000，確保 JSON 完整
                 }
                 
                 # 只有 SiliconFlow 支持 response_format，AkashML 不支持
