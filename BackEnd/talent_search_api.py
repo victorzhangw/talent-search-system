@@ -304,24 +304,52 @@ class LLMService:
                 if response.status_code == 200:
                     result = response.json()
                     content = result['choices'][0]['message']['content']
-                    analysis = json.loads(content)
                     
-                    print(f"\n🤖 LLM 分析結果:")
-                    print(f"   理解: {analysis.get('understanding', '')}")
-                    print(f"   匹配特質: {len(analysis.get('matched_traits', []))} 個")
-                    for trait in analysis.get('matched_traits', []):
-                        print(f"     • {trait['chinese_name']} ({trait['system_name']}) >= {trait['min_score']}")
+                    # 詳細日誌：顯示 LLM 原始返回
+                    print(f"\n📥 LLM 原始返回內容:")
+                    print(f"   API: {self.api_endpoint}")
+                    print(f"   Model: {self.model}")
+                    print(f"   內容長度: {len(content)} 字符")
+                    print(f"   前 200 字符: {content[:200]}")
+                    if len(content) > 200:
+                        print(f"   後 100 字符: ...{content[-100:]}")
+                    print(f"   完整內容:\n{content}")
+                    print(f"{'='*60}")
                     
-                    return {
-                        'success': True,
-                        'analysis': analysis
-                    }
+                    # 嘗試解析 JSON
+                    try:
+                        analysis = json.loads(content)
+                        
+                        print(f"\n✅ JSON 解析成功")
+                        print(f"🤖 LLM 分析結果:")
+                        print(f"   理解: {analysis.get('understanding', '')}")
+                        print(f"   匹配特質: {len(analysis.get('matched_traits', []))} 個")
+                        for trait in analysis.get('matched_traits', []):
+                            print(f"     • {trait['chinese_name']} ({trait['system_name']}) >= {trait['min_score']}")
+                        
+                        return {
+                            'success': True,
+                            'analysis': analysis
+                        }
+                    except json.JSONDecodeError as json_err:
+                        print(f"\n❌ JSON 解析失敗:")
+                        print(f"   錯誤: {str(json_err)}")
+                        print(f"   位置: line {json_err.lineno}, column {json_err.colno}")
+                        print(f"   問題字符附近: {content[max(0, json_err.pos-50):json_err.pos+50]}")
+                        return {'success': False, 'error': f'JSON 解析失敗: {str(json_err)}'}
                 else:
                     print(f"❌ LLM API 錯誤: {response.status_code}")
+                    print(f"   Response: {response.text[:500]}")
                     return {'success': False, 'error': 'LLM API 錯誤'}
         
+        except json.JSONDecodeError as json_err:
+            print(f"❌ JSON 解析錯誤: {str(json_err)}")
+            return {'success': False, 'error': f'JSON 解析錯誤: {str(json_err)}'}
         except Exception as e:
             print(f"❌ LLM 分析錯誤: {str(e)}")
+            print(f"   錯誤類型: {type(e).__name__}")
+            import traceback
+            print(f"   堆棧追蹤:\n{traceback.format_exc()}")
             return {'success': False, 'error': str(e)}
     
     async def generate_match_reason(self, candidate: Dict, query: str, matched_traits: List[Dict]) -> str:
