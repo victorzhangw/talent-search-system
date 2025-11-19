@@ -14,7 +14,7 @@ services:
       echo "Installing dependencies..."
       pip install -r requirements.txt
       echo "Build complete!"
-    startCommand: cd BackEnd && python start_fixed_api.py
+    startCommand: cd BackEnd && python talent_search_api.py
     envVars:
       - key: DB_SSH_HOST
         sync: false

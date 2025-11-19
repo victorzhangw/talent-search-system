@@ -87,16 +87,26 @@ app = FastAPI(
 
 # CORS 設定 - 根據環境調整
 if IS_PRODUCTION:
+    # 生產環境：指定允許的來源
     allowed_origins = [
         os.getenv('FRONTEND_URL', 'https://talent-search-frontend-68e7.onrender.com'),
+        "https://talent-search-frontend.vercel.app",
+        "https://talent-search-frontend.netlify.app",
         "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ]
+    # 支持通配符匹配 (Render/Vercel/Netlify 的預覽部署)
+    allow_origin_regex = r"https://.*\.(onrender\.com|vercel\.app|netlify\.app)$"
 else:
+    # 開發環境：允許所有來源
     allowed_origins = ["*"]
+    allow_origin_regex = None
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=allow_origin_regex if IS_PRODUCTION else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1693,7 +1703,20 @@ async def get_all_traits():
         }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ 獲取特質定義錯誤: {str(e)}")
+        # 返回預設列表，不讓前端崩潰
+        default_traits = [
+            {"id": 1, "name": "communication", "chinese_name": "溝通能力", "system_name": "communication", "description": "與他人有效交流的能力"},
+            {"id": 2, "name": "leadership", "chinese_name": "領導力", "system_name": "leadership", "description": "引導和激勵團隊的能力"},
+            {"id": 3, "name": "creativity", "chinese_name": "創造力", "system_name": "creativity", "description": "產生新想法和解決方案的能力"},
+            {"id": 4, "name": "analytical", "chinese_name": "分析能力", "system_name": "analytical", "description": "邏輯思考和數據分析的能力"},
+            {"id": 5, "name": "teamwork", "chinese_name": "團隊合作", "system_name": "teamwork", "description": "與他人協作完成目標的能力"},
+        ]
+        return {
+            "total": len(default_traits),
+            "traits": default_traits,
+            "traits_by_category": {"所有特質": default_traits}
+        }
 
 @app.get("/api/candidates/{candidate_id}")
 async def get_candidate_detail(candidate_id: int):
