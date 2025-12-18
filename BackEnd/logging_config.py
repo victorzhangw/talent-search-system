@@ -93,6 +93,8 @@ def setup_logging():
     ]
     for logger_name in llm_loggers:
         logger = logging.getLogger(logger_name)
+        # 清除現有 handlers 避免重複
+        logger.handlers.clear()
         logger.addHandler(llm_handler)
         # 防止日誌向上傳播到根 logger（避免重複記錄）
         logger.propagate = False

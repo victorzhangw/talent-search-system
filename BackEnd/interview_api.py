@@ -8,6 +8,7 @@ import httpx
 import json
 import os
 import asyncio
+from datetime import datetime
 
 router = APIRouter()
 
@@ -26,12 +27,14 @@ if IS_PRODUCTION:
     }
     print("🌐 面試 API 使用 AkashML")
 else:
-    # 開發環境：使用 SiliconFlow
+    # 開發環境：從環境變數讀取 LLM 配置
+    # 注意：不在模組載入時檢查，而是在使用時檢查
+    llm_api_host = os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn')
     LLM_CONFIG = {
-        'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
-        'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
+        'api_key': os.getenv('LLM_API_KEY', ''),  # 空字串作為預設值
+        'api_host': llm_api_host,
         'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
-        'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
+        'endpoint': f"{llm_api_host}/v1/chat/completions"
     }
     print("🌐 面試 API 使用 SiliconFlow")
 
@@ -133,7 +136,15 @@ async def generate_interview_questions(request: InterviewRequest):
         
         for attempt in range(max_retries):
             try:
-                print(f"📡 嘗試調用 LLM API (第 {attempt + 1} 次)")
+                # 記錄 LLM API 調用開始（面試問題生成）
+                print("=" * 80)
+                print(f"🚀 開始調用 LLM API（面試問題生成 - 第 {attempt + 1}/{max_retries} 次）")
+                print(f"📍 API 端點: {LLM_CONFIG['endpoint']}")
+                print(f"🤖 模型: {LLM_CONFIG['model']}")
+                print(f"⏰ 請求時間: {datetime.now().isoformat()}")
+                
+                import time
+                start_time = time.time()
                 
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     request_data = {
@@ -143,7 +154,16 @@ async def generate_interview_questions(request: InterviewRequest):
                         'max_tokens': 2000
                     }
                     
-                    print(f"請求資料大小: {len(str(request_data))} 字元")
+                    print(f"🌡️ Temperature: 0.7")
+                    print(f"📊 Max Tokens: 2000")
+                    print(f"💬 消息數量: {len(messages)}")
+                    print(f"📝 請求資料大小: {len(str(request_data))} 字元")
+                    
+                    # 記錄消息內容摘要
+                    for i, msg in enumerate(messages):
+                        role = msg.get('role', 'unknown')
+                        content_len = len(msg.get('content', ''))
+                        print(f"   消息 {i+1}: {role} ({content_len} 字符)")
                     
                     response = await client.post(
                         LLM_CONFIG['endpoint'],
@@ -154,11 +174,27 @@ async def generate_interview_questions(request: InterviewRequest):
                         json=request_data
                     )
                     
-                    print(f"📥 收到回應: 狀態碼 {response.status_code}")
+                    elapsed_time = time.time() - start_time
+                    
+                    # 記錄響應狀態
+                    print(f"⏱️ API 響應時間: {elapsed_time:.2f} 秒")
+                    print(f"📡 HTTP 狀態碼: {response.status_code}")
                     
                     if response.status_code == 200:
                         result = response.json()
+                        
+                        # 記錄 Token 使用統計
+                        if 'usage' in result:
+                            usage = result['usage']
+                            print(f"📊 Token 使用統計:")
+                            print(f"   - Prompt Tokens: {usage.get('prompt_tokens', 'N/A')}")
+                            print(f"   - Completion Tokens: {usage.get('completion_tokens', 'N/A')}")
+                            print(f"   - Total Tokens: {usage.get('total_tokens', 'N/A')}")
+                        
                         questions = result['choices'][0]['message']['content']
+                        print(f"💬 生成的問題長度: {len(questions)} 字符")
+                        print(f"✅ 面試問題生成成功")
+                        print("=" * 80)
                         
                         return InterviewResponse(
                             questions=questions,
@@ -167,6 +203,7 @@ async def generate_interview_questions(request: InterviewRequest):
                     elif response.status_code == 503 and attempt < max_retries - 1:
                         # 503 錯誤且還有重試機會，等待後重試
                         print(f"⚠️ LLM API 503 錯誤，{retry_delay} 秒後重試 (嘗試 {attempt + 1}/{max_retries})")
+                        print("=" * 80)
                         await asyncio.sleep(retry_delay)
                         retry_delay *= 2  # 指數退避
                         continue
@@ -183,18 +220,24 @@ async def generate_interview_questions(request: InterviewRequest):
                                 error_detail += f" - {error_text[:200]}"
                             except:
                                 pass
+                        print("=" * 80)
                         raise HTTPException(status_code=500, detail=error_detail)
             except httpx.TimeoutException:
+                print(f"❌ LLM API 超時異常")
                 if attempt < max_retries - 1:
-                    print(f"⚠️ LLM API 超時，{retry_delay} 秒後重試 (嘗試 {attempt + 1}/{max_retries})")
+                    print(f"⚠️ {retry_delay} 秒後重試 (嘗試 {attempt + 1}/{max_retries})")
+                    print("=" * 80)
                     await asyncio.sleep(retry_delay)
                     retry_delay *= 2
                     continue
                 else:
+                    print("=" * 80)
                     raise HTTPException(status_code=504, detail="LLM API 請求超時")
             except httpx.RequestError as e:
+                print(f"❌ LLM API 連線錯誤: {e}")
                 if attempt < max_retries - 1:
-                    print(f"⚠️ LLM API 連線錯誤: {e}，{retry_delay} 秒後重試")
+                    print(f"⚠️ {retry_delay} 秒後重試")
+                    print("=" * 80)
                     await asyncio.sleep(retry_delay)
                     retry_delay *= 2
                     continue

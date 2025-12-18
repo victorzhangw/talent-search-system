@@ -72,7 +72,26 @@ export const useTalentStore = defineStore("talent", () => {
       };
 
       messages.value.push(systemMessage);
-      candidates.value = response.candidates;
+      
+      // 前端去重：確保每個候選人只出現一次（以 id 為準）
+      const uniqueCandidates = [];
+      const seenIds = new Set();
+      
+      for (const candidate of response.candidates) {
+        if (!seenIds.has(candidate.id)) {
+          seenIds.add(candidate.id);
+          uniqueCandidates.push(candidate);
+        }
+      }
+      
+      candidates.value = uniqueCandidates;
+      
+      // 如果有重複，在控制台警告
+      if (uniqueCandidates.length < response.candidates.length) {
+        console.warn(
+          `⚠️ 檢測到重複的候選人: 原始 ${response.candidates.length} 筆，去重後 ${uniqueCandidates.length} 筆`
+        );
+      }
 
       if (response.suggestions) {
         suggestions.value = response.suggestions;

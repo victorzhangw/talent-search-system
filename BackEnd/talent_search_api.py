@@ -59,11 +59,14 @@ if IS_PRODUCTION:
     }
     print("🌐 使用 AkashML API")
 else:
+    # 從環境變數讀取 LLM 配置
+    # 注意：不在模組載入時檢查，而是在使用時檢查
+    llm_api_host = os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn')
     LLM_CONFIG = {
-        'api_key': os.getenv('LLM_API_KEY', 'sk-xmwxrtsxgsjwuyeceydoyuopezzlqresdjyvlzrbbjeejiff'),
-        'api_host': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn'),
+        'api_key': os.getenv('LLM_API_KEY', ''),  # 空字串作為預設值
+        'api_host': llm_api_host,
         'model': os.getenv('LLM_MODEL', 'deepseek-ai/DeepSeek-V3'),
-        'endpoint': os.getenv('LLM_API_HOST', 'https://api.siliconflow.cn') + '/v1/chat/completions'
+        'endpoint': f"{llm_api_host}/v1/chat/completions"
     }
     print("🌐 使用 SiliconFlow API")
 
@@ -223,6 +226,8 @@ class LLMService:
     
     def __init__(self):
         self.api_key = LLM_CONFIG['api_key']
+        if not self.api_key:
+            raise ValueError("LLM_API_KEY 環境變數未設定，請檢查 .env.local 文件")
         self.api_endpoint = LLM_CONFIG['endpoint']
         self.model = LLM_CONFIG['model']
         self.available_traits = list(trait_cache.values())
@@ -283,30 +288,49 @@ class LLMService:
     async def analyze_query(self, query: str) -> Dict[str, Any]:
         """使用 LLM 分析查詢"""
         try:
+            # 記錄 LLM API 調用開始（人才搜索）
+            print("=" * 80)
+            print("🚀 開始調用 LLM API（人才搜索 - 查詢分析）")
+            print(f"📍 API 端點: {self.api_endpoint}")
+            print(f"🤖 模型: {self.model}")
+            print(f"❓ 用戶查詢: {query}")
+            print(f"⏰ 請求時間: {datetime.now().isoformat()}")
+            
+            import time
+            start_time = time.time()
+            
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # 準備請求參數
+                system_prompt = self.get_trait_analysis_prompt()
+                user_prompt = f'請分析以下人才需求：\n\n{query}'
+                
                 request_params = {
                     'model': self.model,
                     'messages': [
                         {
                             'role': 'system',
-                            'content': self.get_trait_analysis_prompt()
+                            'content': system_prompt
                         },
                         {
                             'role': 'user',
-                            'content': f'請分析以下人才需求：\n\n{query}'
+                            'content': user_prompt
                         }
                     ],
                     'temperature': 0.3,
                     'max_tokens': 3000  # 增加到 3000，確保 JSON 完整
                 }
                 
+                print(f"🌡️ Temperature: 0.3")
+                print(f"📊 Max Tokens: 3000")
+                print(f"📝 System Prompt 長度: {len(system_prompt)} 字符")
+                print(f"📝 User Prompt 長度: {len(user_prompt)} 字符")
+                
                 # 只有 SiliconFlow 支持 response_format，AkashML 不支持
                 if 'siliconflow' in self.api_endpoint.lower():
                     request_params['response_format'] = {'type': 'json_object'}
-                    print("   使用 response_format: json_object")
+                    print("   ✅ 使用 response_format: json_object")
                 else:
-                    print("   不使用 response_format（AkashML 不支持）")
+                    print("   ⚠️ 不使用 response_format（AkashML 不支持）")
                 
                 response = await client.post(
                     self.api_endpoint,
@@ -317,16 +341,29 @@ class LLMService:
                     json=request_params
                 )
                 
+                elapsed_time = time.time() - start_time
+                
+                # 記錄響應狀態
+                print(f"⏱️ API 響應時間: {elapsed_time:.2f} 秒")
+                print(f"📡 HTTP 狀態碼: {response.status_code}")
+                
                 if response.status_code == 200:
                     result = response.json()
+                    
+                    # 記錄 Token 使用統計
+                    if 'usage' in result:
+                        usage = result['usage']
+                        print(f"📊 Token 使用統計:")
+                        print(f"   - Prompt Tokens: {usage.get('prompt_tokens', 'N/A')}")
+                        print(f"   - Completion Tokens: {usage.get('completion_tokens', 'N/A')}")
+                        print(f"   - Total Tokens: {usage.get('total_tokens', 'N/A')}")
+                    
                     content = result['choices'][0]['message']['content']
                     
                     # 詳細日誌：顯示 LLM 原始返回
                     print(f"\n{'='*80}")
                     print(f"📥 LLM 原始返回內容")
                     print(f"{'='*80}")
-                    print(f"API: {self.api_endpoint}")
-                    print(f"Model: {self.model}")
                     print(f"內容長度: {len(content)} 字符")
                     print(f"\n--- 開始完整內容 ---")
                     print(content)
@@ -457,8 +494,75 @@ class TalentSearchEngine:
         """獲取所有候選人 - 使用 test_project_result"""
         cursor = self.conn.cursor()
         
+        # 使用子查詢確保先去重再 LIMIT
         sql = """
-            SELECT 
+            SELECT * FROM (
+                SELECT DISTINCT ON (tiv.id)
+                    tiv.id,
+                    tiv.name,
+                    tiv.email,
+                    tiv.phone,
+                    tiv.company,
+                    tiv.position,
+                    tp.name as project_name,
+                    tpr.trait_results,
+                    tpr.category_results,
+                    tpr.score_value,
+                    tpr.prediction_value,
+                    tpr.crawled_at
+                FROM test_project_result tpr
+                INNER JOIN test_invitation ti ON tpr.test_invitation_id = ti.id
+                INNER JOIN test_invitee tiv ON ti.invitee_id = tiv.id
+                INNER JOIN test_project tp ON tpr.test_project_id = tp.id
+                WHERE tpr.trait_results IS NOT NULL
+                  AND tpr.trait_results != '{}'::jsonb
+                ORDER BY tiv.id, tpr.crawled_at DESC
+            ) AS unique_candidates
+            ORDER BY crawled_at DESC
+            LIMIT %s;
+        """
+        
+        print(f"\n🔍 執行查詢: get_all_candidates (limit={limit})")
+        cursor.execute(sql, (limit,))
+        results = cursor.fetchall()
+        print(f"✓ 查詢返回 {len(results)} 筆記錄")
+        
+        candidates = []
+        for row in results:
+            # 豐富特質結果，添加中文名稱
+            trait_results = enrich_trait_results(row[7] if row[7] else {})
+            
+            candidate = {
+                'id': row[0],
+                'name': row[1],
+                'email': row[2],
+                'phone': row[3],
+                'company': row[4],
+                'position': row[5],
+                'project_name': row[6],
+                'trait_results': trait_results,
+                'category_results': row[8] if row[8] else {},
+                'score_value': row[9],
+                'prediction_value': row[10],
+                'test_date': row[11].isoformat() if row[11] else None
+            }
+            candidates.append(candidate)
+            
+            print(f"  候選人 {row[1]}: {len(trait_results)} 個特質")
+        
+        cursor.close()
+        return candidates
+    
+    def get_candidates_by_ids(self, candidate_ids: List[int]) -> List[Dict]:
+        """根據候選人 ID 列表獲取候選人資料"""
+        if not candidate_ids:
+            return []
+        
+        cursor = self.conn.cursor()
+        
+        # 已經指定了 ID 列表，不需要子查詢
+        sql = """
+            SELECT DISTINCT ON (tiv.id)
                 tiv.id,
                 tiv.name,
                 tiv.email,
@@ -477,18 +581,17 @@ class TalentSearchEngine:
             INNER JOIN test_project tp ON tpr.test_project_id = tp.id
             WHERE tpr.trait_results IS NOT NULL
               AND tpr.trait_results != '{}'::jsonb
-            ORDER BY tpr.crawled_at DESC
-            LIMIT %s;
+              AND tiv.id = ANY(%s)
+            ORDER BY tiv.id, tpr.crawled_at DESC;
         """
         
-        print(f"\n🔍 執行查詢: get_all_candidates (limit={limit})")
-        cursor.execute(sql, (limit,))
+        print(f"\n🔍 執行查詢: get_candidates_by_ids (ids={candidate_ids})")
+        cursor.execute(sql, (candidate_ids,))
         results = cursor.fetchall()
         print(f"✓ 查詢返回 {len(results)} 筆記錄")
         
         candidates = []
         for row in results:
-            # 豐富特質結果，添加中文名稱
             trait_results = enrich_trait_results(row[7] if row[7] else {})
             
             candidate = {
@@ -535,28 +638,32 @@ class TalentSearchEngine:
             where_clause = f"({where_clause}) AND tiv.id = ANY(%s)"
             params.append(previous_candidate_ids)
         
+        # 使用子查詢確保先去重再 LIMIT
         sql = f"""
-            SELECT 
-                tiv.id,
-                tiv.name,
-                tiv.email,
-                tiv.phone,
-                tiv.company,
-                tiv.position,
-                tp.name as project_name,
-                tpr.trait_results,
-                tpr.category_results,
-                tpr.score_value,
-                tpr.prediction_value,
-                tpr.crawled_at
-            FROM test_project_result tpr
-            INNER JOIN test_invitation ti ON tpr.test_invitation_id = ti.id
-            INNER JOIN test_invitee tiv ON ti.invitee_id = tiv.id
-            INNER JOIN test_project tp ON tpr.test_project_id = tp.id
-            WHERE tpr.trait_results IS NOT NULL
-              AND tpr.trait_results != '{{}}'::jsonb
-              AND ({where_clause})
-            ORDER BY tpr.crawled_at DESC
+            SELECT * FROM (
+                SELECT DISTINCT ON (tiv.id)
+                    tiv.id,
+                    tiv.name,
+                    tiv.email,
+                    tiv.phone,
+                    tiv.company,
+                    tiv.position,
+                    tp.name as project_name,
+                    tpr.trait_results,
+                    tpr.category_results,
+                    tpr.score_value,
+                    tpr.prediction_value,
+                    tpr.crawled_at
+                FROM test_project_result tpr
+                INNER JOIN test_invitation ti ON tpr.test_invitation_id = ti.id
+                INNER JOIN test_invitee tiv ON ti.invitee_id = tiv.id
+                INNER JOIN test_project tp ON tpr.test_project_id = tp.id
+                WHERE tpr.trait_results IS NOT NULL
+                  AND tpr.trait_results != '{{}}'::jsonb
+                  AND ({where_clause})
+                ORDER BY tiv.id, tpr.crawled_at DESC
+            ) AS unique_candidates
+            ORDER BY crawled_at DESC
             LIMIT %s;
         """
         
@@ -1119,7 +1226,7 @@ async def analyze_candidate(candidate_id: int):
         cursor = conn.cursor()
         
         sql = """
-            SELECT 
+            SELECT DISTINCT ON (tiv.id)
                 tiv.id,
                 tiv.name,
                 tiv.email,
@@ -1135,6 +1242,7 @@ async def analyze_candidate(candidate_id: int):
             INNER JOIN test_project tp ON tpr.test_project_id = tp.id
             WHERE tiv.id = %s
               AND tpr.trait_results IS NOT NULL
+            ORDER BY tiv.id, tpr.crawled_at DESC
             LIMIT 1;
         """
         

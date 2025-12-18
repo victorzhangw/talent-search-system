@@ -8,11 +8,53 @@
 
 ### 最簡單的方式
 
-1. **雙擊運行** `啟動完整系統.bat`
-2. **等待** 瀏覽器自動打開
-3. **開始使用** 聊天界面！
+#### Windows 用戶
+
+1. **檢查環境**（首次使用）
+
+   ```batch
+   check-environment.bat
+   ```
+
+2. **啟動系統**
+
+   ```batch
+   start.bat
+   ```
+
+   或直接雙擊 `start.bat`
+
+3. **等待** 瀏覽器自動打開
+
+4. **開始使用**！
+
+#### Linux/Mac 用戶
+
+1. **設置權限**（首次使用）
+
+   ```bash
+   chmod +x start.sh stop.sh
+   ```
+
+2. **啟動系統**
+
+   ```bash
+   ./start.sh
+   ```
+
+3. **開始使用**！
 
 就這麼簡單！✨
+
+### 停止系統
+
+```batch
+# Windows
+stop.bat
+
+# Linux/Mac
+./stop.sh
+```
 
 ---
 
@@ -36,13 +78,15 @@
 
 ## 📁 啟動腳本
 
-| 文件                    | 說明                  | 適合         |
-| ----------------------- | --------------------- | ------------ |
-| **啟動完整系統.bat** ⭐ | 啟動 API + 前端服務器 | **推薦使用** |
-| 啟動人才搜索服務.bat    | 只啟動 API 服務       | 開發調試     |
-| 啟動並測試.bat          | 啟動 API + 測試頁面   | 快速測試     |
-| 停止所有服務.bat        | 停止所有服務          | 清理進程     |
-| 人才搜索系統.bat        | 控制面板（選單）      | 完整管理     |
+| 文件                      | 說明                | 平台      |
+| ------------------------- | ------------------- | --------- |
+| **start.bat** ⭐          | 啟動前端 + 後端服務 | Windows   |
+| **start.sh** ⭐           | 啟動前端 + 後端服務 | Linux/Mac |
+| **stop.bat**              | 停止所有服務        | Windows   |
+| **stop.sh**               | 停止所有服務        | Linux/Mac |
+| **check-environment.bat** | 環境檢查            | Windows   |
+
+詳細使用說明請查看：[啟動腳本使用指南](docs/guides/STARTUP_SCRIPTS.md)
 
 ---
 
@@ -50,10 +94,16 @@
 
 啟動後可以訪問：
 
-- **聊天界面**: http://localhost:8080/talent-chat-frontend.html
-- **測試頁面**: http://localhost:8080/test_api.html
+### 前端界面
+
+- **主界面**: http://localhost:5173
+
+### 後端 API
+
 - **API 文檔**: http://localhost:8000/docs
 - **健康檢查**: http://localhost:8000/health
+- **人才搜索**: http://localhost:8000/api/talent
+- **HR 諮詢**: http://localhost:8000/api/hr-consult
 
 ---
 
@@ -86,23 +136,31 @@ PostgreSQL 數據庫 (通過 SSH 隧道)
 
 ## 📖 文檔
 
-### 快速入門
+### 📚 完整文檔中心
 
-- [README-快速開始.md](./README-快速開始.md) - 最簡單的開始方式
-- [快速啟動指南.md](./快速啟動指南.md) - 詳細的啟動說明
-- [如何使用聊天界面.md](./如何使用聊天界面.md) - 聊天界面使用說明
-- [使用說明-圖解.txt](./使用說明-圖解.txt) - 圖解版說明
+查看 **[docs/README.md](./docs/README.md)** 獲取完整的文檔索引和系統說明。
 
-### 技術文檔
+### 🚀 快速入門
 
-- [搜索功能修正總結](./docs/backend/搜索功能修正總結-2025-11-15.md)
-- [JSONB 存儲方案總結](./docs/backend/JSONB存儲方案總結.md)
-- [JSON 數據結構說明](./docs/backend/JSON數據結構說明.md)
-- [數據庫修正說明](./docs/backend/數據庫修正說明.md)
+- **[快速開始指南](./docs/guides/GETTING_STARTED.md)** - 安裝和基本設置
+- **[環境變數配置](./docs/configuration/README_ENV.md)** - 配置系統環境
+- **[Prompt 配置](./docs/configuration/PROMPT_CONFIGURATION.md)** - 自定義 AI 回答風格
 
-### 完整文檔索引
+### 🔧 操作指南
 
-查看 [docs/backend/README.md](./docs/backend/README.md) 獲取所有文檔列表。
+- **[部署指南](./docs/guides/DEPLOYMENT.md)** - 生產環境部署
+- **[故障排除](./docs/guides/TROUBLESHOOTING.md)** - 常見問題解決
+
+### 🧪 測試
+
+- **[測試說明](./docs/tests/README.md)** - 測試腳本使用指南
+- 運行測試：`cd docs/tests && python test_env_config.py`
+
+### 📊 遷移報告
+
+- [配置遷移總結](./docs/migration-reports/CONFIGURATION_MIGRATION_SUMMARY.md)
+- [LLM 配置遷移](./docs/migration-reports/LLM_CONFIG_MIGRATION_COMPLETE.md)
+- [Prompt 配置遷移](./docs/migration-reports/PROMPT_CONFIG_MIGRATION_COMPLETE.md)
 
 ---
 
