@@ -311,8 +311,12 @@ async function handleHRConsult(query) {
     // 調用 HR 諮詢，會自動使用已選擇的候選人
     const result = await hrStore.consult(query);
 
+    console.log("[ChatArea] 收到 HR 諮詢結果:", result);
+    console.log("[ChatArea] parsed_answer:", result.parsed_answer);
+    console.log("[ChatArea] parsed_answer 類型:", typeof result.parsed_answer);
+
     // 添加 AI 回答
-    hrMessages.value.push({
+    const message = {
       id: Date.now() + 1,
       type: "system",
       isHRConsult: true,
@@ -322,7 +326,12 @@ async function handleHRConsult(query) {
       parsedAnswer: result.parsed_answer || null, // 結構化回應
       dataSummary: result.data_summary,
       timestamp: result.timestamp,
-    });
+    };
+
+    console.log("[ChatArea] 添加消息:", message);
+    console.log("[ChatArea] message.parsedAnswer:", message.parsedAnswer);
+
+    hrMessages.value.push(message);
   } catch (error) {
     // 顯示錯誤，但保持候選人選擇狀態
     hrMessages.value.push({

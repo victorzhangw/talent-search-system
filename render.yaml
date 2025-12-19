@@ -49,3 +49,18 @@ services:
       - key: ENVIRONMENT
         value: production
     healthCheckPath: /health
+
+  # 前端服務
+  - type: web
+    name: talent-search-frontend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_HR_API_BASE_URL
+        value: https://talent-search-api.onrender.com
+      - key: VITE_API_BASE_URL
+        value: https://talent-search-api.onrender.com

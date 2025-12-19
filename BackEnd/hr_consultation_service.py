@@ -726,12 +726,18 @@ class HRConsultationService:
         # 6. 解析 JSON 回應
         parsed_response = self._parse_llm_response(llm_response)
         
+        # 記錄解析結果
+        if parsed_response:
+            logger.info("✅ LLM 回應已成功解析為結構化格式")
+        else:
+            logger.warning("⚠️ LLM 回應未能解析為結構化格式，將使用純文本")
+        
         # 7. 提取使用的特質
         used_traits = self._extract_mentioned_traits(llm_response, trait_results)
         
         return {
             'answer': llm_response,  # 保留原始回應
-            'parsed_answer': parsed_response,  # 解析後的結構化數據
+            'parsed_answer': parsed_response,  # 解析後的結構化數據（可能為 None）
             'data_summary': {
                 'strengths': strengths,
                 'weaknesses': weaknesses,
@@ -1062,7 +1068,7 @@ class HRConsultationService:
             logger.error(f"LLM 調用失敗: {e}", exc_info=True)
             return "抱歉，諮詢服務暫時不可用，請稍後再試。"
     
-    def _parse_llm_response(self, response: str) -> Dict:
+    def _parse_llm_response(self, response: str) -> Optional[Dict]:
         """
         解析 LLM 的 JSON 回應
         
@@ -1070,43 +1076,54 @@ class HRConsultationService:
             response: LLM 返回的字符串
             
         Returns:
-            解析後的結構化數據，或原始文本
+            解析後的結構化數據，如果解析失敗則返回 None
         """
         try:
             # 嘗試提取 JSON（可能包含在 ```json ``` 代碼塊中）
             import re
             
+            logger.info(f"🔍 開始解析 LLM 回應，長度: {len(response)} 字符")
+            logger.info(f"📝 回應前 200 字符: {response[:200]}")
+            
             # 方法 1：尋找 JSON 代碼塊
             json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
+                logger.info("✅ 找到 JSON 代碼塊")
             else:
                 # 方法 2：尋找第一個 { 到最後一個 }
                 start = response.find('{')
                 end = response.rfind('}')
                 if start != -1 and end != -1 and end > start:
                     json_str = response[start:end+1]
+                    logger.info(f"✅ 提取 JSON 字符串，位置: {start} 到 {end}")
                 else:
                     # 方法 3：整個回應就是 JSON
                     json_str = response
+                    logger.info("⚠️ 使用整個回應作為 JSON")
             
             # 解析 JSON
             parsed = json.loads(json_str)
+            logger.info(f"✅ JSON 解析成功，keys: {list(parsed.keys())}")
             
             # 驗證必要欄位
             if 'sections' in parsed or 'summary' in parsed:
-                logger.info("✅ 成功解析 JSON 格式回應")
+                logger.info("✅ 成功解析結構化 JSON 格式回應")
+                logger.info(f"   - summary: {'有' if 'summary' in parsed else '無'}")
+                logger.info(f"   - sections: {len(parsed.get('sections', []))} 個")
+                logger.info(f"   - key_points: {len(parsed.get('key_points', []))} 個")
                 return parsed
             else:
-                logger.warning("⚠️ JSON 格式不完整，使用原始文本")
-                return {'text': response}
+                logger.warning(f"⚠️ JSON 格式不完整，缺少 sections 或 summary，實際 keys: {list(parsed.keys())}")
+                return None
                 
         except json.JSONDecodeError as e:
-            logger.warning(f"⚠️ JSON 解析失敗: {e}，使用原始文本")
-            return {'text': response}
+            logger.warning(f"⚠️ JSON 解析失敗: {e}")
+            logger.warning(f"   嘗試解析的字符串前 200 字符: {json_str[:200] if 'json_str' in locals() else 'N/A'}")
+            return None
         except Exception as e:
-            logger.error(f"❌ 解析回應時發生錯誤: {e}")
-            return {'text': response}
+            logger.error(f"❌ 解析回應時發生錯誤: {e}", exc_info=True)
+            return None
     
     def _enforce_response_length(self, response: str, max_length: int) -> str:
         """
