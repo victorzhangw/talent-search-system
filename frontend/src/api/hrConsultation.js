@@ -7,7 +7,7 @@ import axios from "axios";
 // 創建 HR 諮詢專用的 axios 實例
 const hrApiClient = axios.create({
   baseURL: import.meta.env.VITE_HR_API_BASE_URL || "http://localhost:8000",
-  timeout: 60000, // 增加到 60 秒以支持長回應生成
+  timeout: 90000, // 增加到 90 秒以支持長回應生成（LLM 響應時間約 54 秒）
   headers: {
     "Content-Type": "application/json",
   },

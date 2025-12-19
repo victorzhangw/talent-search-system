@@ -999,8 +999,8 @@ class HRConsultationService:
             import time
             start_time = time.time()
             
-            # 增加超時時間以支持長回應生成（60 秒）
-            with httpx.Client(timeout=60.0) as client:
+            # 增加超時時間以支持長回應生成（90 秒）
+            with httpx.Client(timeout=90.0) as client:
                 response = client.post(
                     api_endpoint,
                     headers={

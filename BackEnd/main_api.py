@@ -214,6 +214,6 @@ if __name__ == "__main__":
         port=port,
         reload=True,  # 開發模式自動重載
         log_level="info",
-        timeout_keep_alive=75,  # Keep-alive 超時（秒）
+        timeout_keep_alive=120,  # Keep-alive 超時（秒）- 增加以支持長 LLM 響應
         timeout_graceful_shutdown=10  # 優雅關閉超時（秒）
     )
