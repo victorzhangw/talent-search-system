@@ -11,3 +11,4 @@
     "user_prompt_template": "用戶問題：{query}\n\n請從資深 HR 專家的角度給出專業建議。\n\n要求：\n1. 字數限制在 {max_response_length} 字以內\n2. 提供具備實操性的具體步驟或方法\n3. 確保回答結構清晰、邏輯嚴密"
   }
 }
+ 

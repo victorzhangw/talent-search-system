@@ -1,0 +1,98 @@
+{
+    "enterprise_code": "ACME-TW",
+    "enterprise_name": "ACME Taiwan",
+    "candidates": [
+        {
+            "candidate_id": "cand_001",
+            "name": "張大偉",
+            "email": "david.zhang@example.com",
+            "position": "Product Manager",
+            "status": "employed",
+            "last_assessment_date": "2025-11-20T10:00:00Z"
+        },
+        {
+            "candidate_id": "cand_002",
+            "name": "李小美",
+            "email": "may.li@example.com",
+            "position": "Sales Director",
+            "status": "employed",
+            "last_assessment_date": "2025-11-21T14:30:00Z"
+        }
+    ],
+    "assessments": {
+        "cand_001": {
+            "assessment_id": "asmt_987",
+            "project_code": "traitty_pm",
+            "score_value": 86.5,
+            "trait_results": {
+                "CIA_01": {
+                    "trait_id": "CIA_01",
+                    "score": 59.0,
+                    "headsupflag": 1,
+                    "semantic_band": "B"
+                },
+                "CIA_02": {
+                    "trait_id": "CIA_02",
+                    "score": 82.0,
+                    "headsupflag": 0,
+                    "semantic_band": "A"
+                }
+            },
+            "trait_metadata": {
+                "CIA_01": {
+                    "trait_name_zh": "盡責性",
+                    "semantic": {
+                        "semantic_band": "B",
+                        "semantic_label": "情境式盡責",
+                        "semantic_description": "在結構明確或熟悉情境中能有效分析，但在高度模糊或快速變動狀態下需要更多脈絡與引導。"
+                    }
+                },
+                "CIA_02": {
+                    "trait_name_zh": "誠實謙遜",
+                    "semantic": {
+                        "semantic_band": "A",
+                        "semantic_label": "誠懇公平取向",
+                        "semantic_description": "表現出穩定的分析性思考，能以邏輯與結構化方式拆解問題。"
+                    }
+                }
+            }
+        },
+        "cand_002": {
+            "assessment_id": "asmt_988",
+            "project_code": "traitty_sales",
+            "score_value": 92.0,
+            "trait_results": {
+                "CIA_01": {
+                    "trait_id": "CIA_01",
+                    "score": 88.0,
+                    "headsupflag": 0,
+                    "semantic_band": "A"
+                },
+                "CIA_02": {
+                    "trait_id": "CIA_02",
+                    "score": 75.0,
+                    "headsupflag": 0,
+                    "semantic_band": "B"
+                }
+            },
+            "trait_metadata": {
+                "CIA_01": {
+                    "trait_name_zh": "盡責性",
+                    "semantic": {
+                        "semantic_band": "A",
+                        "semantic_label": "高度盡責",
+                        "semantic_description": "展現明確的自主領導狀態，能主動設定目標、規劃步驟並追蹤進度。"
+                    }
+                },
+                "CIA_02": {
+                    "trait_name_zh": "誠實謙遜",
+                    "semantic": {
+                        "semantic_band": "B",
+                        "semantic_label": "適度誠實",
+                        "semantic_description": "在目標與期待清楚時，能穩定完成任務並維持一定自我管理。"
+                    }
+                }
+            }
+        }
+    }
+}

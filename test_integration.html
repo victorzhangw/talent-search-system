@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talent Chat Integration Test</title>
+    <!-- Favicon: Local SVG -->
+    <link rel="icon" type="image/svg+xml" href="frontend/chat-widget/public/favicon.svg">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: white;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            max-width: 600px;
+        }
+        h1 { margin-bottom: 1rem; }
+        p { color: #cbd5e1; line-height: 1.6; }
+        .code-block {
+            background: rgba(0,0,0,0.3);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: left;
+            margin: 1.5rem 0;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #a5b4fc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Talent Chat Integration Test</h1>
+        <p>This page simulates a client application (e.g. HR System) hosting the Chat Widget.</p>
+        
+        <div class="code-block">
+            // Script Integration Example<br>
+            &lt;script src="http://localhost:5173/loader.js"&gt;&lt;/script&gt;
+        </div>
+
+        <p>Click the launcher icon in the bottom-right corner to start.</p>
+    </div>
+
+    <!-- 
+      In real integration, this points to the build output.
+      For Dev, we point to the Vite Dev Server Main Entry
+    -->
+    <script type="module" src="http://localhost:5173/src/main.js"></script>
+</body>
+</html>

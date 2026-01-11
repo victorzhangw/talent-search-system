@@ -1,0 +1,412 @@
+# Traitty × 甲方：Candidate Data Provider API 規格書（給甲方開發者）
+
+> 文件版本：v1.0（提供甲方開發 Candidate Data Provider API）  
+> 最後更新：2025-12-24  
+> 本文件**只描述甲方需提供給 Traitty 後端呼叫的 API 規格**（B 層）。
+
+---
+
+## 1. 目的與使用情境
+
+使用者已先登入**甲方系統（Django）**。插件與 Traitty 會使用：
+
+- `account_id`（使用者/帳號識別）
+- `enterprise_id`（使用者目前所屬公司/組織識別；可能是 Traitty 內部的 enterprise id）
+- `Authorization: Bearer <access_token>`（插件專用短效 Token；由甲方簽發，供 Traitty 驗證）
+
+Traitty 後端會依序：
+
+1. 透過甲方 API **用 (`account_id`, `enterprise_id`, Bearer Token) 解析出「公司編碼」**（下稱 `enterprise_code`）。
+2. 使用 `enterprise_code` 取得該公司底下所有候選人。
+3. 使用者在 Traitty 前端可**複選候選人**，Traitty 後端將批次取得各候選人的：
+   - 測驗/評量報告（最新或指定）
+   - 報告解讀所需欄位（請見 `trait_metadata.<trait_id>.semantic`；並在 `trait_results.<trait_id>.semantic_band` 指出個人落點）
+
+---
+
+## 1.1 整體呼叫流程（Token → 公司代碼 → 候選人 → 報告）
+
+### Step 0：使用者先登入甲方系統，插件取得「插件專用短效 token」
+
+前提：使用者已在**甲方系統（Django）**完成登入，登入態由 **Django session cookie（HttpOnly）**維持。
+
+插件載入後，呼叫甲方提供的端點取得「插件專用短效 token」（短效、限定 plugin scope，供 Traitty 驗證）：
+
+- `POST /plugin-auth/token`
+- 認證方式：使用者已登入（瀏覽器自動帶 session cookie；插件**不需也不應讀取** HttpOnly cookie）
+
+Response（示例）：
+
+```json
+{
+  "access_token": "<plugin_access_token>",
+  "expires_in": 600,
+  "account_id": "acc_12345",
+  "enterprise_id": "cmp_67890"
+}
+```
+
+插件後續呼叫 Traitty API 時，帶上：
+
+- `Authorization: Bearer <plugin_access_token>`
+
+> 重要：此 `plugin_access_token` 不等同主系統登入憑證；其權限、受眾與有效時間皆被限制（見 2.2.1）。
+
+### Step 1：解析公司代碼 enterprise_code（甲方必做）
+
+1) Traitty 後端呼叫：`POST /v1/enterprise/resolve`（甲方 API）
+2) 甲方驗證 `plugin_access_token` 與 account/enterprise 關係
+3) 回傳：`enterprise_code`
+
+### Step 2：取得候選人清單
+
+1) Traitty 後端呼叫：`GET /v1/candidates?enterprise_code=...`
+2) 甲方回傳候選人清單（每筆包含 `candidate_id`）
+
+### Step 3：複選候選人後，批次取得測驗報告 + 報告解讀
+
+1) Traitty 前端複選多位候選人
+2) Traitty 後端呼叫：`POST /v1/assessments/latest:batch`
+3) 甲方回傳每位候選人的最新報告（含 `trait_results.<trait_id>.semantic_band` 與 `trait_metadata.<trait_id>.semantic` 的語意解說）
+
+---
+
+## 2. 通用規範
+
+### 2.1 Base URL 與版本
+
+- Base URL（示例）：`https://customer-hr.example.com`
+- API Version 前綴：`/v1`
+
+### 2.2 認證（必填）
+
+所有端點皆需驗證：
+
+- Header：`Authorization: Bearer <plugin_access_token>`
+
+> 說明：此 token 由甲方 `POST /plugin-auth/token` 簽發，供 Traitty 驗證後使用。
+
+#### 2.2.1 plugin_access_token 規格（HS256；甲方需實作）
+
+- Token 型態：JWT（JWS）
+- 簽章演算法：HS256（shared secret）
+- 建議有效時間：5–15 分鐘（例如 `exp = now + 600`）
+
+JWT Claims（建議/必填）：
+
+- `iss`：甲方系統識別（例如 `customer-django`）
+- `sub`：使用者識別（例如 `account:acc_12345`）
+- `account_id`：`acc_12345`
+- `enterprise_id`：`cmp_67890`
+- `aud`：固定 `traitty`（受眾限制；僅供 Traitty 使用）
+- `scope`：固定包含 `traitty_plugin`
+- `iat`：簽發時間
+- `exp`：過期時間
+- `jti`：唯一 token id（可選，但建議）
+
+Traitty 驗證規則：
+
+- 驗簽（HS256 shared secret）
+- 檢查 `exp` 未過期
+- 檢查 `aud == "traitty"`
+- 檢查 `scope` 包含 `traitty_plugin`
+- 取出 `account_id` / `enterprise_id` 供後續 `enterprise/resolve` 使用
+
+### 2.3 必要 Header（建議一致）
+
+- `X-Request-ID: <uuid>`（建議，用於追蹤）
+
+### 2.4 共同錯誤格式
+
+建議統一錯誤回應：
+
+```json
+{
+  "error": {
+    "code": "INVALID_ARGUMENT",
+    "message": "enterprise_id is required",
+    "details": {
+      "field": "enterprise_id"
+    }
+  }
+}
+```
+
+建議錯誤碼：
+
+- `UNAUTHORIZED`（401）
+- `FORBIDDEN`（403）
+- `INVALID_ARGUMENT`（400）
+- `NOT_FOUND`（404）
+- `RATE_LIMITED`（429）
+- `INTERNAL_ERROR`（500）
+
+---
+
+## 3. 名詞與資料結構
+
+### 3.1 公司編碼 enterprise_code
+
+- `enterprise_code`：甲方系統中用於資料隔離/查詢的公司編碼（可能是 BU Code、Tenant Code、Org Code 等）。
+- `enterprise_id`：插件 token 內的公司識別（不一定等同甲方 `enterprise_code`）。
+
+> 因此需要一個「解析/映射」端點把 (`account_id`, `enterprise_id`) 轉成甲方可查詢的 `enterprise_code`。
+
+#### 參考：Traitty 現行 DB 欄位（僅供對照）
+
+若以 Traitty 現行 Django DB 結構對照：
+
+- `enterprise_code` 可對應（候選）欄位：`EnterpriseProfile.tax_id`（統一編號；較穩定）
+- 候選人代碼 `candidate_id`（現行 DB）：`TestInvitee.id`
+
+（workspace 已提供可執行探勘腳本：`project/db_probe.py`）
+
+### 3.2 候選人 candidate
+
+候選人唯一鍵：`candidate_id`（建議字串，避免格式衝突）
+
+### 3.3 測驗/評量 assessment
+
+- 一個候選人可有多筆評量（不同日期/不同專案）。
+- Traitty 核心需求是：**能取得最新一筆評量**，以及（可選）批次取得多位候選人的最新評量。
+
+### 3.4 Trait 與「報告解讀（description）」
+
+Traitty 需要 trait 分數與 trait 的解讀文字：
+
+- `trait_results`：以 `trait_id` 為 key，回傳分數/旗標/個人落點（`semantic_band`）
+- `trait_metadata`：以 `trait_id` 為 key，回傳中英名 + 特質解說（僅回傳該候選人落點 band 的一段解說）
+
+> **本文件要求：API 傳回的個人報告必須附帶特質解說資料**（對應您提供的 Excel 欄位）：
+>
+>- `assessment_type`
+>- `trait_id`
+>- `trait_name_zh`, `trait_name_en`
+>- `semantic_band`（A/B/C…；個人落點）
+>- `semantic_label`, `semantic_description`
+>- `management_focus`, `usage_note`
+
+其中 Traitty 端會用到：
+- 個人落點：`trait_results.<trait_id>.semantic_band`
+- 解說內容：`trait_metadata.<trait_id>.semantic.semantic_description` 等欄位
+
+> 規則（重要）：`trait_results` 與 `trait_metadata` 的**外層 key 必須使用 `trait_id`**（例如 `CIA_01`），避免英文 trait 名稱不一致造成對應失敗。
+
+
+---
+
+## 4. API 端點規格
+
+### 4.1 解析公司編碼（必做）
+
+`POST /v1/enterprise/resolve`
+
+用途：使用插件 token 中的 `account_id`、`enterprise_id` 解析出甲方的 `enterprise_code`。
+
+#### Request
+
+Headers:
+- `Authorization: Bearer <plugin_access_token>`
+- `Content-Type: application/json`
+
+Body:
+```json
+{
+  "account_id": "acc_12345",
+  "enterprise_id": "cmp_67890"
+}
+```
+
+#### Response 200
+
+```json
+{
+  "account_id": "acc_12345",
+  "enterprise_id": "cmp_67890",
+  "enterprise_code": "ACME-TW",
+  "enterprise_name": "ACME Taiwan"
+}
+```
+
+#### Error
+
+- 401/403：token 無效或無權限
+- 404：查無對應 enterprise_code
+
+---
+
+### 4.2 取得候選人清單（必做）
+
+`GET /v1/candidates`
+
+#### Query
+
+- `enterprise_code`（必填）：由 4.1 取得
+- `q`（可選）：搜尋關鍵字（姓名/email/職務）
+- `status`（可選）：`employed` | `job_seeker` | `all`（預設 `all`）
+- `has_assessment`（可選）：`true` | `false` | `all`（預設 `all`）
+- `limit`（可選）：1..100（預設 20）
+- `offset`（可選）：>=0（預設 0）
+- `sort_by`（可選）：`last_assessment_date` | `name` | `created_at`（預設 `last_assessment_date`）
+- `sort_order`（可選）：`asc` | `desc`（預設 `desc`）
+
+#### Response 200
+
+```json
+{
+  "data": [
+    {
+      "candidate_id": "cand_001",
+      "name": "張三",
+      "email": "zs@example.com",
+      "phone": "+886900000000",
+      "enterprise_name": "ACME Taiwan",
+      "position": "Product Manager",
+      "status": "employed",
+      "created_at": "2025-01-02T00:00:00Z",
+      "last_assessment_date": "2025-11-20T10:00:00Z",
+      "latest_assessment": {
+        "assessment_id": "asmt_987",
+        "project_code": "traitty_pm",
+        "project_name": "Traitty PM",
+        "score_value": 86.5
+      }
+    }
+  ],
+  "page": {
+    "total": 123,
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+
+---
+
+### 4.3 取得單一候選人基本資料（建議）
+
+`GET /v1/candidates/{candidate_id}`
+
+#### Query
+
+- `enterprise_code`（必填）
+- `include_assessments`（可選）：`none` | `latest` | `all`（預設 `latest`）
+
+#### Response 200
+
+```json
+{
+  "candidate_id": "cand_001",
+  "name": "張三",
+  "email": "zs@example.com",
+  "phone": "+886900000000",
+  "enterprise_name": "ACME Taiwan",
+  "position": "Product Manager",
+  "status": "employed",
+  "created_at": "2025-01-02T00:00:00Z",
+  "assessments": [
+    {
+      "assessment_id": "asmt_987",
+      "project_code": "traitty_pm",
+      "project_name": "Traitty PM",
+      "test_date": "2025-11-20T10:00:00Z",
+      "score_value": 86.5,
+      "prediction_value": "High Fit"
+    }
+  ]
+}
+```
+
+---
+
+### 4.4 批次取得多位候選人最新評量報告（必做；支援複選）
+
+`POST /v1/assessments/latest:batch`
+
+用途：Traitty 前端複選候選人後，Traitty 後端一次向甲方取回多位候選人的最新報告。
+
+> 規則：`trait_metadata`（含語意解說）為**必回**，不提供關閉參數。
+
+#### Request
+
+Headers:
+- `Authorization: Bearer <plugin_access_token>`
+- `Content-Type: application/json`
+
+Body:
+```json
+{
+  "enterprise_code": "ACME-TW",
+  "candidate_ids": ["cand_001", "cand_002", "cand_003"]
+}
+```
+
+#### Response 200
+
+```json
+{
+  "enterprise_code": "ACME-TW",
+  "results": [
+    {
+      "candidate_id": "cand_001",
+      "ok": true,
+      "assessment": {
+        "assessment_id": "asmt_987",
+        "project_code": "traitty_pm",
+        "project_name": "Traitty PM",
+        "test_date": "2025-11-20T10:00:00Z",
+        "score_value": 86.5,
+        "prediction_value": "High Fit",
+        "trait_results": {
+          "CIA_01": {"trait_id": "CIA_01", "score": 59.0, "headsupflag": 1, "semantic_band": "B"},
+          "CIA_02": {"trait_id": "CIA_02", "score": 82.0, "headsupflag": 0, "semantic_band": "A"}
+        },
+        "trait_metadata": {
+          "CIA_01": {
+            "assessment_type": "CIA",
+            "trait_id": "CIA_01",
+            "trait_name_zh": "盡責",
+            "trait_name_en": "Conscientiousness",
+            "semantic": {
+              "semantic_band": "B",
+              "semantic_label": "情境式盡責",
+              "semantic_description": "...",
+              "management_focus": "...",
+              "usage_note": "..."
+            }
+          },
+          "CIA_02": {
+            "assessment_type": "CIA",
+            "trait_id": "CIA_02",
+            "trait_name_zh": "誠實謙遜",
+            "trait_name_en": "Honesty-Humility",
+            "semantic": {
+              "semantic_band": "A",
+              "semantic_label": "誠懇公平取向",
+              "semantic_description": "...",
+              "management_focus": "...",
+              "usage_note": "..."
+            }
+          }
+        }
+      }
+    },
+    {
+      "candidate_id": "cand_002",
+      "ok": false,
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "candidate_id not found",
+        "details": {"candidate_id": "cand_002"}
+      }
+    }
+  ]
+}
+```
+
+#### 規則
+
+- `results` 需保持與 `candidate_ids` 同順序（建議），方便 Traitty 對應。
+- 單筆失敗不影響其他筆（partial success）。
+
+---

@@ -1,0 +1,85 @@
+{
+    "UC-SEL-01": {
+        "description": "人才適配性 (單人/多人)",
+        "answer_guidence": "【CONSULTING-GRADE】依 decision_tier 採用顧問級結構；使用高/中高/中/低；不得逐分解讀分數；檢索證據僅限系統內部",
+        "keywords": [
+            "勝任",
+            "適合",
+            "符合",
+            "能否擔任",
+            "適配度"
+        ],
+        "prompt_config": {
+            "style_ref": "CONSULTING-GRADE",
+            "risk_notes": [
+                "避免標籤化 (Avoid Labeling)",
+                "原始分數僅限內部，對外需轉化為語意描述"
+            ],
+            "template_id": "selection_template",
+            "allowed_knowledge_sources": [
+                "trait_reports",
+                "job_description"
+            ]
+        }
+    },
+    "UC-CMP-01": {
+        "description": "候選人比較",
+        "answer_guidence": "【CONSULTING-GRADE】依 decision_tier 採用顧問級結構；使用高/中高/中/低；不得逐分解讀分數；檢索證據僅限系統內部",
+        "keywords": [
+            "比較",
+            "差異",
+            "哪位更好",
+            "優劣"
+        ],
+        "prompt_config": {
+            "style_ref": "ANALYTICAL-COMPARISON",
+            "risk_notes": [
+                "保持中立",
+                "基於事實比較，避免主觀偏好"
+            ],
+            "template_id": "comparison_template",
+            "allowed_knowledge_sources": [
+                "trait_reports"
+            ]
+        }
+    },
+    "UC-DEV-01": {
+        "description": "發展建議",
+        "answer_guidence": "【CONSULTING-GRADE】依 decision_tier 採用顧問級結構；使用高/中高/中/低；不得逐分解讀分數；檢索證據僅限系統內部",
+        "keywords": [
+            "發展",
+            "改進",
+            "建議",
+            "缺點",
+            "弱點"
+        ],
+        "prompt_config": {
+            "style_ref": "COACHING-GROWTH",
+            "risk_notes": [
+                "使用正向語言 (Constructive Feedback)",
+                "聚焦於行為改變而非人格缺陷"
+            ],
+            "template_id": "development_template",
+            "allowed_knowledge_sources": [
+                "trait_reports"
+            ]
+        }
+    },
+    "UC-GENERAL": {
+        "description": "通用 HR 助手 (Fallback)",
+        "answer_guidence": "【EXPLANATORY MODE】以說明與理解為目的，不進行決策或價值判斷；使用程度描述語言（偏高／中等／偏低），避免逐分解讀分數；必要時可引用特質語意 Bands 作為行為解釋依據；不得提供錄取、淘汰、晉升或風險判斷建議。",
+        "keywords": [],
+        "prompt_config": {
+            "style_ref": "FACTUAL-ONLY",
+            "risk_notes": [
+                "不提供決策建議",
+                "僅陳述報告事實",
+                "必須包含安全免責聲明"
+            ],
+            "template_id": "general_template",
+            "allowed_knowledge_sources": [
+                "trait_reports"
+            ]
+        }
+    }
+}

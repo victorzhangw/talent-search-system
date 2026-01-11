@@ -13,5 +13,8 @@ paramiko==3.4.0
 # HTTP Client
 httpx==0.25.1
 
+# Workflow YAML
+PyYAML==6.0.2
+
 # Python version compatibility
 python-multipart==0.0.6

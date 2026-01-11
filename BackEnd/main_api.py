@@ -110,6 +110,16 @@ async def get_logs_info():
 
 import traceback
 
+# 新增：Chat workflow API（方案 1：新增新 API，不影響既有模組）
+try:
+    logger.info("🔄 正在載入 Chat Workflow 模組...")
+    from chat.router import router as chat_router
+    app.include_router(chat_router, prefix="/api/chat", tags=["Chat Workflow"])
+    logger.info("✅ Chat Workflow 模組載入成功")
+except Exception as e:
+    logger.error(f"❌ Chat Workflow 模組載入失敗: {e}")
+    logger.error(traceback.format_exc())
+
 # 導入子模組的路由
 try:
     logger.info("🔄 正在載入人才搜索模組...")

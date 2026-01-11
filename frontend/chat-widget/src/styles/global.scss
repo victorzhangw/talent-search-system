@@ -1,0 +1,66 @@
+/* Global Variables & Themes */
+
+/* Default Theme (Dark Glass) */
+:root {
+    --glass-bg: rgba(20, 20, 30, 0.95);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-text-primary: #f9fafb;
+    --glass-text-secondary: #9ca3af;
+
+    --primary-color: #6366f1;
+    --primary-hover: #4f46e5;
+    --accent-color: #ec4899;
+
+    --bubble-ai-bg: rgba(255, 255, 255, 0.05);
+    --bubble-ai-border: rgba(255, 255, 255, 0.08);
+
+    /* Layout Spacing (shared) */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+}
+
+/* Theme: Light */
+[data-theme='light'] {
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-text-primary: #111827;
+    --glass-text-secondary: #4b5563;
+
+    --primary-color: #4f46e5;
+    --bubble-ai-bg: rgba(0, 0, 0, 0.04);
+    --bubble-ai-border: rgba(0, 0, 0, 0.06);
+}
+
+/* Theme: Midnight (OLED/High Contrast) */
+[data-theme='midnight'] {
+    --glass-bg: rgba(5, 5, 10, 0.98);
+    /* Almost black */
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --glass-text-primary: #ffffff;
+    --glass-text-secondary: #94a3b8;
+
+    --primary-color: #3b82f6;
+    --bubble-ai-bg: rgba(30, 41, 59, 0.4);
+    --bubble-ai-border: rgba(51, 65, 85, 0.5);
+}
+
+/* Theme: Sepia (Reading Mode) */
+[data-theme='sepia'] {
+    --glass-bg: rgba(253, 246, 227, 0.96);
+    /* Solarized Light base */
+    --glass-border: rgba(147, 161, 161, 0.2);
+    --glass-text-primary: #002b36;
+    --glass-text-secondary: #586e75;
+
+    --primary-color: #b58900;
+    /* Yellow/Gold */
+    --bubble-ai-bg: rgba(0, 0, 0, 0.03);
+    --bubble-ai-border: rgba(165, 122, 0, 0.1);
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+}
