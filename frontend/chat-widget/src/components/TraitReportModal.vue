@@ -14,9 +14,7 @@
             {{ error }}
         </div>
         <div v-else class="trait-table-container">
-            <div class="meta-row">
-                <span>測評日期: {{ assessmentDate }}</span>
-            </div>
+           
             <table class="trait-table">
                 <thead>
                     <tr>
@@ -27,7 +25,8 @@
                 </thead>
                 <tbody>
                     <tr v-for="trait in traits" :key="trait.name">
-                        <td>{{ trait.name }}</td>
+                        <!-- Use Chinese Name if available, otherwise fallback (handled in fetch) -->
+                        <td class="trait-name">{{ trait.name }}</td>
                         <td>
                             <div class="score-bar-container">
                                 <span>{{ trait.score }}</span>
@@ -52,7 +51,7 @@
 import { onMounted, ref } from 'vue'
 
 const props = defineProps({
-    candidateId: String,
+    candidateId: [String, Number],
     candidateName: String,
     token: String
 })
@@ -72,6 +71,29 @@ const getBandLabel = (score) => {
 }
 
 onMounted(async () => {
+    console.log("TraitReportModal Mounted. ID:", props.candidateId, "Token:", props.token ? "Yes" : "No")
+    
+    // Try to load from Session Storage first
+    try {
+        const cachedReports = sessionStorage.getItem('traitty_batch_reports')
+        if (cachedReports) {
+            const reportsMap = JSON.parse(cachedReports)
+            const cachedReport = reportsMap[props.candidateId]
+            
+            if (cachedReport) {
+                console.log('[TraitReportModal] Using cached report for candidate', props.candidateId)
+                traits.value = cachedReport.traits || []
+                assessmentDate.value = cachedReport.assessment_date || ''
+                loading.value = false
+                return  // Exit early, no need to fetch from API
+            }
+        }
+    } catch (e) {
+        console.warn('[TraitReportModal] Failed to load from cache:', e)
+    }
+    
+    // Fallback: Fetch from API if not in cache
+    console.log('[TraitReportModal] Cache miss, fetching from API...')
     try {
         const res = await fetch(`http://localhost:5000/api/v2/candidates/${props.candidateId}/report`, {
             headers: { 'Authorization': `Bearer ${props.token}` }
@@ -90,11 +112,11 @@ onMounted(async () => {
 
 <style scoped>
 .modal-backdrop {
-    position: fixed;
+    position: absolute; /* Changed from fixed to absolute to stay within ChatContainer */
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%; /* Changed from 100vw to 100% of parent */
+    height: 100%; /* Changed from 100vh to 100% of parent */
     background: rgba(0, 0, 0, 0.4);
     display: flex;
     align-items: center;
@@ -116,18 +138,19 @@ onMounted(async () => {
     color: #333;
 }
 
+
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.5rem;
+    padding: 0.8rem 1rem; /* Reduced padding */
     border-bottom: 1px solid #eee;
     background: #f8f9fa;
 }
 
 .modal-header h3 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1rem; /* Smaller font */
     color: #2c3e50;
     font-weight: 600;
 }
@@ -135,13 +158,13 @@ onMounted(async () => {
 .close-btn {
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     cursor: pointer;
     color: #999;
 }
 
 .modal-body {
-    padding: 1.5rem;
+    padding: 1rem;
     overflow-y: auto;
 }
 
@@ -152,8 +175,8 @@ onMounted(async () => {
 }
 
 .meta-row {
-    margin-bottom: 1rem;
-    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
     color: #666;
     text-align: right;
 }
@@ -161,56 +184,63 @@ onMounted(async () => {
 .trait-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
 }
 
 .trait-table th {
     text-align: left;
-    padding: 0.8rem;
+    padding: 0.4rem 0.5rem; /* Compact padding */
     border-bottom: 2px solid #eee;
     color: #555;
     font-weight: 600;
+    font-size: 12px; /* Smaller font */
 }
 
 .trait-table td {
-    padding: 0.8rem;
+    padding: 0.25rem 0.5rem; /* Very compact padding */
     border-bottom: 1px solid #f5f5f5;
     vertical-align: middle;
+}
+
+.trait-table td.trait-name {
+    font-size: 12px;
+    font-weight: 500;
 }
 
 .score-bar-container {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .score-bar-container span {
     width: 25px;
     text-align: right;
     font-weight: bold;
-    color: #444;
+    color: #f97316;
+    font-size: 12px;
 }
 
 .score-bar-bg {
     flex: 1;
-    height: 8px;
-    background: #eee;
-    border-radius: 4px;
+    height: 6px; /* Thinner bar */
+    background: #ffe4d6; /* Light orange bg */
+    border-radius: 3px;
     overflow: hidden;
-    min-width: 100px;
+    min-width: 80px;
 }
 
 .score-bar-fill {
     height: 100%;
-    background: #4f46e5; /* Professional Indigo */
-    border-radius: 4px;
+    background: #f97316; /* Match score color */
+    border-radius: 3px;
 }
 
 .badged-text {
     background: #f3f4f6;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 0.75rem;
     color: #555;
 }
 </style>

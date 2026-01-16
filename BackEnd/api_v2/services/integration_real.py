@@ -17,31 +17,59 @@ class RealIntegrationService(IntegrationServiceInterface):
             "Accept": "application/json"
         }
 
-    def get_candidates(self, token: str):
+    def get_candidates(self, auth_key: str, limit: int = 20, offset: int = 0) -> dict:
         """
         Fetch candidates from Traitty API using the provided JWT.
         Endpoint: GET /v1/candidates/
         """
+        token = auth_key
         if not token:
             print("[RealService] No token provided")
-            return []
+            return {"data": [], "page": {"total": 0}}
 
         try:
             url = f"{self.base_url}/v1/candidates/"
             headers = self._get_headers(token)
+            params = {"limit": limit, "offset": offset}
             
-            print(f"[RealService] Requesting {url}...")
-            response = httpx.get(url, headers=headers, timeout=15.0)
+            print(f"[RealService] Requesting {url} with params {params}...")
             
+            response = httpx.get(url, headers=headers, params=params, timeout=15.0)
+            
+            print(f"[RealService] Candidates Response Status: {response.status_code}")
             if response.status_code == 200:
                 data = response.json()
-                return data.get('data', [])
+                # Ensure structure
+                if 'data' not in data:
+                    return {'data': [], 'page': {}}
+                return data
             else:
-                print(f"[RealService] Candidates Error {response.status_code}: {response.text}")
-                return []
+                print(f"[RealService] Candidates Error Body: {response.text}")
+                return {"data": [], "page": {"total": 0}}
         except Exception as e:
             print(f"[RealService] Exception fetching candidates: {e}")
-            return []
+            return {"data": [], "page": {"total": 0}}
+
+    def get_candidate_by_id(self, token: str, candidate_id: str) -> dict:
+        """
+        Fetch Single Candidate by ID
+        Endpoint: GET /v1/candidates/{candidate_id}
+        """
+        try:
+            url = f"{self.base_url}/v1/candidates/{candidate_id}"
+            headers = self._get_headers(token)
+            
+            print(f"[RealService] Fetching Single Candidate: {url}...")
+            response = httpx.get(url, headers=headers, timeout=10.0)
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"[RealService] Single Candidate Error {response.status_code}: {response.text}")
+                return None
+        except Exception as e:
+            print(f"[RealService] Exception fetching single candidate: {e}")
+            return None
 
     def resolve_enterprise(self, token: str):
         """
@@ -55,10 +83,12 @@ class RealIntegrationService(IntegrationServiceInterface):
             print(f"[RealService] Resolving Enterprise: {url}...")
             response = httpx.get(url, headers=headers, timeout=10.0)
 
+            print(f"[RealService] Enterprise Response Status: {response.status_code}")
             if response.status_code == 200:
+                print(f"[RealService] Enterprise Data: {response.text}")
                 return response.json() # Returns { enterprise_name, job_desc: [] }
             else:
-                print(f"[Enterprise] Error {response.status_code}: {response.text}")
+                print(f"[Enterprise] Error Body: {response.text}")
                 return None
         except Exception as e:
             print(f"[Enterprise] Exception: {e}")
@@ -77,8 +107,13 @@ class RealIntegrationService(IntegrationServiceInterface):
             headers = self._get_headers(token)
             body = { "assessment_ids": assessment_ids }
 
-            print(f"[RealService] Batch Fetch Assessments: {len(assessment_ids)} IDs...")
+            print(f"[RealService] Batch Fetch Assessments URL: {url}")
+            print(f"[RealService] Request Body: {body}")
+            
             response = httpx.post(url, headers=headers, json=body, timeout=20.0)
+
+            print(f"[RealService] Assessments Response Status: {response.status_code}")
+            print(f"[RealService] Assessments Response Body: {response.text}")
 
             if response.status_code == 200:
                 # Response model: { enterprise_code, results: [{...}] }

@@ -1,20 +1,16 @@
 <template>
   <div class="reasoning-block">
-    <div class="reasoning-header" @click="isExpanded = !isExpanded">
+    <div class="reasoning-header">
       <span class="icon">🧠</span>
-      <span class="title">思考過程 (Reasoning)</span>
-      <span class="toggle-icon">{{ isExpanded ? '▲' : '▼' }}</span>
+      <span class="title">
+        Traitty 努力思考中，請稍待一會
+        <span class="loading-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
+      </span>
     </div>
-    <transition name="slide-fade">
-      <div v-if="isExpanded" class="reasoning-content">
-        <div class="intent-tag" v-if="intent">
-          <span class="label">意圖識別:</span> {{ intent }}
-        </div>
-        <div class="content-text">
-            <slot></slot>
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -32,7 +28,7 @@ const isExpanded = ref(false)
 .reasoning-block {
   margin: 0.5rem 0;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2); // Darker background for contrast
+  background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
   font-size: 0.9rem;
@@ -42,45 +38,58 @@ const isExpanded = ref(false)
   padding: 0.5rem 0.8rem;
   display: flex;
   align-items: center;
-  cursor: pointer;
   color: #94a3b8;
-  
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #e2e8f0;
+
+  .icon { 
+    margin-right: 0.5rem;
+    font-size: 1.1rem;
   }
-
-  .icon { margin-right: 0.5rem; }
-  .title { flex: 1; font-weight: 500; }
-  .toggle-icon { font-size: 0.8rem; }
+  
+  .title { 
+    flex: 1; 
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
 }
 
-.reasoning-content {
-  padding: 0.8rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.1);
-  color: #cbd5e1;
-  font-family: monospace;
-  white-space: pre-wrap;
+/* Loading Dots Animation */
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.4rem;
 }
 
-.intent-tag {
-  margin-bottom: 0.5rem;
-  font-size: 0.8rem;
-  color: #6366f1;
-  .label { color: #64748b; margin-right: 0.3rem;}
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  animation: bounce 1.4s infinite ease-in-out both;
 }
 
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.3s ease-out;
-  max-height: 500px;
-  opacity: 1;
+.dot:nth-child(1) {
+  animation-delay: -0.32s;
 }
 
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  max-height: 0;
-  opacity: 0;
+.dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 </style>

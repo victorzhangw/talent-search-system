@@ -24,14 +24,31 @@ class RAGService:
             self.integration_service = MockIntegrationService()
             
         # 3. Setup LLM Client (DeepSeek / MockConfig)
-        # HARDCODED FOR VERIFICATION
-        key = "sk-8377e508025f417eaa201aa714eabb0f"
-        base = "https://api.deepseek.com"
-        print(f"[RAG] HARDCODED INIT - Base: {base}, Key: {key[:5]}...")
+        # 3. Setup LLM Client
+        api_key = current_app.config.get('DEEPSEEK_API_KEY')
+        api_base = current_app.config.get('DEEPSEEK_API_BASE')
+        
+        # Fallback: Retry loading .env if key is missing (Hotfix for loading issue)
+        if not api_key:
+             print("[RAG] WARNING: DEEPSEEK_API_KEY is None. Attempting to reload .env manually...")
+             try:
+                 from dotenv import load_dotenv
+                 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+                 load_dotenv(env_path, override=True)
+                 api_key = os.getenv('DEEPSEEK_API_KEY')
+             except Exception as e:
+                 print(f"[RAG] .env reload failed: {e}")
+
+        # Final Safety Check: Use dummy key to prevent crash, let call_llm handle authentication error
+        if not api_key:
+             print("[RAG] CRITICAL: Still no API KEY. Using dummy key to prevent startup crash.")
+             api_key = "sk-dummy-key-for-init"
+
+        print(f"[RAG] Init LLM - Base: {api_base}, Key: {api_key[:5]}...")
         
         self.client = openai.OpenAI(
-            api_key=key,
-            base_url=base
+            api_key=api_key,
+            base_url=api_base
         )
 
         # 4. In-Memory Cache (Simple Dict for MVP)
@@ -64,10 +81,18 @@ class RAGService:
             'timestamp': time.time()
         }
 
-    def generate_response(self, query: str, candidate_ids: List[str], session_id: str):
+    def generate_response(self, query: str, candidate_ids: List[str], session_id: str, 
+                         candidates_info: List[Dict] = None, trait_reports: Dict = None):
         """
         Orchestrates the Full RAG Flow:
         Token -> Data Fetch (Cache/API) -> Context -> LLM
+        
+        Args:
+            query: User's question
+            candidate_ids: List of candidate IDs
+            session_id: Session identifier for caching
+            candidates_info: Optional. Full candidate info from frontend (includes name, position, etc.)
+            trait_reports: Optional. Trait reports from frontend Session Storage (keyed by candidate_id)
         """
         
         # Cache Key Strategy: Session ID + Candidate IDs hash
@@ -99,40 +124,133 @@ class RAGService:
                 print(f"[RAG] Enterprise: {enterprise_data.get('enterprise_name')}")
             
             # B. Candidates Basic Info
-            all_candidates = self.integration_service.get_candidates(upstream_token)
-            target_candidates_basic = [c for c in all_candidates if c['candidate_id'] in candidate_ids]
+            # NEW: Prioritize frontend-provided candidate info
+            target_candidates_basic = []
             
+            if candidates_info:
+                # Use frontend-provided data (preferred)
+                print(f"[RAG] Using {len(candidates_info)} candidates from frontend")
+                target_candidates_basic = candidates_info
+                for c in target_candidates_basic:
+                    print(f"[RAG-DEBUG] Frontend candidate: id={c.get('candidate_id')}, name='{c.get('name')}', position='{c.get('position')}'", flush=True)
+            else:
+                # Fallback: Fetch from API
+                print(f"[RAG] No frontend candidate info. Fetching from API...")
+                cand_resp = self.integration_service.get_candidates(upstream_token, limit=100)
+                
+                if isinstance(cand_resp, dict):
+                    all_candidates = cand_resp.get('data', [])
+                else:
+                    all_candidates = cand_resp
+                    
+                def to_str(v): return str(v) if v is not None else ""
+                target_ids_str = set(map(to_str, candidate_ids))
+                
+                for c in all_candidates:
+                    cid = to_str(c.get('candidate_id'))
+                    if cid in target_ids_str:
+                        target_candidates_basic.append(c)
+                        print(f"[RAG-DEBUG] Found candidate {cid}: name='{c.get('name')}', position='{c.get('position')}'", flush=True)
+
             # C. Detailed Assessments (Batch)
-            assessment_ids = []
-            for cand in target_candidates_basic:
-                # Check various locations for assessment_id
-                lat = cand.get('latest_assessment')
-                if lat and isinstance(lat, dict) and 'assessment_id' in lat:
-                    assessment_ids.append(lat['assessment_id'])
-                elif cand.get('assessment_id'):
-                    assessment_ids.append(cand.get('assessment_id'))
-            
-            assessments_list = []
-            if assessment_ids and isinstance(self.integration_service, RealIntegrationService):
-                try:
-                    assessments_list = self.integration_service.get_assessments(upstream_token, assessment_ids)
-                    print(f"[RAG] Fetched {len(assessments_list)} assessments.")
-                except Exception as e:
-                    print(f"[RAG] Assessments Fetch Failed: {e}")
-            
-            # D. Merge Data
-            final_candidates_data = []
-            for cand in target_candidates_basic:
-                my_asmt_id = cand.get('latest_assessment', {}).get('assessment_id')
+            # NEW: Check if trait_reports are provided from frontend
+            if trait_reports:
+                print(f"[RAG] ✅ Using trait reports from frontend for {len(trait_reports)} candidates")
                 
-                # Fix: Cast to string for comparison to avoid Int vs Str mismatch
-                my_asmt_data = next((a for a in assessments_list if str(a.get('assessment_id')) == str(my_asmt_id)), None)
+                # Merge trait reports with candidate basic info
+                final_candidates_data = []
+                for cand in target_candidates_basic:
+                    cand_id = str(cand.get('candidate_id'))
+                    merged = cand.copy()
+                    
+                    # Get trait report from frontend data
+                    if cand_id in trait_reports:
+                        report = trait_reports[cand_id]
+                        print(f"[RAG] Found trait report for candidate {cand_id}: {len(report.get('traits', []))} traits")
+                        
+                        # Convert frontend report format to expected format
+                        # Frontend format: { assessment_id, traits: [...], assessment_date }
+                        # Expected format: { assessment: { trait_results: {...} } }
+                        
+                        # Convert traits array to trait_results dict
+                        trait_results = {}
+                        for trait in report.get('traits', []):
+                            # Use trait name as key (not ideal, but works for now)
+                            # Better would be to use trait_id, but frontend doesn't have it
+                            trait_name = trait.get('name', 'Unknown')
+                            trait_results[trait_name] = {
+                                'score': trait.get('score', 0),
+                                'band': trait.get('band', ''),
+                                'chinese_name': trait_name  # Already translated
+                            }
+                        
+                        merged['assessment'] = {
+                            'assessment_id': report.get('assessment_id'),
+                            'trait_results': trait_results,
+                            'completion_time': report.get('assessment_date', 'N/A')
+                        }
+                    else:
+                        print(f"[RAG] WARNING: No trait report found for candidate {cand_id}")
+                    
+                    final_candidates_data.append(merged)
                 
-                merged = cand.copy()
-                if my_asmt_data:
-                    merged['assessment'] = my_asmt_data.get('assessment', {}) 
+                print(f"[RAG] Merged {len(final_candidates_data)} candidates with trait reports")
                 
-                final_candidates_data.append(merged)
+            else:
+                # Fallback: Fetch assessments from upstream API (original logic)
+                print(f"[RAG] No trait reports from frontend. Fetching from upstream API...")
+                
+                assessment_ids = []
+                cand_map = {}
+                
+                for cand in target_candidates_basic:
+                    lat = cand.get('latest_assessment')
+                    aid = None
+                    
+                    if lat and isinstance(lat, dict) and 'assessment_id' in lat:
+                        aid = lat['assessment_id']
+                    elif cand.get('assessment_id'):
+                        aid = cand.get('assessment_id')
+                        
+                    if aid:
+                        assessment_ids.append(aid)
+                        cand_map[str(aid)] = cand.get('name', 'Unknown')
+                    else:
+                        print(f"[RAG] Skipped candidate {cand.get('name')} - No Assessment ID. Data: {lat}")
+                
+                assessment_ids = list(set([aid for aid in assessment_ids if aid]))
+                print(f"[RAG] Prepared Assessment IDs: {assessment_ids} for candidates: {list(cand_map.values())}")
+
+                assessments_list = []
+                if assessment_ids and isinstance(self.integration_service, RealIntegrationService):
+                    try:
+                        assessments_list = self.integration_service.get_assessments(upstream_token, assessment_ids)
+                        print(f"[RAG] Fetched {len(assessments_list)} assessments.")
+                    except Exception as e:
+                        print(f"[RAG] Assessments Fetch Failed: {e}")
+                
+                # D. Merge Data
+                final_candidates_data = []
+                for cand in target_candidates_basic:
+                    my_asmt_id = cand.get('latest_assessment', {}).get('assessment_id')
+                    
+                    my_asmt_data = None
+                    for a in assessments_list:
+                        if str(a.get('assessment_id')) == str(my_asmt_id):
+                            my_asmt_data = a
+                            break
+                        inner = a.get('assessment', {})
+                        if inner and str(inner.get('assessment_id')) == str(my_asmt_id):
+                            my_asmt_data = a
+                            break
+                    
+                    merged = cand.copy()
+                    if my_asmt_data:
+                        merged['assessment'] = my_asmt_data.get('assessment', {}) 
+                    
+                    final_candidates_data.append(merged)
+                    print(f"[RAG-DEBUG] Final merged candidate: id={merged.get('candidate_id')}, name='{merged.get('name')}', has_assessment={bool(my_asmt_data)}", flush=True)
+
             
             # Save to Cache
             self._cache_data(cache_key, {
@@ -164,9 +282,14 @@ class RAGService:
 
 【Strict Context Constraint】
 1. 回答必須完全基於上方提供的【基礎特質分析資料】。
-2. 禁止捏造報告中不存在的特質分數。
-3. 若使用者詢問職位適配性，請引用具體的特質分數作為證據。即使使用者切換話題，此規則依然適用。
-4. 請務必使用候選人的「真實姓名」進行稱呼（例如 "Evagelion", "Devin"），嚴禁使用 "候選人A"、"候選人B" 等代稱。
+2. 禁止捏造報告中不存在的特質資訊。
+3. 若使用者詢問職位適配性，請深入分析候選人的行為特徵與潛在優劣勢。
+4. **【嚴禁數據輸出】**：
+   - 禁止在回答中提及具體的「特質分數」(score)（例如："得分 8.5"、"分數 7 分"）。
+   - 禁止在回答中提及原始的「區間等級」(band)（例如："落在 High 區間"、"屬於高分族群"）。
+   - 請直接將這些數據轉化為自然的顧問式行為描述（例如用「展現出強烈的...」、「在...方面較為謹慎」）。
+5. 嚴禁在回答中提及或解釋你所採用的「解說模式」或「Prompt設定」，請直接給出專業建議。
+6. 請務必使用候選人的「真實姓名」進行稱呼，嚴禁使用 "候選人A"、"候選人B" 等代稱。
 
 【核心指導原則】
 {ans_guide}
@@ -235,15 +358,21 @@ SESSION: {session_id} | USE_CASE: {uc_id}
             return response, uc_id
         except Exception as e:
             print(f"LLM Call Failed: {e}")
-            return self._mock_stream_fallback(), uc_id
+            # Use 'yield from' if this was a generator, but here we return the generator object
+            return self._mock_stream_fallback(error_msg=str(e)), uc_id
 
-    def _mock_stream_fallback(self):
+
+    def _mock_stream_fallback(self, error_msg=None):
         class MockChunk: 
             def __init__(self, content):
                 self.choices = [type('obj', (object,), {'delta': type('obj', (object,), {'content': content})})]
         
         def generator():
-            yield MockChunk("注意：由於 LLM 連線失敗 (或 Key 設定為 Mock)，以下為模擬回應。\n\n")
-            yield MockChunk("根據系統檢索到的企業與候選人資料，我已準備好回答您的問題。\n")
-            yield MockChunk("請檢查後端 Console Log 以確認 RAG Context 是否組裝正確。")
+            if error_msg:
+                 yield MockChunk(f"⚠️ 系統提示：AI 服務暫時無法連線 ({error_msg})。\n\n")
+            else:
+                 yield MockChunk("注意：由於 LLM 連線失敗 (或 Key 設定為 Mock)，以下為模擬回應。\n\n")
+            
+            yield MockChunk("很抱歉，因為後端服務暫時沒有回應，無法為您分析這幾位候選人。\n")
+            yield MockChunk("請稍後再試，或聯繫管理員檢查 API 設定。")
         return generator()

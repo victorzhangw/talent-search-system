@@ -2,17 +2,23 @@
 
 /* Default Theme (Dark Glass) */
 :root {
-    --glass-bg: rgba(20, 20, 30, 0.95);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-text-primary: #f9fafb;
-    --glass-text-secondary: #9ca3af;
+    /* Default Theme: Bright/Light */
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-text-primary: #111827;
+    --glass-text-secondary: #4b5563;
 
-    --primary-color: #6366f1;
-    --primary-hover: #4f46e5;
+    --primary-color: #4f46e5;
+    /* Indigo-600 */
+    --primary-hover: #4338ca;
+
     --accent-color: #ec4899;
 
-    --bubble-ai-bg: rgba(255, 255, 255, 0.05);
-    --bubble-ai-border: rgba(255, 255, 255, 0.08);
+    --btn-text-color: #ffffff;
+    /* Revert to white text */
+
+    --bubble-ai-bg: rgba(0, 0, 0, 0.04);
+    --bubble-ai-border: rgba(0, 0, 0, 0.06);
 
     /* Layout Spacing (shared) */
     --space-xs: 0.25rem;

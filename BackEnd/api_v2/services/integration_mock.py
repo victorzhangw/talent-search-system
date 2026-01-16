@@ -19,8 +19,18 @@ class MockIntegrationService(IntegrationServiceInterface):
             'enterprise_name': self.data['enterprise_name']
         }
 
-    def get_candidates(self, enterprise_code: str) -> List[Dict[str, Any]]:
-        return self.data['candidates']
+    def get_candidates(self, auth_key: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+        all_candidates = self.data['candidates']
+        sliced = all_candidates[offset : offset + limit]
+        
+        return {
+            "data": sliced,
+            "page": {
+                "total": len(all_candidates),
+                "limit": limit,
+                "offset": offset
+            }
+        }
 
     def get_assessments(self, enterprise_code: str, candidate_ids: List[str]) -> List[Dict[str, Any]]:
         results = []

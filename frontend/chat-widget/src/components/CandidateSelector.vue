@@ -15,7 +15,7 @@
             <input 
                 v-model="searchQuery" 
                 type="text" 
-                placeholder="搜尋姓名或職位..."
+                placeholder="輸入姓名或Email..."
             />
             <!-- Icon: Close -->
             <button v-if="searchQuery" class="clear-btn" @click="searchQuery = ''">
@@ -40,7 +40,7 @@
     </div>
 
     <!-- List -->
-    <div class="list-container">
+    <div class="list-container" ref="listContainer">
       <div 
         v-for="cand in filteredCandidates" 
         :key="cand.id" 
@@ -54,14 +54,24 @@
         </div>
         
         <div class="info">
-          <span class="role">{{ cand.position || '候選人' }}</span>
-          <span class="separator">-</span>
-          <span class="name">{{ cand.name }}</span>
+          <template v-if="cand.position">
+            <span class="role">【{{ cand.position }}】</span>
+            <span class="separator">-</span>
+          </template>
+          <span class="name">
+            {{ cand.name }}
+            <span v-if="cand.email" class="email">({{ cand.email }})</span>
+          </span>
         </div>
       </div>
       
-      <div v-if="filteredCandidates.length === 0" class="empty-state">
+      <div v-if="filteredCandidates.length === 0 && !isLoading" class="empty-state">
           沒有找到匹配的候選人
+      </div>
+
+      <!-- Loading Indicator -->
+      <div v-if="isLoading" class="loading-more">
+          <div class="spinner-small"></div> 載入中...
       </div>
     </div>
 
@@ -74,7 +84,7 @@
         :disabled="selectedIds.length === 0"
         @click="$emit('confirm', selectedIds)"
       >
-        開始分析
+        開始提問
         <!-- Icon: Arrow Forward -->
         <svg class="material-icon" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
       </button>
@@ -83,16 +93,24 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const props = defineProps({
   candidates: {
     type: Array,
     default: () => []
+  },
+  isLoading: {
+      type: Boolean,
+      default: false
+  },
+  hasMore: {
+      type: Boolean,
+      default: false
   }
 })
 
-const emit = defineEmits(['confirm'])
+const emit = defineEmits(['confirm', 'load-more'])
 const selectedIds = ref([])
 const searchQuery = ref('')
 
@@ -104,7 +122,8 @@ const filteredCandidates = computed(() => {
     return props.candidates.filter(c => {
         const nameMatch = (c.name || '').toLowerCase().includes(query)
         const posMatch = (c.position || '').toLowerCase().includes(query)
-        return nameMatch || posMatch
+        const emailMatch = (c.email || '').toLowerCase().includes(query)
+        return nameMatch || posMatch || emailMatch
     })
 })
 
@@ -122,6 +141,24 @@ const selectAllFiltered = () => {
     const newSelection = [...new Set([...selectedIds.value, ...idsToAdd])]
     selectedIds.value = newSelection
 }
+// Scroll Detection
+const listContainer = ref(null)
+
+const onScroll = (e) => {
+    const el = e.target
+    // Trigger when within 50px of bottom
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 50) {
+        if (!props.isLoading && props.hasMore) {
+            emit('load-more')
+        }
+    }
+}
+
+onMounted(() => {
+    if(listContainer.value) {
+        listContainer.value.addEventListener('scroll', onScroll)
+    }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -248,6 +285,8 @@ const selectAllFiltered = () => {
   padding-right: 0.5rem; 
 }
 
+
+
 .candidate-item {
   display: flex;
   align-items: center;
@@ -311,6 +350,12 @@ const selectAllFiltered = () => {
     .name { 
         font-weight: 400; 
         color: var(--glass-text-secondary); 
+        
+        .email {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            margin-left: 0.3rem;
+        }
     }
   }
 }
@@ -320,6 +365,26 @@ const selectAllFiltered = () => {
     padding: 2rem;
     color: var(--glass-text-secondary);
     font-style: italic;
+}
+
+.loading-more {
+    padding: 1rem;
+    text-align: center;
+    color: var(--glass-text-secondary);
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+
+    .spinner-small {
+        width: 16px; 
+        height: 16px; 
+        border: 2px solid rgba(127,127,127, 0.2); 
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
 }
 
 .action-footer {

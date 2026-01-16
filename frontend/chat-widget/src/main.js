@@ -16,6 +16,17 @@ window.mountTalentChat = (containerId = 'talent-chat-root') => {
 }
 
 // Auto-mount if in dev mode
-if (import.meta.env.MODE === 'development') {
-    window.mountTalentChat()
+// Auto-mount logic
+// 1. Dev mode: always mount
+// 2. Production: mount immediately if window.TRAITTY_WIDGET_AUTO_INIT is true
+// 3. Otherwise, wait for manual call to window.mountTalentChat()
+const shouldAutoMount = import.meta.env.MODE === 'development' || window.TRAITTY_WIDGET_CONFIG?.autoInit;
+
+if (shouldAutoMount) {
+    // Wrap in timeout to ensure DOM is ready if script is in head
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => window.mountTalentChat());
+    } else {
+        window.mountTalentChat();
+    }
 }

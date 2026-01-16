@@ -20,10 +20,11 @@ def create_app(config_class=Config):
         return traceback.format_exc(), 500
 
     # Register Blueprints
-    from routes import chat, auth, candidates
+    from routes import chat, auth, candidates, reports
     app.register_blueprint(chat.bp) # Default /chat
     app.register_blueprint(auth.bp, url_prefix='/auth')
     app.register_blueprint(candidates.bp, url_prefix='/api/v2/candidates') # Explicit path
+    app.register_blueprint(reports.bp, url_prefix='/api/v2/reports') # NEW: Batch reports endpoint
 
     @app.route('/health')
     def health_check():

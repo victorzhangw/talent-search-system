@@ -31,10 +31,21 @@
 <script setup>
 import { ref } from 'vue'
 
+const props = defineProps({
+  serverRoot: {
+    type: String,
+    default: 'http://localhost:5000'
+  },
+  initialError: {
+    type: String,
+    default: ''
+  }
+})
+
 const emit = defineEmits(['login-success'])
 
 const email = ref('')
-const errorMsg = ref('')
+const errorMsg = ref(props.initialError)
 const isLoading = ref(false)
 
 const handleLogin = async () => {
@@ -47,7 +58,8 @@ const handleLogin = async () => {
     errorMsg.value = ''
 
     try {
-        const res = await fetch('http://localhost:5000/auth/login', {
+        // Use dynamic server root
+        const res = await fetch(`${props.serverRoot}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email.value })

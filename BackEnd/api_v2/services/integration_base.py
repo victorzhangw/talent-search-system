@@ -16,9 +16,10 @@ class IntegrationServiceInterface(ABC):
         pass
 
     @abstractmethod
-    def get_candidates(self, enterprise_code: str) -> List[Dict[str, Any]]:
+    def get_candidates(self, auth_key: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
         """
         Get list of candidates for the enterprise.
+        Returns: { 'data': [...], 'page': {'total': N, ...} }
         """
         pass
 

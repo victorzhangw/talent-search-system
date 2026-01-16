@@ -18,3 +18,9 @@ PyYAML==6.0.2
 
 # Python version compatibility
 python-multipart==0.0.6
+
+# IIS Deployment
+wfastcgi>=3.0.0
+
+# IIS Deployment
+wfastcgi>=3.0.0

@@ -37,8 +37,19 @@ class ContextBuilder:
         
         # 2. Candidate Analysis
         for cand in candidates_data:
-            cand_name = f"{cand.get('name')} ({cand.get('position', 'NA')})"
+            # Debug: Log raw candidate data
+            print(f"[ContextBuilder-DEBUG] Processing candidate: {cand.get('candidate_id')}, name='{cand.get('name')}', position='{cand.get('position')}'", flush=True)
+            
+            # Robust name extraction with fallback
+            name = cand.get('name') or f"Candidate-{cand.get('candidate_id', 'Unknown')}"
+            position = cand.get('position', 'NA')
+            cand_name = f"{name} ({position})"
+            
+            if not cand.get('name'):
+                print(f"[ContextBuilder-WARNING] Candidate {cand.get('candidate_id')} has no 'name' field. Using fallback.", flush=True)
+            
             components["base_analysis"] += f"### 候選人: {cand_name}\n"
+
             
             # Assessment Data
             # Note: Upstream API format check needed. 
@@ -47,7 +58,16 @@ class ContextBuilder:
             # Based on Swagger: { assessment: { trait_results: ... } } inside the result item.
             
             asmt = cand.get('assessment', {})
+            # Robust Extraction: Check 'trait_results' inside assessment or directly in assessment or top level
             results = asmt.get('trait_results', {})
+            if not results:
+                # Try getting from top level if not nested
+                results = cand.get('trait_results', {})
+            # Sometimes 'trait_results' is the list itself if not dict
+            # or 'asmt' itself is the results dict? Let's check keys
+            if not results and isinstance(asmt, dict) and 'trait_id' in str(asmt):
+                # Heuristic: asmt might be the results dict/list
+                results = asmt
             
             if not results:
                 components["base_analysis"] += "  (無詳細測評數據)\n"

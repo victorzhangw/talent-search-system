@@ -3,9 +3,11 @@ import jwt
 import time
 import uuid
 
+import os
+
 bp = Blueprint('auth', __name__)
 
-SECRET_KEY = "traitty_ai_api"
+SECRET_KEY = os.getenv('PARTY_A_PLUGIN_SECRET', "traitty_ai_api")
 
 @bp.route('/login', methods=['POST'])
 def login():
