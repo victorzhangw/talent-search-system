@@ -228,6 +228,25 @@ const cycleTheme = () => {
 }
 
 const openNewTab = () => {
+    // Save state to LOCAL STORAGE for cross-tab sharing
+    const state = {
+        token: userToken.value,
+        activeIds: activeConversationCandidateIds.value,
+        selectedCandidates: candidates.value.filter(c => activeConversationCandidateIds.value.includes(c.candidate_id)),
+        messages: messages.value,
+        sessionId: currentSessionId.value,
+        theme: themeIndex.value
+    }
+    
+    try {
+        localStorage.setItem('traitty_new_tab_state', JSON.stringify(state))
+        
+        // Also ensure session storage has reports (though difficult to transfer large data)
+        // We rely on re-fetching or localStorage if session storage is empty in new tab
+    } catch (e) {
+        console.error("Failed to save state for new tab", e)
+    }
+
     window.open(window.location.href, '_blank')
 }
 
@@ -348,21 +367,44 @@ const handleLoginSuccess = async (authData) => {
 
 const restoreSessionState = () => {
     try {
+        // Priority 1: Check Local Storage (from New Tab action)
+        const newTabStateRaw = localStorage.getItem('traitty_new_tab_state')
+        if (newTabStateRaw) {
+            const state = JSON.parse(newTabStateRaw)
+            console.log('[ChatContainer] Hydrating from Local Storage (New Tab)...')
+            
+            // Restore Token if not already set (this bypasses auto-login wait)
+            if (state.token && !userToken.value) {
+                userToken.value = state.token
+                // We might need to fetch candidates now if not done yet
+                if (candidates.value.length === 0) fetchCandidates()
+                currentTab.value = 'main'
+            }
+            
+            if (state.activeIds && state.activeIds.length > 0) {
+                activeConversationCandidateIds.value = state.activeIds
+                isSelectionLocked.value = true
+                selectedCandidateIds.value = [] // Keep UI clean
+            }
+            
+            if (state.messages) messages.value = state.messages
+            if (state.sessionId) currentSessionId.value = state.sessionId
+            if (state.theme !== undefined) themeIndex.value = state.theme
+            
+            // Clear it so it doesn't persist forever
+            localStorage.removeItem('traitty_new_tab_state')
+            return 
+        }
+
+        // Priority 2: Check Session Storage (Same tab reload)
         const rawIds = sessionStorage.getItem('traitty_session_active_ids')
         if (rawIds) {
             const ids = JSON.parse(rawIds)
             if (Array.isArray(ids) && ids.length > 0) {
                 console.log('[ChatContainer] Restoring session state for IDs:', ids)
-                
-                // Restore Active Conversation State
                 activeConversationCandidateIds.value = ids
                 isSelectionLocked.value = true
-                
-                // Clear UI Selection (Per user requirement to have clean checklist underneath)
                 selectedCandidateIds.value = [] 
-                
-                // If we want to be safe, we can sync selectedIds to be empty, so UI is unchecked.
-                // The overlay will cover it anyway.
             }
         }
     } catch (e) {
@@ -549,9 +591,22 @@ const performAutoLogin = async (email) => {
 }
 
 onMounted(async () => {
-    if (window.TRAITTY_WIDGET_CONFIG && window.TRAITTY_WIDGET_CONFIG.userEmail) {
+    // First, check if we have a state transfer incoming
+    // If we do, we can skip the standard auto-login wait because we have the token
+    const newTabStateRaw = localStorage.getItem('traitty_new_tab_state')
+    if (newTabStateRaw) {
+        restoreSessionState()
+        // Ensure candidates are loaded
+        if (userToken.value) {
+             await fetchCandidates()
+        }
+    } 
+    
+    // Normal Flow: Auto Login if needed
+    if (!userToken.value && window.TRAITTY_WIDGET_CONFIG && window.TRAITTY_WIDGET_CONFIG.userEmail) {
         await performAutoLogin(window.TRAITTY_WIDGET_CONFIG.userEmail)
     }
+    
     isInitializing.value = false
 })
 
@@ -671,5 +726,5 @@ const sendMessage = async (e) => {
 </script>
 
 <style lang="scss" scoped>
-@import '../styles/chat-container.scss';
+@use '../styles/chat-container.scss';
 </style>
