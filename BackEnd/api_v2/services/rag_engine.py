@@ -275,39 +275,37 @@ class RAGService:
     def _assemble_prompt(self, uc_config, rag_context):
         # Retrieve answer guidance safely, default to empty string if missing
         ans_guide = uc_config.get('answer_guidence', '')
+        style_ref = uc_config['prompt_config'].get('style_ref', '')
+        risk_notes = chr(10).join([f'- {n}' for n in uc_config['prompt_config'].get('risk_notes', [])])
         
-        return f"""
-你是一個專業的人才測評顧問助手。
-{rag_context['enterprise_context']}
+        # Load prompt template from file
+        import os
+        prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', 'rag_system_prompt.txt')
+        
+        try:
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                template = f.read()
+        except Exception as e:
+            print(f"[RAG] Error loading prompt template: {e}")
+            # Fallback (Emergency simple prompt to avoid crash)
+            return f"System Error: Prompt template missing. Context: {rag_context['base_analysis']}"
 
-【Strict Context Constraint】
-1. 回答必須完全基於上方提供的【基礎特質分析資料】。
-2. 禁止捏造報告中不存在的特質資訊。
-3. 若使用者詢問職位適配性，請深入分析候選人的行為特徵與潛在優劣勢。
-4. **【嚴禁數據輸出】**：
-   - 禁止在回答中提及具體的「特質分數」(score)（例如："得分 8.5"、"分數 7 分"）。
-   - 禁止在回答中提及原始的「區間等級」(band)（例如："落在 High 區間"、"屬於高分族群"）。
-   - 請直接將這些數據轉化為自然的顧問式行為描述（例如用「展現出強烈的...」、「在...方面較為謹慎」）。
-5. 嚴禁在回答中提及或解釋你所採用的「解說模式」或「Prompt設定」，請直接給出專業建議。
-6. 請務必使用候選人的「真實姓名」進行稱呼，嚴禁使用 "候選人A"、"候選人B" 等代稱。
-
-【核心指導原則】
-{ans_guide}
-
-【回答風格與模式】
-模式: {uc_config['prompt_config']['style_ref']}
-風險提示:
-{chr(10).join(['- '+n for n in uc_config['prompt_config']['risk_notes']])}
-
-【基礎特質分析資料】 (Sheet 02 - Base Semantics)
-{rag_context['base_analysis']}
-
-【特質交互作用加強分析】 (Sheet 08 - Enhanced Context)
-{rag_context['interactions'] if rag_context['interactions'] else "(無顯著交互作用)"}
-
-【AI 回答約束條件】 (Do/Dont)
-{rag_context['constraints']}
-"""
+        # Format variables
+        # Note: We use .format(**dict) style but ensure keys match template placeholders
+        try:
+            sys_prompt = template.format(
+                enterprise_context=rag_context.get('enterprise_context', ''),
+                ans_guide=ans_guide,
+                style_ref=style_ref,
+                risk_notes=risk_notes,
+                base_analysis=rag_context.get('base_analysis', ''),
+                interactions=rag_context.get('interactions') if rag_context.get('interactions') else "(無顯著交互作用)",
+                constraints=rag_context.get('constraints', '')
+            )
+            return sys_prompt
+        except KeyError as e:
+            print(f"[RAG] Prompt formatting error: Missing key {e}")
+            return f"System Error: Prompt key error {e}"
 
     def _log_prompt(self, session_id, uc_id, sys_prompt, user_query):
         """ Log the prompt to a file for audit/debugging """

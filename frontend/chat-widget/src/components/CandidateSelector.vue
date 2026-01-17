@@ -3,7 +3,7 @@
     <div class="header-section">
       <h3>
         請選擇評估候選人
-        <span class="subtitle">（您可以選擇一位或多位候選人進行分析）</span>
+        <span class="subtitle"></span>
       </h3>
     </div>
 
@@ -28,7 +28,7 @@
                 全選 ({{ filteredCandidates.length }})
             </button>
             <span class="divider" v-if="selectedIds.length > 0">|</span>
-            <button class="action-link" v-if="selectedIds.length > 0" @click="selectedIds = []">
+            <button class="action-link" v-if="selectedIds.length > 0 && !disabled" @click="clearSelection">
                 清除已選
             </button>
         </div>
@@ -45,8 +45,8 @@
         v-for="cand in filteredCandidates" 
         :key="cand.id" 
         class="candidate-item"
-        :class="{ active: selectedIds.includes(cand.id) }"
-        @click="toggle(cand.id)"
+        :class="{ active: selectedIds.includes(cand.id), disabled: disabled }"
+        @click="!disabled && toggle(cand.id)"
       >
         <div class="checkbox">
           <!-- Icon: Check -->
@@ -75,19 +75,8 @@
       </div>
     </div>
 
-    <div class="action-footer">
-      <div class="selected-count">
-        已選擇 {{ selectedIds.length }} 位
-      </div>
-      <button 
-        class="start-btn" 
-        :disabled="selectedIds.length === 0"
-        @click="$emit('confirm', selectedIds)"
-      >
-        開始提問
-        <!-- Icon: Arrow Forward -->
-        <svg class="material-icon" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
-      </button>
+    <div class="selected-count">
+      已選擇 {{ selectedIds.length }} 位
     </div>
   </div>
 </template>
@@ -107,10 +96,14 @@ const props = defineProps({
   hasMore: {
       type: Boolean,
       default: false
+  },
+  disabled: {
+      type: Boolean,
+      default: false
   }
 })
 
-const emit = defineEmits(['confirm', 'load-more'])
+const emit = defineEmits(['change', 'load-more'])
 const selectedIds = ref([])
 const searchQuery = ref('')
 
@@ -133,6 +126,7 @@ const toggle = (id) => {
   } else {
     selectedIds.value.push(id)
   }
+  emit('change', selectedIds.value)
 }
 
 // Batch Actions
@@ -140,7 +134,14 @@ const selectAllFiltered = () => {
     const idsToAdd = filteredCandidates.value.map(c => c.id)
     const newSelection = [...new Set([...selectedIds.value, ...idsToAdd])]
     selectedIds.value = newSelection
+    emit('change', selectedIds.value)
 }
+
+const clearSelection = () => {
+    selectedIds.value = []
+    emit('change', [])
+}
+
 // Scroll Detection
 const listContainer = ref(null)
 
@@ -173,8 +174,9 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 1.5rem;
+  padding: 1.1rem;
   color: var(--glass-text-primary);
+  overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
 .header-section {
@@ -285,13 +287,11 @@ onMounted(() => {
   padding-right: 0.5rem; 
 }
 
-
-
 .candidate-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.8rem; 
+  gap: 0.9rem;
+  padding: 0.6rem; 
   
   background: rgba(127, 127, 127, 0.05); 
   border: 1px solid var(--glass-border);
@@ -308,7 +308,13 @@ onMounted(() => {
     border-color: var(--primary-color);
   }
 
-  /* Fixed Nesting Logic */
+  &.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: rgba(127,127,127,0.05); /* Force non-hover look */
+    &:hover { background: rgba(127,127,127,0.05); } 
+  }
+
   &.active .checkbox {
       background: var(--primary-color);
       border-color: var(--primary-color);
@@ -336,6 +342,8 @@ onMounted(() => {
     align-items: center;
     gap: 0.5rem;
     font-size: 0.95rem;
+    min-width: 0; /* Crucial for flex child truncation */
+    flex: 1;
     
     .role { 
         font-weight: 700; 
@@ -349,12 +357,21 @@ onMounted(() => {
     
     .name { 
         font-weight: 400; 
+        font-size: 0.7rem;
         color: var(--glass-text-secondary); 
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1; 
         
         .email {
-            font-size: 0.85rem;
+            font-size: 0.65rem;
             opacity: 0.7;
             margin-left: 0.3rem;
+            display: block; /* Make it block to force line break or we can keep inline-block? */
+            /* If we want single line with truncation: */
+            display: inline-block;
+            max-width: 100%;
         }
     }
   }
@@ -387,41 +404,12 @@ onMounted(() => {
     }
 }
 
-.action-footer {
-  margin-top: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 1rem;
-  border-top: 1px solid var(--glass-border);
-  flex-shrink: 0;
-
-  .selected-count {
-      color: var(--glass-text-secondary);
-      font-size: 0.9rem;
-  }
-
-  .start-btn {
-    background: var(--primary-color);
-    color: white;
-    border: none;
-    padding: 0.6rem 1.2rem;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      background: gray;
-    }
-    
-    &:hover:not(:disabled) {
-      background: var(--primary-hover);
-    }
-  }
+.selected-count {
+    color: var(--glass-text-secondary);
+    font-size: 0.9rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--glass-border);
+    flex-shrink: 0;
 }
 </style>

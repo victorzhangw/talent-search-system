@@ -13,6 +13,11 @@
         Traitty Beta
       </div>
       <div class="actions">
+        <!-- New Tab Button -->
+        <button class="icon-btn new-tab-btn" @click="openNewTab" title="在新分頁開啟">
+            <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+        </button>
+
         <!-- Theme Switcher -->
         <div class="theme-selector">
             <button class="icon-btn theme-btn" @click="cycleTheme" :title="'切換主題: ' + currentThemeLabel">
@@ -22,13 +27,6 @@
             </button>
         </div>
         
-        <button 
-          v-if="currentTab === 'chat'" 
-          class="text-btn" 
-          @click="resetAndReselect"
-        >
-          重選
-        </button>
         <!-- Icon: Close -->
         <button class="icon-btn close-btn" @click="$emit('close')">
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -38,82 +36,132 @@
 
     <!-- Main Flex Container -->
     <div class="main-layout">
-        <!-- Left/Main Content Area -->
-        <div class="content-body">
-          
-
-          <!-- Loading State -->
-          <div v-if="isInitializing" class="loading-view">
-             <div class="spinner"></div>
-             <p>驗證身分中...</p>
-          </div>
-
-          <!-- Tab 0: Login (Only show if not initializing and failed to auto-login) -->
-          <LoginView
-            v-else-if="currentTab === 'login'"
-            :serverRoot="computedServerRoot"
-            :initialError="autoLoginError"
-            @login-success="handleLoginSuccess"
-           />
-
-          <!-- Tab 1: Selection -->
-          <CandidateSelector 
-            v-else-if="currentTab === 'selection'"
-            :candidates="candidates"
-            :is-loading="isLoadingCandidates"
-            :has-more="hasMoreCandidates"
-            @confirm="handleSelectionConfirmed"
-            @load-more="loadMoreCandidates"
-          />
-
-          <!-- Tab 2: Chat -->
-          <div v-else-if="currentTab === 'chat'" class="chat-view">
-            <div class="selected-summary">
-                已鎖定: 
-                <span 
-                    v-for="(cand, idx) in selectedCandidatesObjects" 
-                    :key="cand.id"
-                    class="candidate-link"
-                    @click="openReport(cand)"
-                >
-                    {{ cand.name }}<span v-if="idx < selectedCandidatesObjects.length - 1">, </span>
-                </span>
+        
+        <!-- Login View (Intercepts everything if not logged in) -->
+        <div v-if="currentTab === 'login'" class="content-body">
+            <!-- Loading State -->
+            <div v-if="isInitializing" class="loading-view">
+                <div class="spinner"></div>
+                <p>驗證身分中...</p>
             </div>
             
-            <MessageList :messages="messages" />
-
-            <div class="input-area">
-              <textarea 
-                v-model="inputQuery" 
-                @keydown.enter.prevent="sendMessage"
-                placeholder="請提問... (Shift+Enter 換行)"
-                :disabled="isTyping"
-              ></textarea>
-              <button class="send-btn" @click="sendMessage" :disabled="!inputQuery.trim() || isTyping">
-                <!-- Icon: Send -->
-                <svg class="material-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-              </button>
-            </div>
-          </div>
+            <LoginView
+                v-else
+                :serverRoot="computedServerRoot"
+                :initialError="autoLoginError"
+                @login-success="handleLoginSuccess"
+            />
         </div>
 
-        <!-- Right Sidebar (Only in Chat Mode) -->
-        <div v-if="currentTab === 'chat'" class="quick-sidebar">
-            <div class="sidebar-title">
-                <svg class="material-icon small" viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-                快速提問
+        <!-- Split View (Selection Left + Chat Right) -->
+        <div v-else class="split-view">
+            
+            <!-- LEFT PANEL: Candidate List -->
+            <div class="left-panel">
+                <div class="panel-header" v-if="!isSelectionLocked">
+                     <button 
+                        class="primary-btn full-width"
+                        :disabled="selectedCandidateIds.length === 0"
+                        @click="lockSelectionAndStart"
+                     >
+                        開始分析 ({{ selectedCandidateIds.length }})
+                     </button>
+                </div>
+                <div class="panel-header" v-else>
+                     <button class="secondary-btn full-width" @click="resetAndReselect">
+                        重選候選人
+                     </button>
+                </div>
+                
+                <!-- Selector Wrapper -->
+                <div class="selector-wrapper">
+                    <CandidateSelector 
+                        ref="candidateSelectorRef"
+                        :candidates="candidates"
+                        :is-loading="isLoadingCandidates"
+                        :has-more="hasMoreCandidates"
+                        :disabled="isSelectionLocked"
+                        @change="handleSelectionChange"
+                        @load-more="loadMoreCandidates"
+                    />
+
+                    <!-- Locked Overlay -->
+                    <div v-if="isSelectionLocked" class="locked-overlay">
+                        <div class="overlay-content">
+                            <!-- Icon: Lock -->
+                            <svg class="material-icon large" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                            <h3>已進入分析模式</h3>
+                            <p>下方列表已暫時鎖定。</p>
+                            <p style="font-size: 0.8rem; margin-top: 0.5rem;">如需切換候選人，請點擊上方的「重選」按鈕。</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="quick-btn-list">
-                <button 
-                  v-for="(q, idx) in quickQuestions" 
-                  :key="idx" 
-                  class="quick-btn"
-                  @click="sendQuickMessage(q)"
-                  :disabled="isTyping"
-                >
-                 {{ q }}
-                </button>
+
+            <!-- RIGHT PANEL: Chat Area -->
+            <div class="right-panel">
+                
+                <!-- Chat View -->
+                <div v-if="isSelectionLocked" class="chat-view">
+                    <div class="selected-summary">
+                        已鎖定: 
+                        <span 
+                            v-for="(cand, idx) in activeConversationCandidatesObjects" 
+                            :key="cand.id"
+                            class="candidate-link"
+                            @click="openReport(cand)"
+                        >
+                            {{ cand.name }}<span v-if="idx < activeConversationCandidatesObjects.length - 1">, </span>
+                        </span>
+                    </div>
+                    
+                    <MessageList :messages="messages" />
+
+                    <div class="input-area">
+                        <textarea 
+                            v-model="inputQuery" 
+                            @keydown.enter.prevent="sendMessage"
+                            placeholder="請提問... (Shift+Enter 換行)"
+                            :disabled="isTyping"
+                        ></textarea>
+                        <button class="send-btn" @click="sendMessage" :disabled="!inputQuery.trim() || isTyping">
+                            <!-- Icon: Send -->
+                            <svg class="material-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Empty State Placeholder -->
+                <div v-else class="empty-layout-placeholder">
+                     <div class="placeholder-content">
+                        <!-- Icon: Touch App / Click -->
+                        <svg class="material-icon large" viewBox="0 0 24 24"><path d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6c0-.83-.67-1.5-1.5-1.5S10 6.67 10 7.5v10.74l-3.43-.72c-.08-.01-.15-.03-.24-.03-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.91-1.38z"/></svg>
+                        <h3>準備開始</h3>
+                        <p>請從左側列表勾選候選人，然後點擊「開始分析」。</p>
+                     </div>
+                </div>
+
             </div>
+
+            <!-- Right Sidebar -->
+            <div v-if="isSelectionLocked" class="quick-sidebar">
+                <div class="sidebar-title">
+                    <svg class="material-icon small" viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                    快速提問
+                </div>
+                <div class="quick-btn-list">
+                    <button 
+                        v-for="(q, idx) in quickQuestions" 
+                        :key="idx" 
+                        class="quick-btn"
+                        @click="sendQuickMessage(q)"
+                        :disabled="isTyping"
+                    >
+                        {{ q }}
+                    </button>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -138,7 +186,9 @@ import TraitReportModal from './TraitReportModal.vue'
 
 const emit = defineEmits(['close'])
 
-const currentTab = ref('login') // Defaut to login
+const currentTab = ref('login') // 'login' or 'main' (split view)
+const isSelectionLocked = ref(false) // Controls the split view state
+
 const userToken = ref(null)
 const autoLoginError = ref('')
 
@@ -149,11 +199,16 @@ const inputQuery = ref('')
 const isTyping = ref(false)
 
 const candidates = ref([])
-const selectedCandidateIds = ref([])
+// UI Selection State
+const selectedCandidateIds = ref([]) 
+// Active Conversation Logic State
+const activeConversationCandidateIds = ref([])
+
 const isLoadingCandidates = ref(false)
 const hasMoreCandidates = ref(true)
 const candidateOffset = ref(0)
 const PAGE_LIMIT = 20
+const candidateSelectorRef = ref(null)
 
 // Theme Logic
 const themes = ['light', 'midnight']
@@ -172,11 +227,17 @@ const cycleTheme = () => {
     themeIndex.value = (themeIndex.value + 1) % themes.length
 }
 
+const openNewTab = () => {
+    window.open(window.location.href, '_blank')
+}
+
 const currentSessionId = ref(crypto.randomUUID())
 
-const selectedCandidatesObjects = computed(() => {
-  return candidates.value.filter(c => selectedCandidateIds.value.includes(c.candidate_id))
+// Used for "Locked: XXX, YYY" display
+const activeConversationCandidatesObjects = computed(() => {
+  return candidates.value.filter(c => activeConversationCandidateIds.value.includes(c.candidate_id))
 })
+
 
 // --- API Configuration Helper ---
 const getApiConfig = () => {
@@ -223,27 +284,17 @@ const sendQuickMessage = (text) => {
 const fetchBatchTraitReports = async (selectedCandidates) => {
     const { apiBaseUrl } = getApiConfig()
     
-    console.log('[ChatContainer] ========== Batch Report Fetch Debug ==========')
-    console.log('[ChatContainer] Selected candidates:', selectedCandidates)
-    
     // Extract assessment IDs from selected candidates
     const assessmentIds = selectedCandidates
         .map(c => c.latest_assessment?.assessment_id)
         .filter(id => id != null)
     
-    console.log('[ChatContainer] Extracted assessment IDs:', assessmentIds)
-    
     if (assessmentIds.length === 0) {
-        console.warn('[ChatContainer] No assessment IDs found for selected candidates')
         return
     }
     
     const apiUrl = `${apiBaseUrl}/reports/batch`
     const payload = { assessment_ids: assessmentIds }
-    
-    console.log('[ChatContainer] API URL:', apiUrl)
-    console.log('[ChatContainer] Request Payload:', JSON.stringify(payload, null, 2))
-    console.log('[ChatContainer] Authorization:', userToken.value ? 'Token present' : 'No token')
     
     try {
         const res = await fetch(apiUrl, {
@@ -255,53 +306,32 @@ const fetchBatchTraitReports = async (selectedCandidates) => {
             body: JSON.stringify(payload)
         })
         
-        console.log('[ChatContainer] Response status:', res.status, res.statusText)
-        
         if (!res.ok) {
-            const errorText = await res.text()
-            console.error('[ChatContainer] Error response body:', errorText)
-            throw new Error(`Batch reports fetch failed: ${res.status} - ${errorText}`)
+            throw new Error(`Batch reports fetch failed: ${res.status}`)
         }
         
         const data = await res.json()
-        console.log('[ChatContainer] Response data:', data)
-        console.log('[ChatContainer] Number of reports received:', data.reports?.length || 0)
         
         // Store reports in Session Storage, keyed by candidate_id
         const reportsMap = {}
         data.reports.forEach(report => {
-            console.log('[ChatContainer] Processing report for assessment_id:', report.assessment_id)
-            
-            // Find matching candidate by assessment_id
             const candidate = selectedCandidates.find(
                 c => c.latest_assessment?.assessment_id === report.assessment_id
             )
-            
             if (candidate) {
-                console.log('[ChatContainer] Matched to candidate_id:', candidate.candidate_id)
                 reportsMap[candidate.candidate_id] = report
-            } else {
-                console.warn('[ChatContainer] No candidate found for assessment_id:', report.assessment_id)
             }
         })
         
-        console.log('[ChatContainer] Final reportsMap:', reportsMap)
-        console.log('[ChatContainer] Number of reports to save:', Object.keys(reportsMap).length)
-        
         sessionStorage.setItem('traitty_batch_reports', JSON.stringify(reportsMap))
         console.log('[ChatContainer] ✅ Saved to Session Storage')
-        console.log('[ChatContainer] ========== End Debug ==========')
         
     } catch (e) {
         console.error('[ChatContainer] ❌ Failed to fetch batch reports:', e)
-        console.error('[ChatContainer] Error details:', e.message)
-        console.error('[ChatContainer] ========== End Debug (Error) ==========')
-        // Non-blocking: Continue even if batch fetch fails
     }
 }
 
 const openReport = (cand) => {
-    console.log("openReport called with:", cand)
     currentReportCandidate.value = cand
     showReportModal.value = true
 }
@@ -310,7 +340,34 @@ const handleLoginSuccess = async (authData) => {
     userToken.value = authData.token
     // Fetch candidates after login
     await fetchCandidates()
-    currentTab.value = 'selection'
+    currentTab.value = 'main' // Switch to split view
+    
+    // After login and candidates load, check if we need to restore state (New Tab scenario)
+    restoreSessionState()
+}
+
+const restoreSessionState = () => {
+    try {
+        const rawIds = sessionStorage.getItem('traitty_session_active_ids')
+        if (rawIds) {
+            const ids = JSON.parse(rawIds)
+            if (Array.isArray(ids) && ids.length > 0) {
+                console.log('[ChatContainer] Restoring session state for IDs:', ids)
+                
+                // Restore Active Conversation State
+                activeConversationCandidateIds.value = ids
+                isSelectionLocked.value = true
+                
+                // Clear UI Selection (Per user requirement to have clean checklist underneath)
+                selectedCandidateIds.value = [] 
+                
+                // If we want to be safe, we can sync selectedIds to be empty, so UI is unchecked.
+                // The overlay will cover it anyway.
+            }
+        }
+    } catch (e) {
+        console.error("Failed to restore session state", e)
+    }
 }
 
 const loadMoreCandidates = () => {
@@ -386,52 +443,67 @@ const fetchCandidates = async (isLoadMore = false) => {
   }
 }
 
-const handleSelectionConfirmed = async (ids) => {
+const handleSelectionChange = (ids) => {
     selectedCandidateIds.value = ids
+}
+
+const lockSelectionAndStart = async () => {
+    if (selectedCandidateIds.value.length === 0) return
+
+    const ids = selectedCandidateIds.value
+    // Logic: Promote UI selection to Active Conversation
+    activeConversationCandidateIds.value = [...ids]
     
-    // Save selected candidates to Session Storage for reuse
+    // Identify objects for report fetching
     const selectedCandidates = candidates.value.filter(c => ids.includes(c.candidate_id))
+    
+    // Save to Session Storage for New Tab Restoration
     try {
+        sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(ids))
         sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(selectedCandidates))
-        console.log('[ChatContainer] Saved selected candidates to Session Storage:', selectedCandidates.length)
     } catch (e) {
         console.error('[ChatContainer] Failed to save to Session Storage:', e)
     }
     
-    // NEW: Batch fetch trait reports for all selected candidates
-    console.log('[ChatContainer] Fetching batch trait reports for', ids.length, 'candidates...')
+    // Batch fetch trait reports
     await fetchBatchTraitReports(selectedCandidates)
     
-    currentTab.value = 'chat'
+    // Update State: Lock Selection and Show AI Message
+    isSelectionLocked.value = true
+    
+    // UI Cleanup: Clear checkboxes in the underlying list as requested
+    selectedCandidateIds.value = []
+    if (candidateSelectorRef.value && candidateSelectorRef.value.clearSelection) {
+        candidateSelectorRef.value.clearSelection() 
+    }
+    
+    // Push Helper Message
     messages.value.push({ 
         role: 'ai', 
-        content: `已勾選 ${ids.length} 位候選人。您現在可以針對他們進行提問。` 
+        content: `已鎖定 ${ids.length} 位候選人。您現在可以針對他們進行提問。` 
     })
 }
 
 // Reset Logic: Clears history and generates new session
 const resetAndReselect = () => {
+    // Reset Chat
     messages.value = [{ role: 'ai', content: '您好！我是您的人才評鑑助手。請先選擇候選人，我將為您提供特質分析與建議。' }]
-    selectedCandidateIds.value = []
-    currentSessionId.value = crypto.randomUUID() // New Session -> New Context
+    currentSessionId.value = crypto.randomUUID() 
     inputQuery.value = ''
     
-    // Clear Session Storage (candidates and reports)
+    // Clear Session Storage
     try {
         sessionStorage.removeItem('traitty_selected_candidates')
-        sessionStorage.removeItem('traitty_batch_reports')  // NEW: Clear reports cache
-        console.log('[ChatContainer] Cleared Session Storage')
+        sessionStorage.removeItem('traitty_batch_reports') 
+        sessionStorage.removeItem('traitty_session_active_ids')
     } catch (e) {
         console.error('[ChatContainer] Failed to clear Session Storage:', e)
     }
     
-    // Reset Candidates List (Reload fresh)
-    candidateOffset.value = 0
-    hasMoreCandidates.value = true
-    candidates.value = []
-    fetchCandidates(false)
-    
-    currentTab.value = 'selection'
+    // Unlock Selection
+    isSelectionLocked.value = false
+    activeConversationCandidateIds.value = []
+    selectedCandidateIds.value = [] // Should be empty already
 }
 
 // Initial loading state to prevent login form flash
@@ -443,9 +515,6 @@ const performAutoLogin = async (email) => {
     const maxRetries = 3
     let attempt = 0
     let lastError = null
-
-    // Store for UI display if failed
-    // autoLoginEmailAttempt removed per user request
 
     console.log(`[AutoLogin] Starting auto-login for: ${email}`)
 
@@ -461,39 +530,28 @@ const performAutoLogin = async (email) => {
             if (res.ok) {
                 const data = await res.json()
                 if (data.token) {
-                    console.log("[AutoLogin] Success!")
                     await handleLoginSuccess(data)
-                    return // Success, exit function
+                    return // Success
                 } else {
                     throw new Error("Response OK but no token found")
                 }
             } else {
-                // If 4xx/5xx, capture status text
                 const text = await res.text()
                 throw new Error(`Server returned ${res.status}: ${text}`)
             }
         } catch (e) {
             console.warn(`[AutoLogin] Attempt ${attempt}/${maxRetries} failed:`, e.message)
             lastError = e
-            
-            // Wait 1 second before retrying, unless it's the last attempt
-            if (attempt < maxRetries) {
-                await new Promise(resolve => setTimeout(resolve, 1000))
-            }
+            if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000))
         }
     }
-
-    // If we get here, all retries failed
-    console.error("[AutoLogin] All attempts failed.")
     autoLoginError.value = `自動登入失敗 (重試 ${maxRetries} 次): ${lastError?.message || '未知錯誤'}`
 }
 
 onMounted(async () => {
-    // Check global config for user email
     if (window.TRAITTY_WIDGET_CONFIG && window.TRAITTY_WIDGET_CONFIG.userEmail) {
         await performAutoLogin(window.TRAITTY_WIDGET_CONFIG.userEmail)
     }
-    // Done checking, stop loading
     isInitializing.value = false
 })
 
@@ -518,24 +576,21 @@ const sendMessage = async (e) => {
 
   const { serverRoot } = getApiConfig()
   
-  // Load trait reports from Session Storage
   let traitReports = {}
   try {
     const cachedReports = sessionStorage.getItem('traitty_batch_reports')
-    if (cachedReports) {
-      traitReports = JSON.parse(cachedReports)
-      console.log('[ChatContainer] Loaded trait reports from Session Storage:', Object.keys(traitReports).length, 'reports')
-    } else {
-      console.warn('[ChatContainer] No trait reports found in Session Storage')
-    }
-  } catch (e) {
-    console.error('[ChatContainer] Failed to load trait reports from Session Storage:', e)
-  }
+    if (cachedReports) traitReports = JSON.parse(cachedReports)
+  } catch (e) {}
 
   try {
-    // CORRECTED: Ensure trailing slash to match Flask strict routing
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 90000) // 90 seconds timeout
+    const timeoutId = setTimeout(() => controller.abort(), 90000)
+
+    // Using activeConversationCandidateIds here!
+    const activeIds = activeConversationCandidateIds.value
+    // Find objects for active IDs
+    const activeCandidates = candidates.value.filter(c => activeIds.includes(c.candidate_id))
+
 
     const response = await fetch(`${serverRoot}/chat/`, { 
       method: 'POST',
@@ -545,10 +600,8 @@ const sendMessage = async (e) => {
       },
       body: JSON.stringify({
         query: query,
-        candidate_ids: selectedCandidateIds.value,
-        // Include full candidate info to avoid backend re-fetching
-        // This matches the structure from /v1/candidates/ API
-        candidates_info: selectedCandidatesObjects.value.map(c => ({
+        candidate_ids: activeIds,
+        candidates_info: activeCandidates.map(c => ({
           candidate_id: c.candidate_id,
           name: c.name,
           email: c.email || '',
@@ -560,9 +613,8 @@ const sendMessage = async (e) => {
           last_assessment_date: c.last_assessment_date || '',
           latest_assessment: c.latest_assessment || null
         })),
-        // NEW: Include trait reports from Session Storage
         trait_reports: traitReports,
-        session_id: currentSessionId.value // Dynamic Session ID
+        session_id: currentSessionId.value
       }),
       signal: controller.signal
     })
@@ -593,9 +645,7 @@ const sendMessage = async (e) => {
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const jsonStr = line.slice(6)
-          if (jsonStr === '[DONE]') {
-            continue
-          }
+          if (jsonStr === '[DONE]') continue
           try {
             const data = JSON.parse(jsonStr)
             if (data.type === 'meta') {
@@ -611,7 +661,6 @@ const sendMessage = async (e) => {
     if (error.name === 'AbortError' || error.message === 'TIMEOUT_RESPONSE') {
          messages.value[aiMsgIndex].content = "Traitty暫時沒回應，請稍等一下"
     } else {
-         console.error(error)
          messages.value[aiMsgIndex].content = "系統錯誤。"
     }
   } finally {
@@ -622,273 +671,5 @@ const sendMessage = async (e) => {
 </script>
 
 <style lang="scss" scoped>
-@use '../styles/glass.scss' as *;
-
-.material-icon {
-    width: 24px;
-    height: 24px;
-    fill: currentColor;
-    flex-shrink: 0;
-    
-    &.small {
-        width: 18px;
-        height: 18px;
-    }
-}
-
-.chat-container {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  width: 65vw; /* Expanded from 50vw */
-  min-width: 800px; /* Expanded from 600px */
-  height: 800px;
-  max-height: 92vh;
-  max-width: 95vw;
-  z-index: 9999;
-  
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-
-  @include glass-effect(true); 
-  
-  background: var(--glass-bg);
-  border-color: var(--glass-border);
-  color: var(--glass-text-primary);
-}
-
-.header {
-  padding: 0.8rem 1.2rem;
-  border-bottom: 1px solid var(--glass-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(var(--glass-text-primary), 0.05);
-  flex-shrink: 0;
-  
-  .title { 
-    font-weight: 700; 
-    font-size: 1rem; 
-    display: flex; 
-    align-items: center; 
-    gap: 0.5rem; 
-    color: var(--glass-text-primary);
-    
-    .title-icon {
-        width: 20px; 
-        height: 20px;
-        color: var(--primary-color); 
-    }
-  }
-  
-  .actions {
-    display: flex;
-    gap: 0.8rem;
-    align-items: center;
-  }
-  
-  .text-btn {
-    background: rgba(127,127,127,0.1);
-    border: 1px solid var(--glass-border);
-    color: var(--glass-text-secondary);
-    padding: 0.25rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    &:hover { background: rgba(127,127,127,0.2); color: var(--glass-text-primary); }
-  }
-
-  .icon-btn { 
-    background: none; 
-    border: none; 
-    color: var(--glass-text-secondary); 
-    cursor: pointer; 
-    font-size: 1.1rem; 
-    padding: 0.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    
-    &:hover { 
-        color: var(--glass-text-primary); 
-        background: rgba(127,127,127,0.1); 
-    }
-    
-    &.close-btn:hover {
-        color: #ef4444; 
-        background: rgba(239, 68, 68, 0.1);
-    }
-  }
-}
-
-/* Layout for Content + Sidebar */
-.main-layout {
-    display: flex;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.content-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0; 
-    min-width: 0; /* Important for flex child truncation */
-}
-
-/* Quick Question Sidebar */
-.quick-sidebar {
-    width: 220px;
-    background: rgba(0, 0, 0, 0.02); /* Very subtle background */
-    border-left: 1px solid var(--glass-border);
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    gap: 1rem;
-    
-    .sidebar-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--primary-color);
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    .quick-btn-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.8rem;
-        overflow-y: auto;
-    }
-    
-    .quick-btn {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        color: var(--glass-text-primary);
-        padding: 0.8rem;
-        border-radius: 8px;
-        text-align: left;
-        font-size: 0.85rem;
-        cursor: pointer;
-        transition: all 0.2s;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        
-        &:hover:not(:disabled) {
-            border-color: var(--primary-color);
-            transform: translateX(2px);
-            background: rgba(var(--primary-color), 0.05);
-        }
-        
-        &:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-    }
-}
-
-.chat-view {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-.selected-summary {
-    padding: 0.4rem 1rem;
-    background: rgba(79, 70, 229, 0.1); 
-    border-bottom: 1px solid var(--glass-border);
-    font-size: 0.8rem;
-    color: var(--primary-color); /* Matches theme */
-    flex-shrink: 0;
-    position: relative;
-    z-index: 100;
-
-    .candidate-link {
-        cursor: pointer;
-        text-decoration: underline;
-        font-weight: 600;
-        &:hover {
-            color: var(--glass-text-primary);
-        }
-    }
-}
-
-.input-area {
-  padding: 0.8rem 1rem;
-  border-top: 1px solid var(--glass-border);
-  display: flex;
-  gap: 0.8rem;
-  background: rgba(127, 127, 127, 0.05);
-  flex-shrink: 0;
-
-  textarea {
-    flex: 1;
-    background: rgba(127, 127, 127, 0.1);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
-    padding: 0.6rem 0.8rem;
-    color: var(--glass-text-primary);
-    resize: none;
-    height: 48px;
-    font-family: inherit;
-    font-size: 0.95rem;
-    line-height: 1.4;
-    transition: all 0.2s;
-    
-    &:focus { 
-      outline: none; 
-      border-color: var(--primary-color); 
-      background: rgba(127, 127, 127, 0.15); 
-    }
-    &::placeholder { color: var(--glass-text-secondary); opacity: 0.7; }
-  }
-
-  .send-btn {
-    background: var(--primary-color);
-    border: none;
-    border-radius: 8px;
-    width: 48px;
-    width: 48px;
-    height: 48px;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-    
-    .material-icon { width: 20px; height: 20px; }
-    
-    &:hover:not(:disabled) { background: var(--primary-hover); }
-    &:disabled { opacity: 0.5; cursor: not-allowed; background: #6b7280; }
-  }
-}
-
-.loading-view {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-    color: var(--glass-text-secondary);
-    
-    .spinner {
-        width: 30px;
-        height: 30px;
-        border: 3px solid rgba(127,127,127,0.2);
-        border-top-color: var(--primary-color);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
+@import '../styles/chat-container.scss';
 </style>

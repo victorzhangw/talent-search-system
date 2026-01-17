@@ -1,0 +1,450 @@
+@use 'glass.scss' as *;
+
+.material-icon {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    flex-shrink: 0;
+
+    &.small {
+        width: 18px;
+        height: 18px;
+    }
+
+    &.large {
+        width: 48px;
+        height: 48px;
+        opacity: 0.2;
+        color: var(--glass-text-secondary);
+        margin-bottom: 1rem;
+    }
+}
+
+.chat-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 70vw;
+    min-width: 900px;
+    height: 800px;
+    max-height: 92vh;
+    max-width: 95vw;
+    z-index: 9999;
+
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+
+    @include glass-effect(true);
+
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    color: var(--glass-text-primary);
+
+    /* Responsive for New Tab / Fullscreen */
+    @media (min-width: 1400px) {
+        width: 90vw;
+        height: 90vh;
+        max-width: 1600px;
+    }
+}
+
+.header {
+    padding: 0.8rem 1.2rem;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(var(--glass-text-primary), 0.05);
+    flex-shrink: 0;
+
+    .title {
+        font-weight: 700;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--glass-text-primary);
+
+        .title-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--primary-color);
+        }
+    }
+
+    .actions {
+        display: flex;
+        gap: 0.8rem;
+        align-items: center;
+    }
+
+    .icon-btn {
+        background: none;
+        border: none;
+        color: var(--glass-text-secondary);
+        cursor: pointer;
+        font-size: 1.1rem;
+        padding: 0.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+
+        &:hover {
+            color: var(--glass-text-primary);
+            background: rgba(127, 127, 127, 0.1);
+        }
+
+        &.close-btn:hover {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+    }
+}
+
+.main-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.content-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Split View Styles */
+.split-view {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.left-panel {
+    width: 320px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    background: rgba(127, 127, 127, 0.02);
+    transition: width 0.3s ease;
+
+    /* Responsive Width for Fullscreen */
+    @media (min-width: 1400px) {
+        width: 45%;
+        max-width: 700px;
+    }
+}
+
+.selector-wrapper {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Overlay for Locked Selection */
+.locked-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--glass-text-primary);
+
+    /* Dark mode support */
+    [data-theme="midnight"] & {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .overlay-content {
+        text-align: center;
+        padding: 2rem;
+
+        h3 {
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+    }
+}
+
+/* Grid Layout for Wide Screens (Two Columns) */
+@media (min-width: 1400px) {
+
+    /* Use :deep because these classes are inside CandidateSelector.vue */
+    :deep(.list-container) {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+        align-content: start;
+        padding-right: 1rem;
+        /* Adjust padding */
+    }
+
+    :deep(.candidate-item) {
+        height: auto;
+        /* Allow flexible height */
+    }
+}
+
+.right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+    background: var(--glass-bg);
+}
+
+.panel-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+}
+
+.primary-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.6rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+
+    &:hover:not(:disabled) {
+        background: var(--primary-hover);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: gray;
+    }
+
+    &.full-width {
+        width: 100%;
+    }
+}
+
+.secondary-btn {
+    background: transparent;
+    color: var(--glass-text-secondary);
+    border: 1px solid var(--glass-border);
+    padding: 0.6rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+
+    &:hover {
+        border-color: var(--glass-text-primary);
+        color: var(--glass-text-primary);
+    }
+
+    &.full-width {
+        width: 100%;
+    }
+}
+
+.empty-layout-placeholder {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--glass-text-secondary);
+
+    .placeholder-content {
+        text-align: center;
+        opacity: 0.7;
+
+        h3 {
+            margin: 1rem 0 0.5rem;
+            color: var(--glass-text-primary);
+        }
+
+        p {
+            font-size: 0.9rem;
+        }
+    }
+}
+
+/* Sidebar for quick questions - positioned absolutely or flex? */
+.quick-sidebar {
+    width: 200px;
+    background: rgba(0, 0, 0, 0.02);
+    border-left: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 1rem;
+    flex-shrink: 0;
+
+    .sidebar-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .quick-btn-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        overflow-y: auto;
+    }
+
+    .quick-btn {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        color: var(--glass-text-primary);
+        padding: 0.8rem;
+        border-radius: 8px;
+        text-align: left;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover:not(:disabled) {
+            border-color: var(--primary-color);
+            transform: translateX(2px);
+            background: rgba(var(--primary-color), 0.05);
+        }
+    }
+}
+
+.chat-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.selected-summary {
+    padding: 0.4rem 1rem;
+    background: rgba(79, 70, 229, 0.1);
+    border-bottom: 1px solid var(--glass-border);
+    font-size: 0.8rem;
+    color: var(--primary-color);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 100;
+
+    .candidate-link {
+        cursor: pointer;
+        text-decoration: underline;
+        font-weight: 600;
+
+        &:hover {
+            color: var(--glass-text-primary);
+        }
+    }
+}
+
+.input-area {
+    padding: 0.8rem 1rem;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    gap: 0.8rem;
+    background: rgba(127, 127, 127, 0.05);
+    flex-shrink: 0;
+
+    textarea {
+        flex: 1;
+        background: rgba(127, 127, 127, 0.1);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 0.6rem 0.8rem;
+        color: var(--glass-text-primary);
+        resize: none;
+        height: 48px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        line-height: 1.4;
+        transition: all 0.2s;
+
+        &:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: rgba(127, 127, 127, 0.15);
+        }
+
+        &::placeholder {
+            color: var(--glass-text-secondary);
+            opacity: 0.7;
+        }
+    }
+
+    .send-btn {
+        background: var(--primary-color);
+        border: none;
+        border-radius: 8px;
+        width: 48px;
+        height: 48px;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+
+        .material-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        &:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #6b7280;
+        }
+    }
+}
+
+.loading-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    color: var(--glass-text-secondary);
+
+    .spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid rgba(127, 127, 127, 0.2);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
