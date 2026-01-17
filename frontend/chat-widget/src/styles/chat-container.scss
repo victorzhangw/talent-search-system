@@ -31,6 +31,9 @@
     max-width: 95vw;
     z-index: 9999;
 
+    /* Default Widget Border Radius */
+    border-radius: 16px;
+
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -47,6 +50,25 @@
         width: 90vw;
         height: 90vh;
         max-width: 1600px;
+    }
+
+    /* FULLPAGE MODE OVERRIDE */
+    &.full-page-mode {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        margin: 0;
+        border-radius: 0;
+        border: none;
+
+        /* Ensure z-index is top */
+        z-index: 99999;
     }
 }
 
@@ -124,6 +146,8 @@
     display: flex;
     width: 100%;
     height: 100%;
+
+    /* In fullpage mode, give left panel more room on small screens? No, responsive is handled below */
 }
 
 .left-panel {
@@ -135,10 +159,22 @@
     background: rgba(127, 127, 127, 0.02);
     transition: width 0.3s ease;
 
-    /* Responsive Width for Fullscreen */
+    /* Responsive Width for Fullscreen / Large Widget */
+    /* Applied when container is large enough, or explicitly in full-page mode */
     @media (min-width: 1400px) {
-        width: 45%;
-        max-width: 700px;
+        width: 30%;
+        /* Less aggressive than before */
+        min-width: 350px;
+        max-width: 500px;
+    }
+
+    /* When explicitly in Full Page Mode */
+    .full-page-mode & {
+        width: 400px;
+        /* Base width */
+        min-width: 30%;
+        /* Responsive growth */
+        max-width: 50%;
     }
 }
 
@@ -186,24 +222,41 @@
     }
 }
 
-/* Grid Layout for Wide Screens (Two Columns) */
+/* Grid Layout for Wide Screens OR Full Page Mode */
 @media (min-width: 1400px) {
-
-    /* Use :deep because these classes are inside CandidateSelector.vue */
     :deep(.list-container) {
         display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        /* more responsive */
+        gap: 0.8rem;
         align-content: start;
-        padding-right: 1rem;
-        /* Adjust padding */
+        padding-right: 0.5rem;
     }
 
     :deep(.candidate-item) {
         height: auto;
-        /* Allow flexible height */
     }
 }
+
+/* Ensure Grid triggers in Full Page Mode even on smaller screens if wide enough */
+.full-page-mode .left-panel {
+    /* We can't use @container queries easily without polyfill, so stick to Media Query or JS */
+}
+
+/* Explicit Full Page Mode Grid (Force 2 Columns if space permits) */
+.full-page-mode :deep(.list-container) {
+    display: grid !important;
+    /* Try to fit 2 columns even on slightly narrower screens */
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.8rem;
+    align-content: start;
+    padding-right: 0.5rem;
+}
+
+.full-page-mode :deep(.candidate-item) {
+    height: auto;
+}
+
 
 .right-panel {
     flex: 1;

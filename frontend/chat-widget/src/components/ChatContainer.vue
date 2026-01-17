@@ -1,6 +1,6 @@
 <template>
   <!-- Apply theme to root -->
-  <div class="chat-container" :data-theme="currentTheme">
+  <div class="chat-container" :class="{ 'full-page-mode': isFullPage }" :data-theme="currentTheme">
     <!-- Header -->
     <div class="header">
       <div class="title">
@@ -13,8 +13,8 @@
         Traitty Beta
       </div>
       <div class="actions">
-        <!-- New Tab Button -->
-        <button class="icon-btn new-tab-btn" @click="openNewTab" title="在新分頁開啟">
+        <!-- New Tab Button (Hidden if already in full page mode) -->
+        <button v-if="!isFullPage" class="icon-btn new-tab-btn" @click="openNewTab" title="在新分頁開啟">
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
         </button>
 
@@ -185,6 +185,12 @@ import LoginView from './LoginView.vue'
 import TraitReportModal from './TraitReportModal.vue'
 
 const emit = defineEmits(['close'])
+const props = defineProps({
+    isFullPage: {
+        type: Boolean,
+        default: false
+    }
+})
 
 const currentTab = ref('login') // 'login' or 'main' (split view)
 const isSelectionLocked = ref(false) // Controls the split view state
@@ -240,14 +246,20 @@ const openNewTab = () => {
     
     try {
         localStorage.setItem('traitty_new_tab_state', JSON.stringify(state))
-        
-        // Also ensure session storage has reports (though difficult to transfer large data)
-        // We rely on re-fetching or localStorage if session storage is empty in new tab
     } catch (e) {
         console.error("Failed to save state for new tab", e)
     }
 
-    window.open(window.location.href, '_blank')
+    // Open New Tab with 'mode=fullpage' param
+    const url = new URL(window.location.href)
+    url.searchParams.set('mode', 'fullpage')
+    window.open(url.toString(), '_blank')
+    
+    // Reset Current Window State (Pop-out behavior)
+    resetAndReselect()
+    
+    // Close the widget in current window
+    emit('close')
 }
 
 const currentSessionId = ref(crypto.randomUUID())
