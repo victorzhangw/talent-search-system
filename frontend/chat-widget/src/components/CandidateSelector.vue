@@ -75,9 +75,14 @@
           <div class="spinner-small"></div> 載入中...
       </div>
       
-      <!-- Scroll Hint -->
-      <div v-else-if="hasMore && !searchQuery" class="scroll-hint">
-          <span>滑動載入更多...</span>
+      <!-- Scroll Hint / Manual Load -->
+      <div 
+        v-else-if="hasMore && !searchQuery" 
+        class="scroll-hint clickable" 
+        @click="emit('load-more')"
+        title="點擊載入更多"
+      >
+          <span>載入更多...</span>
           <svg class="material-icon small arrow" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
       </div>
     </div>
@@ -89,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 
 const props = defineProps({
   candidates: {
@@ -166,9 +171,29 @@ const onScroll = (e) => {
     }
 }
 
+// Auto-fill container if content doesn't scrolling (e.g. large screen)
+const checkAndFillContainer = async () => {
+    await nextTick()
+    if (!listContainer.value) return
+    
+    // If not loading, has more data, and NO scrollbar (scrollHeight <= clientHeight)
+    // We fetch more to fill the space
+    const { scrollHeight, clientHeight } = listContainer.value
+    if (!props.isLoading && props.hasMore && scrollHeight <= clientHeight + 50) {
+        emit('load-more')
+    }
+}
+
+// Watch candidates change to re-check if we need to fill more
+watch(() => props.candidates, () => {
+    checkAndFillContainer()
+}, { deep: true }) // Deep watch just in case
+
 onMounted(() => {
     if(listContainer.value) {
         listContainer.value.addEventListener('scroll', onScroll)
+        // Initial check
+        checkAndFillContainer()
     }
 })
 </script>
@@ -291,6 +316,9 @@ onMounted(() => {
 
 .list-container {
   flex: 1;
+  /* Flex height hack: Force height to 0 so flex-grow controls the height entirely */
+  height: 0; 
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -425,6 +453,16 @@ onMounted(() => {
     align-items: center;
     gap: 0.3rem;
     opacity: 0.7;
+    transition: opacity 0.2s;
+    
+    &.clickable {
+        cursor: pointer;
+        &:hover {
+            opacity: 1;
+            background: rgba(127, 127, 127, 0.05);
+            border-radius: 8px;
+        }
+    }
     
     .arrow {
         animation: bounce 2s infinite;
