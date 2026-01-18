@@ -81,6 +81,7 @@
                         :is-loading="isLoadingCandidates"
                         :has-more="hasMoreCandidates"
                         :disabled="isSelectionLocked"
+                        :total-count="totalCandidatesCount"
                         @change="handleSelectionChange"
                         @load-more="loadMoreCandidates"
                     />
@@ -213,6 +214,7 @@ const activeConversationCandidateIds = ref([])
 const isLoadingCandidates = ref(false)
 const hasMoreCandidates = ref(true)
 const candidateOffset = ref(0)
+const totalCandidatesCount = ref(0)
 const PAGE_LIMIT = 20
 const candidateSelectorRef = ref(null)
 
@@ -459,6 +461,8 @@ const fetchCandidates = async (isLoadMore = false) => {
         rawList = data
         total = 9999 // Unknown
     }
+
+    totalCandidatesCount.value = total
 
     const newCandidates = rawList.map(c => ({
         ...c, 

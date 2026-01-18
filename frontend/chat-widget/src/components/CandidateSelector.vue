@@ -35,8 +35,9 @@
     </div>
 
     <!-- Stats -->
-    <div class="list-stats" v-if="searchQuery">
-       搜尋結果: {{ filteredCandidates.length }} 筆
+    <div class="list-stats">
+       <span v-if="searchQuery">搜尋結果: {{ filteredCandidates.length }} 筆</span>
+       <span v-else>已顯示 {{ candidates.length }} / 共 {{ totalCount }} 筆</span>
     </div>
 
     <!-- List -->
@@ -73,6 +74,12 @@
       <div v-if="isLoading" class="loading-more">
           <div class="spinner-small"></div> 載入中...
       </div>
+      
+      <!-- Scroll Hint -->
+      <div v-else-if="hasMore && !searchQuery" class="scroll-hint">
+          <span>滑動載入更多...</span>
+          <svg class="material-icon small arrow" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+      </div>
     </div>
 
     <div class="selected-count">
@@ -100,6 +107,10 @@ const props = defineProps({
   disabled: {
       type: Boolean,
       default: false
+  },
+  totalCount: {
+      type: Number,
+      default: 0
   }
 })
 
@@ -402,6 +413,28 @@ onMounted(() => {
         border-radius: 50%;
         animation: spin 1s linear infinite;
     }
+}
+
+.scroll-hint {
+    padding: 0.8rem;
+    text-align: center;
+    color: var(--glass-text-secondary);
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.3rem;
+    opacity: 0.7;
+    
+    .arrow {
+        animation: bounce 2s infinite;
+    }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+  40% {transform: translateY(5px);}
+  60% {transform: translateY(3px);}
 }
 
 .selected-count {

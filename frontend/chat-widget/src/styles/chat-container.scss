@@ -172,7 +172,7 @@
     .full-page-mode & {
         width: 400px;
         /* Base width */
-        min-width: 30%;
+        min-width: 35%;
         /* Responsive growth */
         max-width: 50%;
     }
@@ -246,8 +246,8 @@
 /* Explicit Full Page Mode Grid (Force 2 Columns if space permits) */
 .full-page-mode :deep(.list-container) {
     display: grid !important;
-    /* Try to fit 2 columns even on slightly narrower screens */
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    /* Force exactly 2 columns to ensure email visibility */
+    grid-template-columns: 1fr 1fr;
     gap: 0.8rem;
     align-content: start;
     padding-right: 0.5rem;
