@@ -2,18 +2,12 @@
 import jwt
 import os
 import datetime
-from fastapi import HTTPException, Security, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from functools import wraps
+from flask import request, jsonify, current_app
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
-from ..database.connection import get_db_cursor, get_db_connection
-from ..database.models import AdminUser
-# We need a proper session management for FastAPI dependency. 
-# get_db_cursor is a context manager, not an iterator for Depends.
-# Let's define a get_db dependency.
+from ..database.connection import get_db_session
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
-security = HTTPBearer()
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "super-secret-key-change-me")
 ALGORITHM = "HS256"
@@ -32,20 +26,25 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_db():
-    db = get_db_session()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return username
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        # Check header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            if auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+        
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+        
+        try:
+            data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            current_user = data['sub']
+        except Exception as e:
+            return jsonify({'message': 'Token is invalid!'}), 401
+            
+        return f(current_user, *args, **kwargs)
+    
+    return decorated

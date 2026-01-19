@@ -21,10 +21,14 @@ def create_app(config_class=Config):
 
     # Register Blueprints
     from routes import chat, auth, candidates, reports
+    from admin import router as admin_router
+    
     app.register_blueprint(chat.bp) # Default /chat
     app.register_blueprint(auth.bp, url_prefix='/auth')
     app.register_blueprint(candidates.bp, url_prefix='/api/v2/candidates') # Explicit path
     app.register_blueprint(reports.bp, url_prefix='/api/v2/reports') # NEW: Batch reports endpoint
+    app.register_blueprint(admin_router.bp) # /api/admin as defined in blueprint url_prefix
+
 
     @app.route('/health')
     def health_check():
