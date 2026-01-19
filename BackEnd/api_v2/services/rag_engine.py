@@ -351,7 +351,8 @@ SESSION: {session_id} | USE_CASE: {uc_id}
             response = self.client.chat.completions.create(
                 model="deepseek-chat",
                 messages=messages,
-                stream=True
+                stream=True,
+                stream_options={"include_usage": True}
             )
             return response, uc_id
         except Exception as e:
