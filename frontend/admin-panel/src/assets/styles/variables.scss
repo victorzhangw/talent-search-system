@@ -1,0 +1,32 @@
+// Core Colors
+$primary-color: #00DC82; // Mint Green
+$primary-hover: #00C675;
+$primary-light: #E6FAF2;
+
+$secondary-color: #4F46E5; // Indigo (for charts/accents)
+$danger-color: #EF4444;
+$warning-color: #F59E0B;
+$success-color: #10B981;
+
+// Backgrounds
+$bg-body: #F8FAFC; // Light gray/blueish background
+$bg-card: #FFFFFF;
+$bg-sidebar: #FFFFFF;
+
+// Text
+$text-main: #1E293B; // Slate 800
+$text-muted: #64748B; // Slate 500
+$text-light: #94A3B8;
+
+// Borders
+$border-color: #E2E8F0;
+$border-radius: 12px;
+$border-radius-sm: 8px;
+
+// Shadows
+$shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+$shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+$shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+// Typography
+$font-family: 'Inter', system-ui, -apple-system, sans-serif;

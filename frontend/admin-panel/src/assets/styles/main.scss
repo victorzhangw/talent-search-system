@@ -1,0 +1,53 @@
+@import 'variables';
+
+body {
+    margin: 0;
+    font-family: $font-family;
+    background-color: $bg-body;
+    color: $text-main;
+    -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+    transition: color 0.2s;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+}
+
+// Utility Classes
+.card {
+    background: $bg-card;
+    border-radius: $border-radius;
+    box-shadow: $shadow-sm;
+    border: 1px solid $border-color;
+    padding: 1.5rem;
+}
+
+.text-primary {
+    color: $primary-color;
+}
+
+.text-danger {
+    color: $danger-color;
+}
+
+.text-muted {
+    color: $text-muted;
+}
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
