@@ -8,6 +8,8 @@ from contextlib import contextmanager
 # Global instances
 _tunnel = None
 _db_pool = None
+_engine = None
+_SessionLocal = None
 
 def get_db_config():
     """Retrieve database config from environment variables."""
@@ -93,6 +95,38 @@ def get_db_connection():
         password=config['db_password']
     )
     return conn
+
+def get_db_engine():
+    """Get SQLAlchemy Engine (Singleton)."""
+    global _engine
+    if _engine:
+        return _engine
+        
+    config = get_db_config()
+    tunnel = get_ssh_tunnel()
+    
+    port = config['db_port']
+    host = config['db_host']
+    
+    if tunnel:
+        port = tunnel.local_bind_port
+        host = 'localhost'
+        
+    db_url = f"postgresql://{config['db_user']}:{config['db_password']}@{host}:{port}/{config['db_name']}"
+    
+    from sqlalchemy import create_engine
+    _engine = create_engine(db_url, pool_pre_ping=True)
+    return _engine
+
+def get_db_session():
+    """Get SQLAlchemy Session."""
+    global _SessionLocal
+    if not _SessionLocal:
+        from sqlalchemy.orm import sessionmaker
+        engine = get_db_engine()
+        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    
+    return _SessionLocal()
 
 @contextmanager
 def get_db_cursor():
