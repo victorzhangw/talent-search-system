@@ -95,12 +95,28 @@ def list_sessions(current_user):
     skip = request.args.get('skip', 0, type=int)
     limit = request.args.get('limit', 20, type=int)
     user_id = request.args.get('user_id')
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
     
     db = get_db_session()
     try:
         query = db.query(ChatSession)
         if user_id:
             query = query.filter(ChatSession.user_id == user_id)
+            
+        if start_date_str:
+            # Assume local input (UTC+8) -> Convert to UTC
+            # E.g. User selects 2026-01-20. This means 2026-01-20 00:00:00 Local -> 2026-01-19 16:00:00 UTC
+            start_date_local = datetime.strptime(start_date_str, '%Y-%m-%d')
+            start_date_utc = start_date_local - timedelta(hours=8)
+            query = query.filter(ChatSession.started_at >= start_date_utc)
+            
+        if end_date_str:
+            # End Date Inclusive (End of Day Local)
+            # E.g. User selects 2026-01-20. This means 2026-01-21 00:00:00 Local -> 2026-01-20 16:00:00 UTC
+            end_date_local = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+            end_date_utc = end_date_local - timedelta(hours=8)
+            query = query.filter(ChatSession.started_at < end_date_utc)
             
         sessions = query.order_by(ChatSession.last_active_at.desc()).offset(skip).limit(limit).all()
         
@@ -179,3 +195,99 @@ def get_dashboard_stats(current_user):
         })
     finally:
         db.close()
+
+# --- Reports & Analytics ---
+
+@bp.route('/reports/users-usage', methods=['GET'])
+@token_required
+def users_usage_report(current_user):
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    
+    db = get_db_session()
+    try:
+        # Base query: Join Session and Message to get token usage per user
+        # We group by user_id
+        
+        query = db.query(
+            ChatSession.user_id,
+            func.count(func.distinct(ChatSession.session_id)).label('session_count'),
+            func.sum(ChatMessage.token_usage).label('total_tokens')
+        ).join(ChatMessage, ChatSession.session_id == ChatMessage.session_id)
+        
+        # Filter Date Range (on Message creation for accurate token usage in period)
+        if start_date_str:
+            start_date_local = datetime.strptime(start_date_str, '%Y-%m-%d')
+            start_date_utc = start_date_local - timedelta(hours=8)
+            query = query.filter(ChatMessage.created_at >= start_date_utc)
+            
+        if end_date_str:
+            end_date_local = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+            end_date_utc = end_date_local - timedelta(hours=8)
+            query = query.filter(ChatMessage.created_at < end_date_utc)
+            
+        results = query.group_by(ChatSession.user_id).all()
+        
+        data = []
+        for r in results:
+            user_id = r.user_id or "Anonymous"
+            data.append({
+                "user_id": user_id,
+                "session_count": r.session_count,
+                "total_tokens": r.total_tokens or 0
+            })
+            
+        return jsonify(data)
+    except Exception as e:
+        print(f"[Admin] Report Error: {e}")
+        return jsonify({'detail': str(e)}), 500
+    finally:
+        db.close()
+
+@bp.route('/reports/daily-usage', methods=['GET'])
+@token_required
+def daily_usage_report(current_user):
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    user_id = request.args.get('user_id')
+    
+    db = get_db_session()
+    try:
+        # Postgres date_trunc
+        date_col = func.date_trunc('day', ChatMessage.created_at).label('date')
+        
+        query = db.query(
+            date_col,
+            func.sum(ChatMessage.token_usage).label('tokens'),
+            func.count(func.distinct(ChatSession.session_id)).label('sessions')
+        ).join(ChatSession, ChatSession.session_id == ChatMessage.session_id)
+        
+        if user_id:
+            query = query.filter(ChatSession.user_id == user_id)
+            
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            query = query.filter(ChatMessage.created_at >= start_date)
+            
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(ChatMessage.created_at < end_date)
+            
+        results = query.group_by(date_col).order_by(date_col).all()
+        
+        data = []
+        for r in results:
+            data.append({
+                "date": r.date.strftime('%Y-%m-%d'),
+                "tokens": r.tokens or 0,
+                "sessions": r.sessions
+            })
+            
+        return jsonify(data)
+    except Exception as e:
+        print(f"[Admin] Daily Report Error: {e}")
+        return jsonify({'detail': str(e)}), 500
+    finally:
+        db.close()
+
+

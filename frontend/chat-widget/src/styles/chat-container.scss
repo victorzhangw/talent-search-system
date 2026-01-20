@@ -45,6 +45,11 @@
     border-color: var(--glass-border);
     color: var(--glass-text-primary);
 
+    /* Smooth transition for width/position changes */
+    transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+        max-width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+        right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+
     /* Responsive for New Tab / Fullscreen */
     @media (min-width: 1400px) {
         width: 90vw;

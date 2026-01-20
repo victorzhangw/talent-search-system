@@ -4,7 +4,13 @@
       <div class="header-section">
           <h2>Session Management</h2>
           <div class="filters">
-              <BaseInput v-model="search" placeholder="Search Session ID..." />
+              <div class="date-group">
+                  <input type="date" v-model="startDate" class="date-input" placeholder="Start Date">
+                  <span class="sep">to</span>
+                  <input type="date" v-model="endDate" class="date-input" placeholder="End Date">
+              </div>
+              <BaseInput v-model="search" placeholder="User ID..." />
+              <BaseButton @click="fetchSessions">Search</BaseButton>
           </div>
       </div>
 
@@ -59,14 +65,18 @@ import { useDateFormat } from '@vueuse/core'
 const sessions = ref([])
 const loading = ref(false)
 const search = ref('')
+const startDate = ref('')
+const endDate = ref('')
 
 const fetchSessions = async () => {
     loading.value = true
     try {
-        // In real app, pass search params
-        const res = await axios.get('/api/admin/sessions', {
-            params: { limit: 50 }
-        })
+        const params = { limit: 50 }
+        if (search.value) params.user_id = search.value
+        if (startDate.value) params.start_date = startDate.value
+        if (endDate.value) params.end_date = endDate.value
+        
+        const res = await axios.get('/api/admin/sessions', { params })
         sessions.value = res.data
     } catch (e) {
         console.error(e)
@@ -88,6 +98,36 @@ onMounted(fetchSessions)
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
+}
+
+.filters {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.date-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: white;
+    padding: 0.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.date-input {
+    border: none;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-family: inherit;
+    outline: none;
+    color: #475569;
+}
+
+.sep {
+    color: #94a3b8;
+    font-size: 0.9rem;
 }
 
 .table-container {

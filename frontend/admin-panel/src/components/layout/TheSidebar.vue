@@ -18,12 +18,20 @@
       </div>
 
       <div class="nav-section">
+        <div class="nav-label">報表中心</div>
+        <router-link to="/reports" class="nav-item" active-class="active">
+          <BarChart2 :size="20" />
+          <span>用量報表</span>
+        </router-link>
+      </div>
+
+      <div class="nav-section">
         <div class="nav-label">管理功能</div>
         <router-link to="/sessions" class="nav-item" active-class="active">
           <MessageSquare :size="20" />
           <span>對話紀錄</span>
         </router-link>
-         <router-link to="/users" class="nav-item" active-class="active">
+        <router-link to="/users" class="nav-item" active-class="active">
           <Users :size="20" />
           <span>使用者管理</span>
         </router-link>
@@ -33,7 +41,7 @@
 </template>
 
 <script setup>
-import { LayoutDashboard, MessageSquare, Users } from 'lucide-vue-next'
+import { LayoutDashboard, MessageSquare, Users, BarChart2 } from 'lucide-vue-next'
 </script>
 
 <style lang="scss" scoped>

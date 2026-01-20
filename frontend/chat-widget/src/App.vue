@@ -20,6 +20,18 @@ const isOpen = ref(false)
 const isFullPageMode = ref(false)
 
 const toggleChat = () => {
+  if (!isOpen.value) {
+      // Opening the widget: Clear session state for a fresh start
+      try {
+          sessionStorage.removeItem('traitty_selected_candidates')
+          sessionStorage.removeItem('traitty_batch_reports')
+          sessionStorage.removeItem('traitty_session_active_ids')
+          // Note: We keeping 'traitty_new_tab_state' in LocalStorage as that's for cross-tab transfer
+          // and usually not relevant when clicking the launcher manually.
+      } catch (e) {
+          console.error('Error clearing storage:', e)
+      }
+  }
   isOpen.value = !isOpen.value
 }
 

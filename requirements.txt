@@ -1,20 +1,25 @@
-# Core dependencies
-fastapi==0.115.0
+# Framework
+Flask==3.1.0
+Flask-Cors==5.0.0
+Werkzeug>=3.1.4
+
+# Server (Production)
 uvicorn[standard]==0.32.0
-pydantic==2.10.0
+waitress==3.0.2
+asgiref==3.11.0
 
-# Database (use psycopg2-binary for Python 3.11 compatibility)
-psycopg2-binary>=2.9.9,<3.0
+# Database
+SQLAlchemy==2.0.23
+psycopg2-binary>=2.9.9
 
-# SSH Tunnel
-sshtunnel==0.4.0
-paramiko==3.4.0
+# AI & API Clients
+openai>=1.0.0
+httpx>=0.25.1
 
-# HTTP Client
-httpx==0.25.1
+# Auth & Admin
+passlib[bcrypt]==1.7.4
+python-jose==3.3.0
 
-# Python version compatibility
-python-multipart==0.0.6
-
-# CORS support
+# Utilities
 python-dotenv==1.0.0
+pydantic>=2.0.0

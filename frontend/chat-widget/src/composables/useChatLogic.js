@@ -467,7 +467,8 @@ export function useChatLogic(emit) {
                         latest_assessment: c.latest_assessment || null
                     })),
                     trait_reports: traitReports,
-                    session_id: currentSessionId.value
+                    session_id: currentSessionId.value,
+                    user_id: window.TRAITTY_WIDGET_CONFIG?.userEmail || 'anonymous'
                 }),
                 signal: controller.signal
             })

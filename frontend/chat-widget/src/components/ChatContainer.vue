@@ -1,6 +1,6 @@
 <template>
   <!-- Apply theme to root -->
-  <div class="chat-container" :class="{ 'full-page-mode': isFullPage }" :data-theme="currentTheme">
+  <div class="chat-container" :class="{ 'full-page-mode': isFullPage, 'expanded-mode': isExpanded }" :data-theme="currentTheme">
     <!-- Header -->
     <div class="header">
       <div class="title">
@@ -13,9 +13,20 @@
         Traitty Beta
       </div>
       <div class="actions">
-        <!-- New Tab Button (Hidden if already in full page mode) -->
         <button v-if="!isFullPage" class="icon-btn new-tab-btn" @click="openNewTab" title="在新分頁開啟">
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+        </button>
+
+        <!-- Dynamic Expand/Collapse Button -->
+        <button v-if="!isFullPage" class="icon-btn expand-btn" @click="toggleExpand" :title="isExpanded ? '恢復預設寬度' : '切換全寬模式'">
+            <!-- Expand Icon -->
+            <svg v-if="!isExpanded" class="material-icon" viewBox="0 0 24 24">
+                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            </svg>
+            <!-- Collapse Icon -->
+            <svg v-else class="material-icon" viewBox="0 0 24 24">
+                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5h2z"/>
+            </svg>
         </button>
 
         <!-- Theme Switcher -->
@@ -247,8 +258,22 @@ const lockSelectionAndStart = () => {
         }
     })
 }
+
+// Full Width Toggle Logic
+const isExpanded = ref(false)
+const toggleExpand = () => {
+    isExpanded.value = !isExpanded.value
+}
+
 </script>
 
 <style lang="scss" scoped>
 @use '../styles/chat-container.scss';
+
+.chat-container.expanded-mode {
+    width: 98vw;
+    max-width: none;
+    right: 1vw;
+    /* Optional: Ensure header doesn't stretch weirdly if needed, but flex handles it */
+}
 </style>
