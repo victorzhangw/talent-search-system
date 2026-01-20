@@ -1,8 +1,8 @@
 import os
 from flask import Flask
 from flask_cors import CORS
-from config.settings import Config
-from database import init_db
+from .config.settings import Config
+from .database import init_db
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -20,8 +20,8 @@ def create_app(config_class=Config):
         return traceback.format_exc(), 500
 
     # Register Blueprints
-    from routes import chat, auth, candidates, reports
-    from admin import router as admin_router
+    from .routes import chat, auth, candidates, reports
+    from .admin import router as admin_router
     
     app.register_blueprint(chat.bp) # Default /chat
     app.register_blueprint(auth.bp, url_prefix='/auth')

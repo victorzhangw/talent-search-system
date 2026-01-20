@@ -10,22 +10,22 @@
 
     <nav class="sidebar-nav">
       <div class="nav-section">
-        <div class="nav-label">Dashboard</div>
+        <div class="nav-label">儀表板</div>
         <router-link to="/dashboard" class="nav-item" active-class="active">
           <LayoutDashboard :size="20" />
-          <span>Analytics</span>
+          <span>數據分析</span>
         </router-link>
       </div>
 
       <div class="nav-section">
-        <div class="nav-label">Management</div>
+        <div class="nav-label">管理功能</div>
         <router-link to="/sessions" class="nav-item" active-class="active">
           <MessageSquare :size="20" />
-          <span>Sessions</span>
+          <span>對話紀錄</span>
         </router-link>
          <router-link to="/users" class="nav-item" active-class="active">
           <Users :size="20" />
-          <span>Users</span>
+          <span>使用者管理</span>
         </router-link>
       </div>
     </nav>

@@ -4,22 +4,22 @@
     <div class="login-card">
         <div class="brand">
             <div class="logo-icon">P</div>
-            <h1>Admin Portal</h1>
+            <h1>管理後台</h1>
         </div>
         
-        <p class="subtitle">Sign in to manage the chatbot system</p>
+        <p class="subtitle">請登入以管理聊天機器人系統</p>
 
         <form @submit.prevent="handleLogin" class="login-form">
             <BaseInput 
                 v-model="username" 
-                label="Username" 
-                placeholder="Enter admin username"
+                label="使用者名稱" 
+                placeholder="輸入管理員帳號"
                 required
             />
             
             <BaseInput 
                 v-model="password" 
-                label="Password" 
+                label="密碼" 
                 type="password" 
                 placeholder="••••••••"
                 required
@@ -30,7 +30,7 @@
             </div>
 
             <BaseButton type="submit" :loading="isLoading" class="w-full">
-                Sign In
+                登入
             </BaseButton>
         </form>
     </div>

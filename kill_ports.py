@@ -15,3 +15,7 @@ def kill_port(port):
 if __name__ == "__main__":
     kill_port(5000)
     kill_port(5173)
+    kill_port(5174)
+    kill_port(5175)
+    kill_port(5176)
+    kill_port(5177)

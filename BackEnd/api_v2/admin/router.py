@@ -35,21 +35,55 @@ def login():
 def read_users_me(current_user):
     return jsonify({"username": current_user})
 
-@bp.route('/register-dev', methods=['POST'])
-def register():
-    # REMOVE IN PROD
+@bp.route('/users', methods=['POST'])
+@token_required
+def create_user(current_user):
     data = request.get_json()
+    if not data or not data.get('username') or not data.get('password'):
+        return jsonify({'detail': 'Username and password required'}), 400
+        
     db = get_db_session()
     try:
-        if db.query(AdminUser).count() > 0:
-             return jsonify({'detail': 'Admins already exist.'}), 400
+        # Check if username exists
+        if db.query(AdminUser).filter(AdminUser.username == data['username']).first():
+            return jsonify({'detail': 'Username already exists.'}), 400
              
         hashed_password = get_password_hash(data['password'])
         new_user = AdminUser(username=data['username'], password_hash=hashed_password)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        return jsonify({"username": new_user.username})
+        return jsonify({"username": new_user.username, "id": new_user.id}), 201
+    finally:
+        db.close()
+
+@bp.route('/users/<int:user_id>/password', methods=['PUT'])
+@token_required
+def update_user_password(current_user, user_id):
+    data = request.get_json()
+    if not data or not data.get('password'):
+        return jsonify({'detail': 'New password required'}), 400
+        
+    db = get_db_session()
+    try:
+        user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+        if not user:
+            return jsonify({'detail': 'User not found'}), 404
+            
+        hashed_password = get_password_hash(data['password'])
+        user.password_hash = hashed_password
+        db.commit()
+        return jsonify({"detail": "Password updated successfully"})
+    finally:
+        db.close()
+
+@bp.route('/users', methods=['GET'])
+@token_required
+def list_users(current_user):
+    db = get_db_session()
+    try:
+        users = db.query(AdminUser).all()
+        return jsonify([{"id": u.id, "username": u.username, "created_at": u.created_at.isoformat()} for u in users])
     finally:
         db.close()
 

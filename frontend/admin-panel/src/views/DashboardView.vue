@@ -2,14 +2,14 @@
 <template>
   <div class="dashboard">
      <div class="header-section">
-         <h2>Analytics Overview</h2>
+         <h2>數據總覽</h2>
          <div class="controls">
-             <BaseButton variant="secondary">Download Report</BaseButton>
+             <BaseButton variant="secondary">下載報表</BaseButton>
          </div>
      </div>
 
      <div class="stats-grid">
-         <BaseCard title="Total Sessions">
+         <BaseCard title="總對話數">
             <div class="stat-content">
                  <div class="stat-value">{{ stats.total_sessions }}</div>
                  <div class="stat-trend text-primary">
@@ -17,19 +17,19 @@
                  </div>
             </div>
          </BaseCard>
-         <BaseCard title="Total Tokens">
+         <BaseCard title="Token 消耗量">
              <div class="stat-content">
                  <div class="stat-value">{{ (stats.total_tokens / 1000).toFixed(1) }}k</div>
-                 <div class="stat-label">Consumed</div>
+                 <div class="stat-label">已消耗</div>
             </div>
          </BaseCard>
-         <BaseCard title="Active Users (24h)">
+         <BaseCard title="24小時活躍用戶">
              <div class="stat-content">
                  <div class="stat-value">{{ stats.active_sessions_24h }}</div>
-                 <div class="stat-label">Sessions</div>
+                 <div class="stat-label">工作階段</div>
             </div>
          </BaseCard>
-         <BaseCard title="Total Messages">
+         <BaseCard title="總訊息數">
              <div class="stat-content">
                  <div class="stat-value">{{ stats.total_messages }}</div>
             </div>
@@ -37,7 +37,7 @@
      </div>
 
      <div class="charts-section">
-         <BaseCard title="Token Consumption Trend">
+         <BaseCard title="Token 消耗趨勢">
              <TokenChart :data="mockChartData" />
          </BaseCard>
      </div>

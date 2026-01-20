@@ -1,6 +1,6 @@
 from typing import Dict, List
 import json
-from database import db_session, TraitBand, TraitInteraction, TraitDefinition
+from ..database import db_session, TraitBand, TraitInteraction, TraitDefinition
 
 class ContextBuilder:
     def __init__(self, use_case_config: Dict):
@@ -33,15 +33,26 @@ class ContextBuilder:
         if jobs:
             components["enterprise_context"] += "相關職缺:\n"
             for job in jobs:
-                components["enterprise_context"] += f"- [{job.get('title')}]: {job.get('desc')}\n"
+                if isinstance(job, dict):
+                    components["enterprise_context"] += f"- [{job.get('title')}]: {job.get('desc')}\n"
+                else:
+                    components["enterprise_context"] += f"- {str(job)}\n"
         
         # 2. Candidate Analysis
-        for cand in candidates_data:
+        for i, cand in enumerate(candidates_data):
             # Debug: Log raw candidate data
-            print(f"[ContextBuilder-DEBUG] Processing candidate: {cand.get('candidate_id')}, name='{cand.get('name')}', position='{cand.get('position')}'", flush=True)
+            if isinstance(cand, str):
+                print(f"[ContextBuilder-ERROR] Candidate item {i} is a string: {cand}", flush=True)
+                continue
+            if not isinstance(cand, dict):
+                 print(f"[ContextBuilder-ERROR] Candidate item {i} is not a dict: {type(cand)} - {cand}", flush=True)
+                 continue
+
+            cand_id = cand.get('candidate_id', 'Unknown')
+            print(f"[ContextBuilder-DEBUG] Processing candidate: {cand_id}", flush=True)
             
             # Robust name extraction with fallback
-            name = cand.get('name') or f"Candidate-{cand.get('candidate_id', 'Unknown')}"
+            name = cand.get('name') or f"Candidate-{cand_id}"
             position = cand.get('position', 'NA')
             cand_name = f"{name} ({position})"
             
@@ -65,7 +76,7 @@ class ContextBuilder:
                 results = cand.get('trait_results', {})
             # Sometimes 'trait_results' is the list itself if not dict
             # or 'asmt' itself is the results dict? Let's check keys
-            if not results and isinstance(asmt, dict) and 'trait_id' in str(asmt):
+            if not results and isinstance(asmt, (dict, str)) and 'trait_id' in str(asmt):
                 # Heuristic: asmt might be the results dict/list
                 results = asmt
             

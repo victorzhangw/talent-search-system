@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app
-from services.integration_mock import MockIntegrationService
-from services.integration_real import RealIntegrationService
-from utils.token_generator import generate_upstream_token
+from ..services.integration_mock import MockIntegrationService
+from ..services.session_store import SqlSessionStore
+from ..database import db_session, ChatSession, ChatMessage
+from ..services.integration_real import RealIntegrationService
+from ..utils.token_generator import generate_upstream_token
 import jwt
 
 # No url_prefix, handled in app.py

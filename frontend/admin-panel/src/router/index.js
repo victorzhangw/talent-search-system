@@ -30,8 +30,14 @@ const router = createRouter({
         {
             path: '/sessions/:id',
             name: 'session-detail',
-            component: () => import('../views/SessionDetailView.vue'), // Placeholder
+            component: () => import('../views/SessionDetailView.vue'),
             meta: { requiresAuth: true, title: 'Session Detail' }
+        },
+        {
+            path: '/users',
+            name: 'users',
+            component: () => import('../views/UserManagementView.vue'),
+            meta: { requiresAuth: true, title: 'User Management' }
         }
     ]
 })

@@ -7,7 +7,7 @@ from .integration_base import IntegrationServiceInterface
 from .integration_mock import MockIntegrationService
 from .integration_real import RealIntegrationService
 from .context_builder import ContextBuilder 
-from utils.token_generator import generate_upstream_token
+from ..utils.token_generator import generate_upstream_token
 
 class RAGService:
     def __init__(self):

@@ -3,10 +3,13 @@ title Talent Search V2 - Backend API
 echo ===========================================
 echo Starting Talent Search V2 Backend (Port 5000)
 echo ===========================================
-cd BackEnd\api_v2
+
+REM Ensure we are in the project root
+cd /d "%~dp0"
+
 if not exist ".venv" (
-    echo Error: .venv not found!
-    echo Please make sure you are in the correct directory or have run 'python -m venv .venv'
+    echo Error: .venv not found in project root!
+    echo Please run 'python -m uv venv' or ensure .venv exists.
     pause
     exit /b 1
 )
@@ -14,7 +17,7 @@ if not exist ".venv" (
 echo Activating virtual environment...
 call .venv\Scripts\activate
 
-echo Starting Flask App...
-python app.py
+echo Starting Backend via run_backend.py...
+python run_backend.py
 
 pause
