@@ -10,15 +10,9 @@
     </div>
 
     <div class="header-right">
-      <div class="search-bar">
-        <Search :size="18" class="search-icon" />
-        <input type="text" placeholder="Search (Ctrl + K)" />
-      </div>
-
       <div class="actions">
-        <button class="icon-btn">
-            <Bell :size="20" />
-            <span class="badge"></span>
+        <button class="icon-btn" @click="handleLogout" title="登出">
+            <LogOut :size="20" />
         </button>
         <div class="user-profile">
             <div class="avatar">AD</div>
@@ -30,11 +24,21 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { Search, Bell, ChevronRight } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { ChevronRight, LogOut } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 const pageTitle = computed(() => route.meta.title || 'Overview')
+
+const handleLogout = () => {
+    if (confirm('確定要登出系統嗎？')) {
+        auth.logout()
+        router.push('/login')
+    }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -64,33 +68,6 @@ const pageTitle = computed(() => route.meta.title || 'Overview')
     align-items: center;
     gap: 1.5rem;
 
-    .search-bar {
-      position: relative;
-      
-      .search-icon {
-        position: absolute;
-        left: 0.75rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: $text-muted;
-      }
-
-      input {
-        padding: 0.5rem 1rem 0.5rem 2.5rem;
-        border: none;
-        background-color: white; // Or input bg
-        border-radius: 20px;
-        width: 240px;
-        font-size: 0.9rem;
-        box-shadow: $shadow-sm;
-        
-        &:focus {
-          outline: none;
-          box-shadow: $shadow-md;
-        }
-      }
-    }
-
     .actions {
         display: flex;
         align-items: center;
@@ -102,19 +79,9 @@ const pageTitle = computed(() => route.meta.title || 'Overview')
             color: $text-muted;
             position: relative;
             padding: 0.25rem;
+            cursor: pointer;
             
-            &:hover { color: $text-main; }
-
-            .badge {
-                position: absolute;
-                top: 0;
-                right: 0;
-                width: 8px;
-                height: 8px;
-                background: $primary-color;
-                border-radius: 50%;
-                border: 1px solid white;
-            }
+            &:hover { color: $primary-color; }
         }
 
         .user-profile {
