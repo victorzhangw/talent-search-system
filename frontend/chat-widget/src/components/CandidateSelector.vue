@@ -55,12 +55,9 @@
         </div>
         
         <div class="info">
-          <template v-if="cand.position">
-            <span class="role">【{{ cand.position }}】</span>
-            <span class="separator">-</span>
-          </template>
           <span class="name">
             {{ cand.name }}
+            <span v-if="cand.position"> - {{ cand.position }}</span>
             <span v-if="cand.email" class="email">({{ cand.email }})</span>
           </span>
         </div>
@@ -384,33 +381,20 @@ onMounted(() => {
     min-width: 0; /* Crucial for flex child truncation */
     flex: 1;
     
-    .role { 
-        font-weight: 700; 
-        color: var(--glass-text-primary); 
-    }
-    
-    .separator {
-        color: var(--glass-text-secondary);
-        opacity: 0.6;
-    }
-    
     .name { 
-        font-weight: 400; 
-        font-size: 0.7rem;
-        color: var(--glass-text-secondary); 
+        font-weight: 500; 
+        font-size: 0.95rem;
+        color: var(--glass-text-primary); 
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         flex: 1; 
         
         .email {
-            font-size: 0.65rem;
-            opacity: 0.7;
-            margin-left: 0.3rem;
-            display: block; /* Make it block to force line break or we can keep inline-block? */
-            /* If we want single line with truncation: */
+            font-size: 0.75rem;
+            color: var(--glass-text-secondary);
+            margin-left: 0.5rem;
             display: inline-block;
-            max-width: 100%;
         }
     }
   }
