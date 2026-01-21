@@ -39,6 +39,7 @@ def chat():
         return jsonify({'error': 'Query is required'}), 400
 
     print(f">>> [DEBUG] Candidate IDs: {candidate_ids}", flush=True)
+    print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}", flush=True)
     
     def generate():
         print(">>> [DEBUG] Generator started", flush=True)
@@ -53,16 +54,26 @@ def chat():
                  existing_session = session_store.get_session(session_id)
                  if not existing_session:
                      # Create with user_id
+                     print(f"[Chat] Creating new session {session_id} with user_id: {user_id}")
                      session_store.create_session(session_id=session_id, user_id=user_id)
-                 elif user_id and existing_session.user_id != user_id:
-                     # Update user_id if it was missing or changed
-                     print(f"[Chat] Updating session {session_id} user_id to {user_id}")
-                     db = get_db_session()
-                     try:
-                         db.query(ChatSession).filter_by(session_id=session_id).update({"user_id": user_id})
-                         db.commit()
-                     finally:
-                         db.close()
+                 else:
+                     # Check if we need to update user_id
+                     current_db_user_id = existing_session.user_id
+                     print(f"[Chat] Found existing session {session_id}. DB user_id: {current_db_user_id}. Request user_id: {user_id}")
+                     
+                     if user_id and current_db_user_id != user_id:
+                         # Update user_id if it was missing or changed
+                         print(f"[Chat] Updating session {session_id} user_id from {current_db_user_id} to {user_id}")
+                         db = get_db_session()
+                         try:
+                             db.query(ChatSession).filter_by(session_id=session_id).update({"user_id": user_id})
+                             db.commit()
+                             print(f"[Chat] Update committed.")
+                         except Exception as update_e:
+                             db.rollback()
+                             print(f"[Chat] Update failed: {update_e}")
+                         finally:
+                             db.close()
              except Exception as e:
                  print(f"[Chat] Session Init Error: {e}")
 
