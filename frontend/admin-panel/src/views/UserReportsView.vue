@@ -70,8 +70,10 @@ import BaseButton from '@/components/base/BaseButton.vue'
 const router = useRouter()
 const loading = ref(false)
 const stats = ref([])
-const startDate = ref('')
-const endDate = ref('')
+// Default to Taiwan/Local today (YYYY-MM-DD)
+const today = new Date().toLocaleDateString('en-CA')
+const startDate = ref(today)
+const endDate = ref(today)
 
 const totalTokens = computed(() => {
     return stats.value.reduce((acc, curr) => acc + curr.total_tokens, 0)
