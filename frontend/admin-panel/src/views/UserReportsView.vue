@@ -1,38 +1,38 @@
 <template>
-  <div class="user-reports">
+      <div class="user-reports">
       <div class="header-section">
           <h2>使用者用量報告 (User Reports)</h2>
           <div class="filters">
               <div class="date-group">
                   <input type="date" v-model="startDate" class="date-input" placeholder="Start Date">
-                  <span class="sep">to</span>
+                  <span class="sep">至</span>
                   <input type="date" v-model="endDate" class="date-input" placeholder="End Date">
               </div>
-              <BaseButton @click="fetchReport" :disabled="loading">Search</BaseButton>
+              <BaseButton @click="fetchReport" :disabled="loading">搜尋</BaseButton>
           </div>
       </div>
 
       <div class="stats-grid" v-if="stats">
           <div class="stat-card">
-              <h3>Total Users</h3>
+              <h3>總使用者數</h3>
               <div class="value">{{ stats.length }}</div>
           </div>
           <div class="stat-card">
-              <h3>Total Tokens</h3>
+              <h3>總 Token 數</h3>
               <div class="value">{{ totalTokens.toLocaleString() }}</div>
           </div>
       </div>
 
       <BaseCard class="mt-4">
           <div class="table-container">
-            <div v-if="loading" class="loading-state">Loading...</div>
+            <div v-if="loading" class="loading-state">讀取中...</div>
             <table v-else class="data-table">
                 <thead>
                     <tr>
-                        <th>User ID (Email)</th>
-                        <th>Sessions</th>
-                        <th>Total Tokens</th>
-                        <th>Actions</th>
+                        <th>使用者 ID (Email)</th>
+                        <th>對話次數</th>
+                        <th>總 Token 數</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -46,12 +46,12 @@
                                 class="btn-sm" 
                                 @click="viewSessions(row.user_id)"
                             >
-                                View Sessions
+                                查看對話
                             </BaseButton>
                         </td>
                     </tr>
                     <tr v-if="stats.length === 0">
-                        <td colspan="4" class="text-center">No data found for selected period.</td>
+                        <td colspan="4" class="text-center">此時段無資料。</td>
                     </tr>
                 </tbody>
             </table>

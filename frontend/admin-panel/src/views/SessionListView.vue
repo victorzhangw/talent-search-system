@@ -2,31 +2,31 @@
 <template>
   <div class="session-list">
       <div class="header-section">
-          <h2>Session Management</h2>
+          <h2>對話紀錄管理 (Session Management)</h2>
           <div class="filters">
               <div class="date-group">
                   <input type="date" v-model="startDate" class="date-input" placeholder="Start Date">
-                  <span class="sep">to</span>
+                  <span class="sep">至</span>
                   <input type="date" v-model="endDate" class="date-input" placeholder="End Date">
               </div>
-              <BaseInput v-model="search" placeholder="User ID..." />
-              <BaseButton @click="fetchSessions">Search</BaseButton>
+              <BaseInput v-model="search" placeholder="輸入使用者 ID..." />
+              <BaseButton @click="fetchSessions">搜尋</BaseButton>
           </div>
       </div>
 
       <BaseCard>
           <div class="table-container">
-            <div v-if="loading" class="loading-state">Loading...</div>
+            <div v-if="loading" class="loading-state">讀取中...</div>
             <table v-else class="data-table">
                 <thead>
                     <tr>
-                        <th>Session ID</th>
-                        <th>User ID</th>
-                        <th>Status</th>
-                        <th>Messages</th>
-                        <th>Tokens</th>
-                        <th>Last Active</th>
-                        <th>Actions</th>
+                        <th>對話 ID</th>
+                        <th>使用者 ID</th>
+                        <th>狀態</th>
+                        <th>訊息數</th>
+                        <th>Tokens (消耗)</th>
+                        <th>最後活動時間</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -43,7 +43,7 @@
                         <td>{{ formatDate(session.last_active_at) }}</td>
                         <td>
                             <router-link :to="`/sessions/${session.session_id}`">
-                                <BaseButton variant="secondary" class="btn-sm">View</BaseButton>
+                                <BaseButton variant="secondary" class="btn-sm">查看內容</BaseButton>
                             </router-link>
                         </td>
                     </tr>
