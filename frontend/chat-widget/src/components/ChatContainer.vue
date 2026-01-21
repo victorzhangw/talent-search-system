@@ -68,7 +68,7 @@
         <div v-else class="split-view">
             
             <!-- LEFT PANEL: Candidate List -->
-            <div class="left-panel">
+            <div class="left-panel" :class="{ 'wide-sidebar': !isSelectionLocked }">
                 <div class="panel-header" v-if="!isSelectionLocked">
                      <button 
                         class="primary-btn full-width"
@@ -260,7 +260,7 @@ const lockSelectionAndStart = () => {
 }
 
 // Full Width Toggle Logic
-const isExpanded = ref(false)
+const isExpanded = ref(true)
 const toggleExpand = () => {
     isExpanded.value = !isExpanded.value
 }
@@ -270,10 +270,24 @@ const toggleExpand = () => {
 <style lang="scss" scoped>
 @use '../styles/chat-container.scss';
 
+.new-tab-btn {
+    display: none !important;
+}
+
 .chat-container.expanded-mode {
     width: 98vw;
     max-width: none;
     right: 1vw;
     /* Optional: Ensure header doesn't stretch weirdly if needed, but flex handles it */
+}
+
+/* Wide Sidebar Logic for Selection Mode (Not Locked) */
+.left-panel.wide-sidebar {
+    width: 60%;
+    max-width: 800px;
+    
+    @media (max-width: 768px) {
+        width: 100%;
+    }
 }
 </style>
