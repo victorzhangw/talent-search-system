@@ -4,15 +4,14 @@ echo ===========================================
 echo   Talent Search V2 - Combined Launcher
 echo ===========================================
 echo.
-echo [1/4] Checking PostgreSQL...
-netstat -an | find "5432" >nul
-if %errorlevel%==0 (
-    echo PostgreSQL is already running.
-) else (
-    echo Starting PostgreSQL...
+echo [1/4] Starting PostgreSQL...
+echo Attempting to restart PostgreSQL...
+"C:\Program Files\PostgreSQL\18\bin\pg_ctl" -D "C:\Program Files\PostgreSQL\18\data" restart
+if %errorlevel% neq 0 (
+    echo Restart failed (server might be stopped), attempting to start...
     "C:\Program Files\PostgreSQL\18\bin\pg_ctl" -D "C:\Program Files\PostgreSQL\18\data" start
-    timeout /t 5 /nobreak >nul
 )
+timeout /t 5 /nobreak >nul
 
 echo [2/4] Starting Backend API...
 start "TalentSearch V2 - Backend" cmd /k "call start-v2-backend.bat"

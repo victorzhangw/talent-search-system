@@ -1,5 +1,6 @@
 from flask import Blueprint, request, Response, jsonify, stream_with_context, current_app
 import json
+from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
 from ..services.session_store import SqlSessionStore
 from ..database.connection import get_db_session
@@ -86,16 +87,24 @@ def chat():
                      candidates_info=candidates_info,
                      trait_reports=trait_reports
                  )
+             except OperationalError as db_err:
+                 # Catch specific DB connection errors
+                 print(f"[RAG DB Error] {db_err}", flush=True)
+                 err_json = json.dumps({'type': 'token', 'content': "⚠️ 系統提示：目前資料庫暫時無法連線，無法讀取候選人資料。請通知管理員檢查後端服務。\n"})
+                 yield f"data: {err_json}\n\n"
+                 yield "data: [DONE]\n\n"
+                 return
              except Exception as e:
                  print(f"[RAG Generation Error] {e}", flush=True)
                  import traceback
                  tb = traceback.format_exc()
-                 # yield f"data: {json.dumps({'type': 'meta', 'intent': 'ERROR'})}\n\n"
-                 # yield f"data: {json.dumps({'type': 'token', 'content': '抱歉，系統發生錯誤，無法進行分析。'})}\n\n"
                  
-                 # DEBUG MODE: Return full traceback
-                 err_json = json.dumps({'type': 'token', 'content': f"SYSTEM ERROR:\n{tb}"})
+                 # Friendly error message for general failures
+                 err_json = json.dumps({'type': 'token', 'content': "⚠️ 抱歉，系統運算時發生未預期的錯誤，請稍後再試。"})
                  yield f"data: {err_json}\n\n"
+                 
+                 # Log full traceback to console/file instead of sending to user
+                 print(f"SYSTEM ERROR TRACEBACK:\n{tb}", flush=True)
                  
                  yield "data: [DONE]\n\n"
                  return
