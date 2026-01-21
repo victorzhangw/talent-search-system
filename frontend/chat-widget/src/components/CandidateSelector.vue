@@ -193,6 +193,10 @@ onMounted(() => {
         checkAndFillContainer()
     }
 })
+
+defineExpose({
+    clearSelection
+})
 </script>
 
 <style lang="scss" scoped>
