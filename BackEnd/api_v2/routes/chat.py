@@ -52,27 +52,27 @@ def chat():
              # Ensure session exists (Upsert logic or Check?)
              try:
                  # Check if exists
-                 existing_session = session_store.get_session(session_id)
+                     existing_session = session_store.get_session(session_id)
                  if not existing_session:
                      # Create with user_id
-                     print(f"[Chat] Creating new session {session_id} with user_id: {user_id}")
+                     print(f"[Chat] Creating new session {session_id} with user_id: '{user_id}'", flush=True)
                      session_store.create_session(session_id=session_id, user_id=user_id)
                  else:
                      # Check if we need to update user_id
                      current_db_user_id = existing_session.user_id
-                     print(f"[Chat] Found existing session {session_id}. DB user_id: {current_db_user_id}. Request user_id: {user_id}")
+                     print(f"[Chat] Found existing session {session_id}. DB user_id: '{current_db_user_id}'. Request user_id: '{user_id}'", flush=True)
                      
                      if user_id and current_db_user_id != user_id:
                          # Update user_id if it was missing or changed
-                         print(f"[Chat] Updating session {session_id} user_id from {current_db_user_id} to {user_id}")
+                         print(f"[Chat] Updating session {session_id} user_id from '{current_db_user_id}' to '{user_id}'", flush=True)
                          db = get_db_session()
                          try:
-                             db.query(ChatSession).filter_by(session_id=session_id).update({"user_id": user_id})
+                             rows = db.query(ChatSession).filter(ChatSession.session_id == session_id).update({"user_id": user_id})
                              db.commit()
-                             print(f"[Chat] Update committed.")
+                             print(f"[Chat] Update committed. Rows affected: {rows}", flush=True)
                          except Exception as update_e:
                              db.rollback()
-                             print(f"[Chat] Update failed: {update_e}")
+                             print(f"[Chat] Update failed: {update_e}", flush=True)
                          finally:
                              db.close()
              except Exception as e:
