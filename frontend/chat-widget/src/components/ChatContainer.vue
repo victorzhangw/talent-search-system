@@ -65,7 +65,7 @@
         </div>
 
         <!-- Split View (Selection Left + Chat Right) -->
-        <div v-else class="split-view">
+        <div v-else class="split-view" :class="{ 'chat-mode': isSelectionLocked }">
             
             <!-- LEFT PANEL: Candidate List -->
             <div class="left-panel" :class="{ 'wide-sidebar': !isSelectionLocked }">
@@ -242,7 +242,7 @@ const {
     loadMoreCandidates,
     handleSelectionChange,
     lockSelectionAndStart: logicLockSelection, // Rename to wrap
-    resetAndReselect,
+    resetAndReselect: logicResetAndReselect,
     sendMessage,
     sendQuickMessage
 } = useChatLogic(emit)
@@ -257,6 +257,14 @@ const lockSelectionAndStart = () => {
             candidateSelectorRef.value.clearSelection() 
         }
     })
+}
+
+// Wrapper for resetAndReselect to handle Template Ref side-effect
+const resetAndReselect = () => {
+    logicResetAndReselect()
+    if (candidateSelectorRef.value && candidateSelectorRef.value.clearSelection) {
+        candidateSelectorRef.value.clearSelection() 
+    }
 }
 
 // Full Width Toggle Logic
@@ -288,6 +296,27 @@ const toggleExpand = () => {
     
     @media (max-width: 768px) {
         width: 100%;
+    }
+}
+/* Chat Mode Layout (15% - 70% - 15%) */
+.split-view.chat-mode {
+    .left-panel {
+        width: 15% !important;
+        min-width: 200px;
+    }
+
+    .right-panel {
+        width: 70% !important;
+        flex: unset !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .quick-sidebar {
+        width: 15% !important;
+        min-width: 150px;
+        border-left: 1px solid var(--glass-border);
+        background: rgba(0, 0, 0, 0.02);
     }
 }
 </style>
