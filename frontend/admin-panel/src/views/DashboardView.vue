@@ -9,7 +9,7 @@
      </div>
 
      <div class="stats-grid">
-         <BaseCard title="總對話數">
+         <BaseCard title="本月對話數">
             <div class="stat-content">
                  <div class="stat-value">{{ stats.total_sessions }}</div>
                  <div class="stat-trend text-primary">
@@ -17,19 +17,19 @@
                  </div>
             </div>
          </BaseCard>
-         <BaseCard title="Token 消耗量">
+         <BaseCard title="本月 Token 消耗">
              <div class="stat-content">
                  <div class="stat-value">{{ (stats.total_tokens / 1000).toFixed(1) }}k</div>
                  <div class="stat-label">已消耗</div>
             </div>
          </BaseCard>
-         <BaseCard title="24小時活躍用戶">
+         <BaseCard title="昨日活躍人數">
              <div class="stat-content">
-                 <div class="stat-value">{{ stats.active_sessions_24h }}</div>
-                 <div class="stat-label">工作階段</div>
+                 <div class="stat-value">{{ stats.active_users_yesterday }}</div>
+                 <div class="stat-label">人數</div>
             </div>
          </BaseCard>
-         <BaseCard title="總訊息數">
+         <BaseCard title="本月訊息數">
              <div class="stat-content">
                  <div class="stat-value">{{ stats.total_messages }}</div>
             </div>
@@ -38,7 +38,7 @@
 
      <div class="charts-section">
          <BaseCard title="Token 消耗趨勢">
-             <TokenChart :data="mockChartData" />
+             <TokenChart :data="stats.token_trend || []" />
          </BaseCard>
      </div>
   </div>
@@ -55,20 +55,12 @@ import { TrendingUp } from 'lucide-vue-next'
 const stats = ref({
     total_sessions: 0,
     total_tokens: 0,
-    active_sessions_24h: 0,
-    total_messages: 0
+    active_users_yesterday: 0,
+    total_messages: 0,
+    token_trend: []
 })
 
-// Mock chart data for MVP (Real API needs history endpoint)
-const mockChartData = [
-    { date: 'Jan 01', tokens: 1200 },
-    { date: 'Jan 02', tokens: 1900 },
-    { date: 'Jan 03', tokens: 1500 },
-    { date: 'Jan 04', tokens: 3200 },
-    { date: 'Jan 05', tokens: 2800 },
-    { date: 'Jan 06', tokens: 4100 },
-    { date: 'Jan 07', tokens: 3800 },
-]
+
 
 onMounted(async () => {
     try {

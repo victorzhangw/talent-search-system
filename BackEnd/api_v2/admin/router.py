@@ -179,19 +179,65 @@ def get_session_details(current_user, session_id):
 def get_dashboard_stats(current_user):
     db = get_db_session()
     try:
-        total_sessions = db.query(func.count(ChatSession.session_id)).scalar()
-        total_tokens = db.query(func.sum(ChatMessage.token_usage)).scalar() or 0
+        # Timezone Handling (Taiwan is UTC+8)
+        now_utc = datetime.utcnow()
+        now_tw = now_utc + timedelta(hours=8)
         
-        one_day_ago = datetime.datetime.utcnow() - dt.timedelta(days=1)
-        active_24h = db.query(func.count(ChatSession.session_id)).filter(ChatSession.last_active_at >= one_day_ago).scalar()
+        # 1. Start of Month (TW) -> UTC
+        start_of_month_tw = now_tw.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_of_month_utc = start_of_month_tw - timedelta(hours=8)
         
-        total_messages = db.query(func.count(ChatMessage.id)).scalar()
+        # 2. Yesterday Range (TW) -> UTC
+        yesterday_date_tw = (now_tw - timedelta(days=1)).date()
+        start_of_yesterday_tw = datetime.combine(yesterday_date_tw, datetime.min.time())
+        end_of_yesterday_tw = start_of_yesterday_tw + timedelta(days=1)
         
+        start_of_yesterday_utc = start_of_yesterday_tw - timedelta(hours=8)
+        end_of_yesterday_utc = end_of_yesterday_tw - timedelta(hours=8)
+        
+        # --- Stats Queries (Monthly Cumulative) ---
+        total_sessions = db.query(func.count(ChatSession.session_id))\
+            .filter(ChatSession.started_at >= start_of_month_utc).scalar() or 0
+            
+        total_tokens = db.query(func.sum(ChatMessage.token_usage))\
+            .filter(ChatMessage.created_at >= start_of_month_utc).scalar() or 0
+            
+        total_messages = db.query(func.count(ChatMessage.id))\
+            .filter(ChatMessage.created_at >= start_of_month_utc).scalar() or 0
+            
+        # --- Active Users Yesterday ---
+        active_users_yesterday = db.query(func.count(func.distinct(ChatSession.user_id)))\
+            .filter(ChatSession.last_active_at >= start_of_yesterday_utc)\
+            .filter(ChatSession.last_active_at < end_of_yesterday_utc).scalar() or 0
+        
+        # --- Token Trend (Last 7 Days) ---
+        # We query per day (UTC for simplicity, or approximate shift)
+        # Using Python adjustment for simplified SQL
+        days_to_fetch = 7
+        trend_start_utc = now_utc - timedelta(days=days_to_fetch)
+        
+        # Truncate to day
+        date_col = func.date_trunc('day', ChatMessage.created_at).label('day_date')
+        
+        trend_results = db.query(
+            date_col,
+            func.sum(ChatMessage.token_usage)
+        ).filter(ChatMessage.created_at >= trend_start_utc)\
+         .group_by(date_col)\
+         .order_by(date_col).all()
+        
+        token_trend = []
+        for r in trend_results:
+            # Format date as MM-DD
+            d_str = r[0].strftime('%m-%d')
+            token_trend.append({"date": d_str, "tokens": r[1] or 0})
+            
         return jsonify({
-            "total_sessions": total_sessions,
-            "total_tokens": total_tokens,
-            "active_sessions_24h": active_24h,
-            "total_messages": total_messages
+            "total_sessions": total_sessions, # This Month
+            "total_tokens": total_tokens,     # This Month
+            "total_messages": total_messages, # This Month
+            "active_users_yesterday": active_users_yesterday, # Yesterday TW
+            "token_trend": token_trend
         })
     finally:
         db.close()
