@@ -6,10 +6,10 @@ echo ===========================================
 echo.
 echo [1/4] Starting PostgreSQL...
 echo Attempting to restart PostgreSQL...
-"C:\Program Files\PostgreSQL\18\bin\pg_ctl" -D "C:\Program Files\PostgreSQL\18\data" restart
+cmd /c ""C:\Program Files\PostgreSQL\18\bin\pg_ctl" -D "C:\Program Files\PostgreSQL\18\data" restart"
 if %errorlevel% neq 0 (
-    echo Restart failed (server might be stopped), attempting to start...
-    "C:\Program Files\PostgreSQL\18\bin\pg_ctl" -D "C:\Program Files\PostgreSQL\18\data" start
+    echo Restart failed or service stopped. Attempting fresh start...
+    cmd /c ""C:\Program Files\PostgreSQL\18\bin\pg_ctl" -D "C:\Program Files\PostgreSQL\18\data" start"
 )
 timeout /t 5 /nobreak >nul
 
