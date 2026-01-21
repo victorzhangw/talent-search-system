@@ -11,10 +11,20 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// Axios Interceptor for 401
+// Axios Configuration
 import axios from 'axios'
 import { useAuthStore } from './stores/auth'
 
+// 1. Load config from window (Runtime) or Env (Build time)
+const config = window.ADMIN_PANEL_CONFIG || {}
+const apiBaseUrl = config.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || ''
+
+if (apiBaseUrl) {
+    axios.defaults.baseURL = apiBaseUrl
+    console.log('[AdminPanel] Using API Base URL:', apiBaseUrl)
+}
+
+// 2. Interceptor for 401
 axios.interceptors.response.use(
     response => response,
     error => {
