@@ -2,11 +2,21 @@
   <div id="talent-rag-widget">
     <!-- Hide Launcher when Open OR in Full Page Mode -->
     <transition name="fade">
-      <ChatLauncher v-if="!isOpen && !isFullPageMode" :is-open="isOpen" @toggle="toggleChat" />
+      <ChatLauncher 
+        v-if="!isOpen && !isFullPageMode" 
+        :is-open="isOpen" 
+        :has-active-session="hasActiveSession"
+        @toggle="toggleChat" 
+      />
     </transition>
     
     <transition name="fade">
-      <ChatContainer v-if="isOpen" :is-full-page="isFullPageMode" @close="isOpen = false" />
+      <ChatContainer 
+        v-if="isOpen" 
+        :is-full-page="isFullPageMode" 
+        @close="handleClose" 
+        @minimize="handleMinimize"
+      />
     </transition>
   </div>
 </template>
@@ -18,21 +28,34 @@ import ChatContainer from './components/ChatContainer.vue'
 
 const isOpen = ref(false)
 const isFullPageMode = ref(false)
+const hasActiveSession = ref(false)
 
 const toggleChat = () => {
   if (!isOpen.value) {
-      // Opening the widget: Clear session state for a fresh start
-      try {
-          sessionStorage.removeItem('traitty_selected_candidates')
-          sessionStorage.removeItem('traitty_batch_reports')
-          sessionStorage.removeItem('traitty_session_active_ids')
-          // Note: We keeping 'traitty_new_tab_state' in LocalStorage as that's for cross-tab transfer
-          // and usually not relevant when clicking the launcher manually.
-      } catch (e) {
-          console.error('Error clearing storage:', e)
+      // Opening the widget
+      if (!hasActiveSession.value) {
+          // Fresh start: Clear session state
+          try {
+              sessionStorage.removeItem('traitty_selected_candidates')
+              sessionStorage.removeItem('traitty_batch_reports')
+              sessionStorage.removeItem('traitty_session_active_ids')
+          } catch (e) {
+              console.error('Error clearing storage:', e)
+          }
       }
+      // If hasActiveSession is true, we simply open (restore) without clearing
   }
   isOpen.value = !isOpen.value
+}
+
+const handleClose = () => {
+    isOpen.value = false
+    hasActiveSession.value = false // Reset active state
+}
+
+const handleMinimize = () => {
+    isOpen.value = false
+    hasActiveSession.value = true // Keep active state
 }
 
 onMounted(() => {

@@ -38,6 +38,11 @@
             </button>
         </div>
         
+        <!-- Minimize Button (Only in Chat Mode) -->
+        <button v-if="isSelectionLocked" class="icon-btn minimize-btn" @click="$emit('minimize')" title="最小化至按鈕">
+            <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+        </button>
+
         <!-- Icon: Close -->
         <button class="icon-btn close-btn" @click="$emit('close')">
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -120,8 +125,6 @@
                         <span 
                             v-for="(cand, idx) in activeConversationCandidatesObjects" 
                             :key="cand.id"
-                            class="candidate-link"
-                            @click="openReport(cand)"
                         >
                             {{ cand.name }}<span v-if="idx < activeConversationCandidatesObjects.length - 1">, </span>
                         </span>
