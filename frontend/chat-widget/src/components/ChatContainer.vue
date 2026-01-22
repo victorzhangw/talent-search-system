@@ -268,7 +268,7 @@ const resetAndReselect = () => {
 }
 
 // Full Width Toggle Logic
-const isExpanded = ref(true)
+const isExpanded = ref(false)
 const toggleExpand = () => {
     isExpanded.value = !isExpanded.value
 }

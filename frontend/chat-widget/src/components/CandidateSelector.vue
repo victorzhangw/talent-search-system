@@ -398,7 +398,7 @@ defineExpose({
             font-size: 0.75rem;
             color: var(--glass-text-secondary);
             margin-left: 0.5rem;
-            display: inline-block;
+            display: none; /* Hidden as requested */
         }
     }
   }
