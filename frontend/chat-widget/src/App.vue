@@ -39,6 +39,8 @@ const toggleChat = () => {
               sessionStorage.removeItem('traitty_selected_candidates')
               sessionStorage.removeItem('traitty_batch_reports')
               sessionStorage.removeItem('traitty_session_active_ids')
+              sessionStorage.removeItem('traitty_session_messages')
+              sessionStorage.removeItem('traitty_session_id')
           } catch (e) {
               console.error('Error clearing storage:', e)
           }

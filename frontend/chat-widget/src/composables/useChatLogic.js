@@ -1,5 +1,5 @@
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 
 export function useChatLogic(emit) {
     // --- State ---
@@ -213,10 +213,13 @@ export function useChatLogic(emit) {
 
                 // Clear it so it doesn't persist forever
                 localStorage.removeItem('traitty_new_tab_state')
+
+                // Immediately save to Session Storage so it survives a refresh/minimize
+                saveSessionToStorage()
                 return
             }
 
-            // Priority 2: Check Session Storage (Same tab reload)
+            // Priority 2: Check Session Storage (Same tab reload or Restore from Minimize)
             const rawIds = sessionStorage.getItem('traitty_session_active_ids')
             if (rawIds) {
                 const ids = JSON.parse(rawIds)
@@ -225,12 +228,33 @@ export function useChatLogic(emit) {
                     activeConversationCandidateIds.value = ids
                     isSelectionLocked.value = true
                     selectedCandidateIds.value = []
+
+                    // Restore Messages & SessionID
+                    const storedMsgs = sessionStorage.getItem('traitty_session_messages')
+                    if (storedMsgs) messages.value = JSON.parse(storedMsgs)
+
+                    const storedSessionId = sessionStorage.getItem('traitty_session_id')
+                    if (storedSessionId) currentSessionId.value = storedSessionId
                 }
             }
         } catch (e) {
             console.error("Failed to restore session state", e)
         }
     }
+
+    // Persist State Helper
+    const saveSessionToStorage = () => {
+        if (activeConversationCandidateIds.value.length > 0) {
+            sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(activeConversationCandidateIds.value))
+            sessionStorage.setItem('traitty_session_messages', JSON.stringify(messages.value))
+            sessionStorage.setItem('traitty_session_id', currentSessionId.value)
+        }
+    }
+
+    // Watch for message usage to persist
+    watch(messages, () => {
+        saveSessionToStorage()
+    }, { deep: true })
 
     const loadMoreCandidates = () => {
         if (isLoadingCandidates.value || !hasMoreCandidates.value) return
@@ -361,6 +385,8 @@ export function useChatLogic(emit) {
             sessionStorage.removeItem('traitty_selected_candidates')
             sessionStorage.removeItem('traitty_batch_reports')
             sessionStorage.removeItem('traitty_session_active_ids')
+            sessionStorage.removeItem('traitty_session_messages')
+            sessionStorage.removeItem('traitty_session_id')
         } catch (e) {
             console.error('[ChatContainer] Failed to clear Session Storage:', e)
         }
