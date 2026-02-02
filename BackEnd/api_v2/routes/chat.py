@@ -34,13 +34,15 @@ def chat():
     session_id = data.get('session_id', 'default_session')
     user_id = data.get('user_id') # Copied from frontend config email
     
+    mode = data.get('mode', 'explanation') # Default to explanation if not provided
+    
     print(f"[Chat] Received trait_reports for {len(trait_reports)} candidates", flush=True)
     
     if not query:
         return jsonify({'error': 'Query is required'}), 400
 
     print(f">>> [DEBUG] Candidate IDs: {candidate_ids}", flush=True)
-    print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}", flush=True)
+    print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}, Mode: {mode}", flush=True)
     
     def generate():
         print(">>> [DEBUG] Generator started", flush=True)
@@ -85,7 +87,8 @@ def chat():
                 response_stream, use_case_id = rag_service.generate_response(
                     query, candidate_ids, session_id, 
                     candidates_info=candidates_info,
-                    trait_reports=trait_reports
+                    trait_reports=trait_reports,
+                    mode=mode
                 )
             except OperationalError as db_err:
                 # Catch specific DB connection errors

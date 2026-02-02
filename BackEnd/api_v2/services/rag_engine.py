@@ -82,7 +82,7 @@ class RAGService:
         }
 
     def generate_response(self, query: str, candidate_ids: List[str], session_id: str, 
-                         candidates_info: List[Dict] = None, trait_reports: Dict = None):
+                         candidates_info: List[Dict] = None, trait_reports: Dict = None, mode: str = 'explanation'):
         """
         Orchestrates the Full RAG Flow:
         Token -> Data Fetch (Cache/API) -> Context -> LLM
@@ -93,6 +93,7 @@ class RAGService:
             session_id: Session identifier for caching
             candidates_info: Optional. Full candidate info from frontend (includes name, position, etc.)
             trait_reports: Optional. Trait reports from frontend Session Storage (keyed by candidate_id)
+            mode: 'expert' (Quick Questions) or 'explanation' (Typed Input).
         """
         
         # Cache Key Strategy: Session ID + Candidate IDs hash
@@ -258,23 +259,51 @@ class RAGService:
                 'final_candidates_data': final_candidates_data
             })
 
-        # 3. Intent Routing
-        uc_id, uc_config = self._get_use_case(query)
-        print(f"[RAG] Use Case: {uc_id}")
+        # 3. Intent Routing & Mode Handling
+        print(f"[RAG] Request Mode: {mode}")
+        
+        if mode == 'explanation':
+            # Force Friendly Explanation Mode irrespective of keywords
+            uc_id = 'UC-EXPLAIN' 
+            # Check if UC-EXPLAIN exists in loaded config, if not, fallback or use UC-GENERAL with override
+            if uc_id in self.use_cases:
+                uc_config = self.use_cases[uc_id]
+            else:
+                 # Fallback to defaults or throw error if configuration is missing
+                 # Creating dynamic config on fly if needed, or better to have it in use_cases.json
+                 # For safety, fallback to UC-GENERAL with dynamic overrides
+                 print("[RAG] UC-EXPLAIN not found in config. Using fallback mechanics.")
+                 uc_id = "UC-GENERAL"
+                 uc_config = self.use_cases["UC-GENERAL"]
+        else:
+            # Expert Mode: Use Keyword Matching
+            uc_id, uc_config = self._get_use_case(query)
+            
+        print(f"[RAG] Final Use Case: {uc_id}")
 
         # 4. Build Context
+        # Pass Mode to ContextBuilder to select correct wording (Friendly vs Standard)
         builder = ContextBuilder(uc_config)
-        rag_context = builder.build(enterprise_data, final_candidates_data)
+        rag_context = builder.build(enterprise_data, final_candidates_data, mode=mode)
 
         # 5. Assemble System Prompt
-        sys_prompt = self._assemble_prompt(uc_config, rag_context)
+        candidate_count = len(final_candidates_data)
+        sys_prompt = self._assemble_prompt(uc_config, rag_context, candidate_count)
         
         # 6. Call LLM
         return self._call_llm(sys_prompt, query, uc_id, session_id)
 
-    def _assemble_prompt(self, uc_config, rag_context):
+    def _assemble_prompt(self, uc_config, rag_context, candidate_count=1):
         # Retrieve answer guidance safely, default to empty string if missing
         ans_guide = uc_config.get('answer_guidence', '')
+        
+        # Inject Multi-Candidate Constraint if needed
+        if candidate_count > 1:
+            ans_guide += "\n\n【多候選人回答規範】\n"
+            ans_guide += "1. 必須「逐一解讀」每一位候選人，不可混在一起講。\n"
+            ans_guide += "2. 在每一段解讀開始前，必須明確提及「候選人姓名」作為標題。\n"
+            ans_guide += "3. 在逐一解讀完畢後，必須在文末加入「綜合點評」作為總結，比較這些候選人的異同或適用情境。"
+            
         style_ref = uc_config['prompt_config'].get('style_ref', '')
         risk_notes = chr(10).join([f'- {n}' for n in uc_config['prompt_config'].get('risk_notes', [])])
         

@@ -81,5 +81,22 @@
                 "trait_reports"
             ]
         }
+    },
+    "UC-EXPLAIN": {
+        "description": "解釋模式 (Friendly/No Jargon)",
+        "answer_guidence": "【EXPLANATION MODE】請以輕鬆、友好的口吻（類似專業但親切的學長姐）向用戶解釋候選人的特質。⚠️ 絕對禁止提及具體的「特質名稱」、「分數」或「Band等級」。請將特質轉化為具體的行為描述或白話文解釋 (使用 friendly wording)。重點在於幫助用戶理解這個人是什麼樣的風格，而不是分析數據。",
+        "keywords": [],
+        "prompt_config": {
+            "style_ref": "FRIENDLY-EXPLANATION",
+            "risk_notes": [
+                "禁止提及特質專有名詞與分數",
+                "保持語氣親切輕鬆",
+                "專注於行為描述"
+            ],
+            "template_id": "explanation_template",
+            "allowed_knowledge_sources": [
+                "trait_reports"
+            ]
+        }
     }
 }

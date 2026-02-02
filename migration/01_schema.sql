@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS trait_definitions (
 CREATE TABLE IF NOT EXISTS trait_bands (
     id SERIAL PRIMARY KEY,
     trait_id VARCHAR(50) REFERENCES trait_definitions(trait_id) ON DELETE CASCADE,
+    trait_project VARCHAR(50),
     band VARCHAR(10), -- A, B, C
     min_score INTEGER,
     max_score INTEGER,
@@ -61,7 +62,10 @@ CREATE TABLE IF NOT EXISTS trait_bands (
     description TEXT,
     management_focus TEXT,
     report_wording TEXT,
-    ai_guidance JSON
+    report_wording_friendly TEXT,
+    ai_guidance JSON,
+    CONSTRAINT uq_trait_bands UNIQUE (trait_id, band)
+
 );
 CREATE INDEX IF NOT EXISTS idx_trait_bands_trait_id ON trait_bands(trait_id);
 
@@ -72,5 +76,7 @@ CREATE TABLE IF NOT EXISTS trait_interactions (
     primary_band VARCHAR(10),
     trigger_trait_id VARCHAR(50), -- No FK to simplify circular refs during load, or add later
     trigger_band VARCHAR(10),
-    narrative TEXT
+    narrative TEXT,
+    CONSTRAINT uq_trait_interactions UNIQUE (primary_trait_id, primary_band, trigger_trait_id, trigger_band)
+
 );

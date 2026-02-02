@@ -258,7 +258,8 @@ def users_usage_report(current_user):
         query = db.query(
             ChatSession.user_id,
             func.count(func.distinct(ChatSession.session_id)).label('session_count'),
-            func.sum(ChatMessage.token_usage).label('total_tokens')
+            func.sum(ChatMessage.token_usage).label('total_tokens'),
+            func.max(ChatSession.last_active_at).label('last_active_at')
         ).join(ChatMessage, ChatSession.session_id == ChatMessage.session_id)
         
         # Filter Date Range (on Message creation for accurate token usage in period)
@@ -280,7 +281,8 @@ def users_usage_report(current_user):
             data.append({
                 "user_id": user_id,
                 "session_count": r.session_count,
-                "total_tokens": r.total_tokens or 0
+                "total_tokens": r.total_tokens or 0,
+                "last_active_at": r.last_active_at.isoformat() if r.last_active_at else None
             })
             
         return jsonify(data)

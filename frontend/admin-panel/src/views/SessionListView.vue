@@ -56,12 +56,14 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import { useDateFormat } from '@vueuse/core'
 
+const route = useRoute()
 const sessions = ref([])
 const loading = ref(false)
 const search = ref('')
@@ -91,7 +93,14 @@ const formatDate = (dateStr) => {
     return useDateFormat(dateStr, 'MM-DD HH:mm').value
 }
 
-onMounted(fetchSessions)
+onMounted(() => {
+    // Initialize from query params if present
+    if (route.query.user_id) search.value = route.query.user_id
+    if (route.query.start_date) startDate.value = route.query.start_date
+    if (route.query.end_date) endDate.value = route.query.end_date
+    
+    fetchSessions()
+})
 </script>
 
 <style lang="scss" scoped>

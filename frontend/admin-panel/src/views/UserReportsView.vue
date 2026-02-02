@@ -32,6 +32,7 @@
                         <th>使用者 ID (Email)</th>
                         <th>對話次數</th>
                         <th>總 Token 數</th>
+                        <th>最後活動時間</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -40,6 +41,7 @@
                         <td>{{ row.user_id }}</td>
                         <td>{{ row.session_count }}</td>
                         <td>{{ row.total_tokens.toLocaleString() }}</td>
+                        <td>{{ formatDate(row.last_active_at) }}</td>
                         <td>
                             <BaseButton 
                                 variant="secondary" 
@@ -63,6 +65,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDateFormat } from '@vueuse/core'
 import axios from 'axios'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -78,6 +81,11 @@ const endDate = ref(today)
 const totalTokens = computed(() => {
     return stats.value.reduce((acc, curr) => acc + curr.total_tokens, 0)
 })
+
+const formatDate = (dateStr) => {
+    if (!dateStr) return '-'
+    return useDateFormat(dateStr, 'YYYY-MM-DD HH:mm').value
+}
 
 const fetchReport = async () => {
     loading.value = true

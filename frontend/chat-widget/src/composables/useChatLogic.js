@@ -40,13 +40,16 @@ export function useChatLogic(emit) {
     const currentReportCandidate = ref({})
 
     const quickQuestions = ref([
-        "候選人的主要優勢是什麼？",
-        "他/她適合擔任什麼角色？",
-        "有什麼潛在風險或缺點嗎？",
-        "與團隊合作的適配性如何？",
-        "請比較所選候選人的領導風格。",
-        "如何提升這位候選人的績效？"
+        "快速面試提問指南？",
+        "工作中主要的優勢與潛力？",
+        "在團隊合作中適合的角色？",
+        "需注意的管理問題或潛在風險？",
+        "如何面對困難、壓力、挑戰？",
+        "合適的管理方式與風格？",
+        "有效的溝通方法/模式",
+        "展現何種領導風格",
     ])
+
 
     // --- Computed ---
     const currentThemeLabel = computed(() => {
@@ -436,7 +439,7 @@ export function useChatLogic(emit) {
         autoLoginError.value = `自動登入失敗 (重試 ${maxRetries} 次): ${lastError?.message || '未知錯誤'}`
     }
 
-    const sendMessage = async (e) => {
+    const sendMessage = async (e, isQuick = false) => {
         if (e && e.shiftKey) return;
 
         const query = inputQuery.value.trim()
@@ -470,6 +473,8 @@ export function useChatLogic(emit) {
             // Find objects for active IDs
             const activeCandidates = candidates.value.filter(c => activeIds.includes(c.candidate_id))
 
+            // Determine Mode: Quick Question -> expert, Typed -> explanation
+            const mode = isQuick ? 'expert' : 'explanation'
 
             const response = await fetch(`${serverRoot}/chat/`, {
                 method: 'POST',
@@ -494,7 +499,8 @@ export function useChatLogic(emit) {
                     })),
                     trait_reports: traitReports,
                     session_id: currentSessionId.value,
-                    user_id: window.TRAITTY_WIDGET_CONFIG?.userEmail || 'anonymous'
+                    user_id: window.TRAITTY_WIDGET_CONFIG?.userEmail || 'anonymous',
+                    mode: mode // Pass mode to backend
                 }),
                 signal: controller.signal
             })
@@ -551,7 +557,7 @@ export function useChatLogic(emit) {
 
     const sendQuickMessage = (text) => {
         inputQuery.value = text
-        sendMessage()
+        sendMessage(null, true) // Pass true for isQuick
     }
 
     onMounted(async () => {

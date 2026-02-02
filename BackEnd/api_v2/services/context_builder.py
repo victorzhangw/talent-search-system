@@ -7,13 +7,14 @@ class ContextBuilder:
         self.config = use_case_config
         self.prompt_config = use_case_config.get('prompt_config', {})
         
-    def build(self, enterprise_data: Dict, candidates_data: List[Dict]) -> Dict[str, str]:
+    def build(self, enterprise_data: Dict, candidates_data: List[Dict], mode: str = 'explanation') -> Dict[str, str]:
         """
         Assembles the comprehensive RAG Context.
         
         Args:
             enterprise_data: { "enterprise_name": "...", "job_desc": [...] }
             candidates_data: List of candidates with merged 'assessment' details.
+            mode: 'expert' or 'explanation'. Used to toggle wording friendliness.
             
         Returns:
             Dict containing formatted string blocks for System Prompt.
@@ -40,44 +41,21 @@ class ContextBuilder:
         
         # 2. Candidate Analysis
         for i, cand in enumerate(candidates_data):
-            # Debug: Log raw candidate data
-            if isinstance(cand, str):
-                print(f"[ContextBuilder-ERROR] Candidate item {i} is a string: {cand}", flush=True)
-                continue
-            if not isinstance(cand, dict):
-                 print(f"[ContextBuilder-ERROR] Candidate item {i} is not a dict: {type(cand)} - {cand}", flush=True)
-                 continue
-
             cand_id = cand.get('candidate_id', 'Unknown')
-            print(f"[ContextBuilder-DEBUG] Processing candidate: {cand_id}", flush=True)
-            
             # Robust name extraction with fallback
             name = cand.get('name') or f"Candidate-{cand_id}"
             position = cand.get('position', 'NA')
             cand_name = f"{name} ({position})"
             
-            if not cand.get('name'):
-                print(f"[ContextBuilder-WARNING] Candidate {cand.get('candidate_id')} has no 'name' field. Using fallback.", flush=True)
-            
             components["base_analysis"] += f"### 候選人: {cand_name}\n"
 
             
-            # Assessment Data
-            # Note: Upstream API format check needed. 
-            # Real Service returns `results` list. Merged data should have 'assessment' key or be flat?
-            # Integration logic merges it. Let's assume 'assessment' key or flat 'trait_results'.
-            # Based on Swagger: { assessment: { trait_results: ... } } inside the result item.
-            
+            # Assessment Data (Robust Extraction Logic matches previous tool output)
             asmt = cand.get('assessment', {})
-            # Robust Extraction: Check 'trait_results' inside assessment or directly in assessment or top level
             results = asmt.get('trait_results', {})
             if not results:
-                # Try getting from top level if not nested
                 results = cand.get('trait_results', {})
-            # Sometimes 'trait_results' is the list itself if not dict
-            # or 'asmt' itself is the results dict? Let's check keys
             if not results and isinstance(asmt, (dict, str)) and 'trait_id' in str(asmt):
-                # Heuristic: asmt might be the results dict/list
                 results = asmt
             
             if not results:
@@ -88,11 +66,6 @@ class ContextBuilder:
             candidate_bands_map = {}
             processed_traits = []
             
-            # Trait Results is expected to be a dict keyed by some ID, or a list.
-            # Based on latest sample: Dict { "143b": { "trait_id": "143b", "chinese_name": "Empathy", "score": 61 ... } }
-            # New Logic: Map 'chinese_name' (which is English) -> DB Trait ID
-            
-            # Normalize to list of result items
             if isinstance(results, dict):
                 results_list = results.values()
             elif isinstance(results, list):
@@ -104,27 +77,19 @@ class ContextBuilder:
 
             for res in results_list:
                 # 1. Identify Name (PK)
-                # "chinese_name" field actually holds the English Name per User Spec
                 trait_name_en = res.get('chinese_name') 
                 if not trait_name_en:
                     continue
 
                 # 2. Key Mapping (Name -> DB Trait ID)
-                # Use case-insensitive match for safety
                 trait_def = db_session.query(TraitDefinition).filter(
                     func.lower(TraitDefinition.name_en) == func.lower(trait_name_en)
                 ).first()
                 
                 if not trait_def:
-                    # Log or Skip if unknown trait
-                    # print(f"Warning: Unknown trait name '{trait_name_en}'")
                     continue
                 
-                trait_id = trait_def.trait_id # The canonical ID (e.g. ANI_01)
-
-                # 3. Score Extraction
-                # Removed: score_value, prediction_value
-                # Retained: score
+                trait_id = trait_def.trait_id
                 score = res.get('score')
                 if score is None: 
                     continue
@@ -142,14 +107,30 @@ class ContextBuilder:
             
             # A. Base Traits Semantics
             for trait_id, score, band_row in processed_traits:
-                # Fetch Name (Already resolved trait_def earlier, but safer to query or cache)
-                # We need name_zh for the prompt display
+                # Fetch Name
                 trait_def = db_session.query(TraitDefinition).filter_by(trait_id=trait_id).first()
                 t_name_zh = trait_def.name_zh if trait_def else trait_id
                 
-                components["base_analysis"] += f"  * [{trait_id}] {t_name_zh} (Score {score} -> Band {band_row.band}):\n"
-                components["base_analysis"] += f"    - 語意: {band_row.semantic_label}\n"
-                components["base_analysis"] += f"    - 描述: {band_row.description}\n"
+                # WORDING SELECTION BASED ON MODE
+                if mode == 'explanation':
+                    # Use Friendly Wording if available, else fallback to standard
+                    wording = band_row.report_wording_friendly or band_row.description or '無描述'
+                    # Explanation Mode: Hide specific scores and bands in the output string if possible, 
+                    # but context needs to provide the semantic meaning.
+                    # User constraint: "cannot mention trait names/scores".
+                    # We provide the semantic analysis to LLM but instruct LLM not to output raw names.
+                    components["base_analysis"] += f"  * [特質洞察]: {wording}\n"
+                    # Using generic label to help LLM avoid leaking names? 
+                    # But LLM needs to connect interactions. 
+                    # Let's provide the name for internal logic but trust the system prompt to hide it.
+                    # Or better: "  * [{t_name_zh}]: {wording}" 
+                    # The prompt instruction says "Don't mention trait names".
+                else: 
+                    # Expert Mode
+                    wording = band_row.description or '無描述'
+                    components["base_analysis"] += f"  * [{trait_id}] {t_name_zh} (Score {score} -> Band {band_row.band}):\n"
+                    components["base_analysis"] += f"    - 語意: {band_row.semantic_label}\n"
+                    components["base_analysis"] += f"    - 描述: {wording}\n"
                 
                 # B. Constraints (Do/Dont)
                 if band_row.ai_guidance:

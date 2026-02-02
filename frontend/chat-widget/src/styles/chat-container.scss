@@ -376,7 +376,7 @@
     .quick-btn-list {
         display: flex;
         flex-direction: column;
-        gap: 0.8rem;
+        gap: 0.6em;
         overflow-y: auto;
     }
 
@@ -384,7 +384,7 @@
         background: var(--glass-bg);
         border: 1px solid var(--glass-border);
         color: var(--glass-text-primary);
-        padding: 0.8rem;
+        padding: 0.6rem;
         border-radius: 8px;
         text-align: left;
         font-size: 0.85rem;
