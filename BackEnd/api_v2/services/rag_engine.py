@@ -16,6 +16,15 @@ class RAGService:
         with open(self.config_path, 'r', encoding='utf-8') as f:
             self.use_cases = json.load(f)
         
+        # 1.5 Load Mode Rules
+        rules_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'mode_rules.json')
+        if os.path.exists(rules_path):
+            with open(rules_path, 'r', encoding='utf-8') as f:
+                self.mode_rules = json.load(f)
+        else:
+             print("[RAG] Warning: mode_rules.json not found.")
+             self.mode_rules = {}
+
         # 2. Setup Integration Service
         mode = current_app.config.get('INTEGRATION_MODE', 'MOCK')
         if mode == 'REAL':
@@ -64,6 +73,33 @@ class RAGService:
                     return uc_id, uc_data
         return "UC-GENERAL", self.use_cases["UC-GENERAL"]
 
+    def _determine_mode(self, query: str, input_mode: str) -> str:
+        """
+        Determines the routing mode based on input signal and semantic rules.
+        """
+        # 1. Force override from frontend (e.g. Quick Buttons)
+        if input_mode == 'expert':
+            return 'expert'
+            
+        # 2. Rule-Based Semantic Routing
+        rules = self.mode_rules.get('expert_mode_rules', {})
+        
+        # Combine all keyword lists for checking
+        all_expert_keywords = (
+            rules.get('intent_keywords', []) + 
+            rules.get('phrase_patterns', []) + 
+            rules.get('context_keywords', [])
+        )
+        
+        for kw in all_expert_keywords:
+            if kw in query:
+                print(f"[RAG] Router: Hit Expert Keyword '{kw}' -> Expert Mode")
+                return 'expert'
+                
+        # 3. Default Fallback
+        print(f"[RAG] Router: No Expert keywords found -> Explanation Mode")
+        return 'explanation'
+ 
     def _get_cached_data(self, key):
         import time
         if key in self._context_cache:
@@ -93,7 +129,7 @@ class RAGService:
             session_id: Session identifier for caching
             candidates_info: Optional. Full candidate info from frontend (includes name, position, etc.)
             trait_reports: Optional. Trait reports from frontend Session Storage (keyed by candidate_id)
-            mode: 'expert' (Quick Questions) or 'explanation' (Typed Input).
+            mode: 'expert', 'explanation' (legacy), or 'auto' (new).
         """
         
         # Cache Key Strategy: Session ID + Candidate IDs hash
@@ -258,34 +294,54 @@ class RAGService:
                 'enterprise_data': enterprise_data,
                 'final_candidates_data': final_candidates_data
             })
+ 
+        # 3. Intent Routing & Mode Handling (NEW LOGIC)
+        # Determine actual mode (expert vs explanation)
+        determined_mode = self._determine_mode(query, mode)
+        print(f"[RAG] Input Mode: {mode}, Determined Mode: {determined_mode}")
 
-        # 3. Intent Routing & Mode Handling
-        print(f"[RAG] Request Mode: {mode}")
+        # Inject Special Prompt Content based on Determined Mode
+        prompt_content_file = 'prompt_explanation_mode.txt' if determined_mode == 'explanation' else 'prompt_expert_mode.txt'
+        prompt_content_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', prompt_content_file)
         
-        if mode == 'explanation':
-            # Force Friendly Explanation Mode irrespective of keywords
-            uc_id = 'UC-EXPLAIN' 
-            # Check if UC-EXPLAIN exists in loaded config, if not, fallback or use UC-GENERAL with override
-            if uc_id in self.use_cases:
-                uc_config = self.use_cases[uc_id]
-            else:
-                 # Fallback to defaults or throw error if configuration is missing
-                 # Creating dynamic config on fly if needed, or better to have it in use_cases.json
-                 # For safety, fallback to UC-GENERAL with dynamic overrides
-                 print("[RAG] UC-EXPLAIN not found in config. Using fallback mechanics.")
-                 uc_id = "UC-GENERAL"
-                 uc_config = self.use_cases["UC-GENERAL"]
-        else:
-            # Expert Mode: Use Keyword Matching
-            uc_id, uc_config = self._get_use_case(query)
-            
-        print(f"[RAG] Final Use Case: {uc_id}")
+        custom_role_prompt = "(Role Definition Missing)"
+        if os.path.exists(prompt_content_path):
+            with open(prompt_content_path, 'r', encoding='utf-8') as f:
+                custom_role_prompt = f.read()
 
+        # Decide on Base Use Case Configuration
+        # If the query matches a specific use case (e.g., Interview Guide), use it.
+        # Otherwise, use a Generic Use Case and override its guidance.
+        
+        # Check specific use cases first (like UC-INT-01 which has its own template)
+        uc_id, uc_config = self._get_use_case(query)
+        
+        # Logic: 
+        # If it's a "generic" match (UC-GENERAL) or "explanation forced" (UC-EXPLAIN was logic before),
+        # we now override the 'answer_guidence' with our custom role prompt.
+        # If it's a specific UC (e.g. UC-INT-01), we might want to respect its specialized template, 
+        # BUT we still need to apply the Expert Mode style if applicable?
+        # Actually, UC-INT-01 (Interview Guide) is highly specialized.
+        
+        if uc_id == "UC-GENERAL":
+            # Override Generic Guidance with our Role Definition
+            # Create a shallow copy to avoid mutating global config
+            uc_config = uc_config.copy() 
+            uc_config['answer_guidence'] = custom_role_prompt
+        else:
+            # It's a specific use case (e.g. Interview Guide or specific Competency Check)
+            # We might still want to prepend the Role Definition or keep specific one?
+            # User requirement: "If query matches specific use case (e.g. Interview Guide), prioritize it"
+            # BUT if it's just general chat, we switch between Expert/Explanation.
+            pass
+
+        print(f"[RAG] Final Use Case: {uc_id}")
+ 
         # 4. Build Context
         # Pass Mode to ContextBuilder to select correct wording (Friendly vs Standard)
         builder = ContextBuilder(uc_config)
-        rag_context = builder.build(enterprise_data, final_candidates_data, mode=mode)
-
+        rag_context = builder.build(enterprise_data, final_candidates_data, mode=determined_mode)
+ 
         # 5. Assemble System Prompt
         candidate_count = len(final_candidates_data)
         sys_prompt = self._assemble_prompt(uc_config, rag_context, candidate_count)

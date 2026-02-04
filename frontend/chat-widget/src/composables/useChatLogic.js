@@ -470,17 +470,15 @@ export function useChatLogic(emit) {
 
             // Using activeConversationCandidateIds here!
             const activeIds = activeConversationCandidateIds.value
-            // Find objects for active IDs
-            const activeCandidates = candidates.value.filter(c => activeIds.includes(c.candidate_id))
-
-            // Determine Mode: Quick Question -> expert, Typed -> explanation
-            const mode = isQuick ? 'expert' : 'explanation'
+            // Determine mode
+            // 1. Quick Questions -> Force 'expert'
+            // 2. Typed Input -> 'auto' (Let backend router decide)
+            const mode = isQuick ? 'expert' : 'auto';
 
             const response = await fetch(`${serverRoot}/chat/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${userToken.value}`
                 },
                 body: JSON.stringify({
                     query: query,
