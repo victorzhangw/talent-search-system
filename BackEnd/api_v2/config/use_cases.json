@@ -65,6 +65,28 @@
             ]
         }
     },
+    "UC-INT-01": {
+        "description": "面試提問指南 (Structured Interview)",
+        "answer_guidence": "請嚴格遵守【快速面試提問指南.txt】的系統提示詞進行生成。採用 STAR 原則，禁止使用心理學術語，產出結構化的面試題庫。",
+        "keywords": [
+            "快速面試提問指南",
+            "面試題目",
+            "提問指南",
+            "面試問題"
+        ],
+        "prompt_config": {
+            "style_ref": "STRUCTURED-INTERVIEW",
+            "risk_notes": [
+                "必須遵循 STAR 框架",
+                "禁止提供主觀錄取建議"
+            ],
+            "template_id": "interview_template",
+            "template_file": "快速面試提問指南.txt",
+            "allowed_knowledge_sources": [
+                "trait_reports"
+            ]
+        }
+    },
     "UC-GENERAL": {
         "description": "通用 HR 助手 (Fallback)",
         "answer_guidence": "【EXPLANATORY MODE】以說明與理解為目的，不進行決策或價值判斷；使用程度描述語言（偏高／中等／偏低），避免逐分解讀分數；必要時可引用特質語意 Bands 作為行為解釋依據；不得提供錄取、淘汰、晉升或風險判斷建議。",

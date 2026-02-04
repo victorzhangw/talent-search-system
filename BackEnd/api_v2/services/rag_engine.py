@@ -309,7 +309,17 @@ class RAGService:
         
         # Load prompt template from file
         import os
-        prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', 'rag_system_prompt.txt')
+        
+        # Determine which template file to load
+        # Default: rag_system_prompt.txt
+        template_filename = 'rag_system_prompt.txt'
+        
+        # Override if specified in prompt_config
+        if 'prompt_config' in uc_config and 'template_file' in uc_config['prompt_config']:
+            template_filename = uc_config['prompt_config']['template_file']
+            print(f"[RAG] Using specialized prompt template: {template_filename}")
+            
+        prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', template_filename)
         
         try:
             with open(prompt_path, 'r', encoding='utf-8') as f:

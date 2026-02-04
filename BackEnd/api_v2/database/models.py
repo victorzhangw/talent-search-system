@@ -70,6 +70,8 @@ class TraitBand(Base):
     description = Column(Text)
     management_focus = Column(Text)
     report_wording = Column(Text)
+    report_wording_friendly = Column(Text)
+    trait_project = Column(String(50))
     ai_guidance = Column(JSON) # {do: [], dont: []}
 
 class TraitInteraction(Base):

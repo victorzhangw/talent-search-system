@@ -3,11 +3,14 @@
     <div class="reasoning-header">
       <span class="icon">🧠</span>
       <span class="title">
-        Traitty 努力思考中，請稍待一會
+        
         <span class="loading-dots">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
+          <span class="bouncing-dot"></span>
+          <span class="bouncing-dot"></span>
+          <span class="bouncing-dot"></span>
+          <span class="bouncing-dot"></span>
+          <span class="bouncing-dot"></span>
+          <span class="bouncing-dot"></span>
         </span>
       </span>
     </div>
@@ -54,42 +57,5 @@ const isExpanded = ref(false)
   }
 }
 
-/* Loading Dots Animation */
-.loading-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: 0.4rem;
-}
 
-.dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background-color: #94a3b8;
-  animation: bounce 1.4s infinite ease-in-out both;
-}
-
-.dot:nth-child(1) {
-  animation-delay: -0.32s;
-}
-
-.dot:nth-child(2) {
-  animation-delay: -0.16s;
-}
-
-.dot:nth-child(3) {
-  animation-delay: 0s;
-}
-
-@keyframes bounce {
-  0%, 80%, 100% {
-    transform: scale(0);
-    opacity: 0.3;
-  }
-  40% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
 </style>
