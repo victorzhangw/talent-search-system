@@ -5,21 +5,16 @@
     @click="$emit('toggle')"
     :title="hasActiveSession ? '回到對話' : '開啟 Traitty'"
   >
-    <!-- Closed State: Pill Design -->
+    <!-- Closed State: Transparent Button with Dynamic SVG Image -->
     <div class="launcher-content" v-if="!isOpen">
-      <!-- Icon Section -->
-      <div class="icon-wrapper" :class="{ active: hasActiveSession }">
-        <svg class="chat-icon" viewBox="0 0 24 24">
-          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
-        </svg>
+      <div class="logo-wrapper">
+        <img 
+          :src="logoSrc" 
+          alt="Traitty AI" 
+          class="logo-img" 
+          :class="{ 'in-use-pulse': hasActiveSession }"
+        />
       </div>
-
-      <!-- Text Section -->
-      <div class="text-wrapper">
-        <span class="title">Traitty</span>
-      </div>
-
-     
     </div>
 
     <!-- Open State: Simple Close Button -->
@@ -32,13 +27,22 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue';
+import suspendLogo from '@/assets/images/suspend.svg';
+import inuseLogo from '@/assets/images/inuse.svg';
+
+const props = defineProps({
   isOpen: Boolean,
   hasActiveSession: {
     type: Boolean,
     default: false
   }
 })
+
+// Dynamic Logo Source Logic
+const logoSrc = computed(() => {
+  return props.hasActiveSession ? inuseLogo : suspendLogo;
+});
 </script>
 
 <style lang="scss" scoped>
@@ -52,29 +56,24 @@ defineProps({
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Default State (Closed): Pill Shape */
+  /* Default State (Closed): Transparent Button with Image */
   &:not(.is-open) {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 
-      0 4px 6px -1px rgba(0, 0, 0, 0.1), 
-      0 2px 4px -1px rgba(0, 0, 0, 0.06),
-      0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    background: transparent; /* No background */
+    box-shadow: none; /* No shadow */
+    border: none;
     
-    border-radius: 999px; /* Pill shape */
-    padding: 0.5rem;
-    padding-right: 1rem;
-    min-width: 100px;
-    height: 3rem;
+    padding: 0;
+    min-width: unset; 
+    width: auto;
+    height: auto;
     
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      transform: scale(1.05); /* Slight grow effect instead of lift */
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); /* Shadow on the image itself */
     }
   }
 
@@ -101,69 +100,45 @@ defineProps({
   .launcher-content {
     display: flex;
     align-items: center;
+    justify-content: center;
     width: 100%;
-    gap: 0.65rem;
+    height: 100%;
   }
 
-  /* Left Icon Wrapper */
-  .icon-wrapper {
-    width: 2.5rem;
-    height: 2.5rem;
-    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); /* Orange Gradient */
-    border-radius: 50%;
+  /* Logo Wrapper */
+  .logo-wrapper {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    flex-shrink: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Clip potential edge artifacts */
     
-    /* Active State (Blue) */
-    &.active {
-       background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    }
-    
-    .chat-icon {
-      width: 1.25rem;
-      height: 1.25rem;
-      fill: currentColor;
+    .logo-img {
+      height: 8.5rem; /* Standalone floating image size */
+      width: auto;
+      object-fit: contain;
+      display: block; /* Remove inline spacing */
+      color: rgba(255,255,255,0.1);
+      /* Fixes for rendering artifacts/flickering */
+      transform: translate3d(0, 0, 0); 
+      backface-visibility: hidden;
+      -webkit-font-smoothing: antialiased;
+
+      /* Heartbeat/Breathing Animation when active */
+      &.in-use-pulse {
+        animation: heartbeat 2s infinite ease-in-out;
+      }
     }
   }
+}
 
-  /* Center Text */
-  .text-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    
-    .title {
-      color: #1f2937; /* Gray-800 */
-      font-weight: 700;
-      font-size: 0.95rem;
-      letter-spacing: 0.01em;
-    }
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1) translate3d(0, 0, 0);
   }
-
-  /* Right Close Decoration */
-  .close-decoration {
-    color: #9ca3af; /* Gray-400 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 50%;
-    transition: background-color 0.2s;
-
-    &:hover {
-        background-color: rgba(0,0,0,0.05);
-        color: #4b5563;
-    }
-
-    .close-icon {
-      width: 18px;
-      height: 18px;
-      fill: currentColor;
-    }
+  50% {
+    transform: scale(0.92) translate3d(0, 0, 0); /* Shrink inwards */
   }
 }
 </style>

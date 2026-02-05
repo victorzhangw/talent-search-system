@@ -470,6 +470,9 @@ export function useChatLogic(emit) {
 
             // Using activeConversationCandidateIds here!
             const activeIds = activeConversationCandidateIds.value
+            // Define activeCandidates for usage in body
+            const activeCandidates = candidates.value.filter(c => activeIds.includes(c.candidate_id))
+
             // Determine mode
             // 1. Quick Questions -> Force 'expert'
             // 2. Typed Input -> 'auto' (Let backend router decide)

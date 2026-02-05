@@ -1,6 +1,8 @@
 <template>
   <div class="reasoning-block">
+     <!--
     <div class="reasoning-header">
+     
       <span class="icon">🧠</span>
       <span class="title">
         
@@ -13,7 +15,8 @@
           <span class="bouncing-dot"></span>
         </span>
       </span>
-    </div>
+     
+    </div> -->
   </div>
 </template>
 
