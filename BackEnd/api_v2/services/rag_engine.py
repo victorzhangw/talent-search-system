@@ -36,6 +36,7 @@ class RAGService:
         # 3. Setup LLM Client
         api_key = current_app.config.get('DEEPSEEK_API_KEY')
         api_base = current_app.config.get('DEEPSEEK_API_BASE')
+        self.model_name = current_app.config.get('DEEPSEEK_MODEL', 'deepseek-chat')
         
         # Fallback: Retry loading .env if key is missing (Hotfix for loading issue)
         if not api_key:
@@ -173,12 +174,19 @@ class RAGService:
             else:
                 # Fallback: Fetch from API
                 print(f"[RAG] No frontend candidate info. Fetching from API...")
-                cand_resp = self.integration_service.get_candidates(upstream_token, limit=100)
-                
-                if isinstance(cand_resp, dict):
-                    all_candidates = cand_resp.get('data', [])
-                else:
-                    all_candidates = cand_resp
+                try:
+                    cand_resp = self.integration_service.get_candidates(upstream_token, limit=100)
+                    
+                    if isinstance(cand_resp, dict):
+                        all_candidates = cand_resp.get('data', [])
+                    else:
+                        all_candidates = cand_resp
+                except Exception as e:
+                    print(f"[RAG] Critical Error fetching candidates from upstream: {e}")
+                    # Decide: crashes here (stopping flow) or continue with empty candidates?
+                    # If we continue with empty candidates, the LLM will say "I don't see any candidates".
+                    # This is slightly better than a hard 500 crash.
+                    all_candidates = []
                     
                 def to_str(v): return str(v) if v is not None else ""
                 target_ids_str = set(map(to_str, candidate_ids))
@@ -442,9 +450,9 @@ SESSION: {session_id} | USE_CASE: {uc_id}
         ]
 
         try:
-            print(f"[LLM] Calling DeepSeek API with model 'deepseek-chat'...")
+            print(f"[LLM] Calling DeepSeek API with model '{self.model_name}'...")
             response = self.client.chat.completions.create(
-                model="deepseek-chat",
+                model=self.model_name,
                 messages=messages,
                 stream=True,
                 stream_options={"include_usage": True}

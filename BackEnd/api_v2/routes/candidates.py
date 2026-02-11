@@ -51,16 +51,20 @@ def list_candidates():
         offset = 0
 
     # Pass token if supported (Real Service) and params
-    if isinstance(service, RealIntegrationService):
-        # returns { 'data': [...], 'page': ... }
-        result = service.get_candidates(upstream_token, limit=limit, offset=offset)
-        candidates = result.get('data', [])
-        page_info = result.get('page', {})
-    else:
-        # returns { 'data': [...], 'page': ... }
-        result = service.get_candidates(enterprise_code, limit=limit, offset=offset)
-        candidates = result.get('data', [])
-        page_info = result.get('page', {})
+    try:
+        if isinstance(service, RealIntegrationService):
+            # returns { 'data': [...], 'page': ... }
+            result = service.get_candidates(upstream_token, limit=limit, offset=offset)
+            candidates = result.get('data', [])
+            page_info = result.get('page', {})
+        else:
+            # returns { 'data': [...], 'page': ... }
+            result = service.get_candidates(enterprise_code, limit=limit, offset=offset)
+            candidates = result.get('data', [])
+            page_info = result.get('page', {})
+    except Exception as e:
+        print(f"ERROR: Failed to fetch candidates: {e}")
+        return jsonify({'error': 'Upstream service unavailable', 'details': str(e)}), 503
     
     if candidates and len(candidates) > 0:
         print(f"DEBUG: Successfully fetched {len(candidates)} candidates.", flush=True)
@@ -89,12 +93,16 @@ def get_candidate_report(candidate_id):
     # 2. Find Assessment ID for this Candidate
     # Note: This limits us to finding candidates within the first 100 results.
     # TODO: Implement Get-By-ID in Upstream or Service to avoid fetching list.
-    if isinstance(service, RealIntegrationService):
-        resp = service.get_candidates(upstream_token, limit=100)
-        candidates = resp.get('data', [])
-    else:
-        resp = service.get_candidates("ACME-TW", limit=100)
-        candidates = resp.get('data', [])
+    try:
+        if isinstance(service, RealIntegrationService):
+            resp = service.get_candidates(upstream_token, limit=100)
+            candidates = resp.get('data', [])
+        else:
+            resp = service.get_candidates("ACME-TW", limit=100)
+            candidates = resp.get('data', [])
+    except Exception as e:
+        print(f"ERROR: Failed to fetch candidate list for report: {e}")
+        return jsonify({'error': 'Upstream service unavailable', 'details': str(e)}), 503
 
     # Debug ID types
     print(f"DEBUG: Looking for candidate_id: {candidate_id} (Type: {type(candidate_id)})", flush=True)

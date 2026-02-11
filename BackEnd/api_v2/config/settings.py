@@ -50,6 +50,7 @@ class Config:
     
     # LLM Settings
     DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
+    DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
     DEEPSEEK_API_BASE = os.getenv('DEEPSEEK_API_BASE', 'https://api.deepseek.com/v1')
     
     # External API Settings

@@ -1,4 +1,5 @@
 import httpx
+import time
 from flask import current_app
 from .integration_base import IntegrationServiceInterface
 
@@ -21,34 +22,70 @@ class RealIntegrationService(IntegrationServiceInterface):
         """
         Fetch candidates from Traitty API using the provided JWT.
         Endpoint: GET /v1/candidates/
+        Includes Retry Logic: 3 attempts with backoff.
         """
+        import time
         token = auth_key
         if not token:
             print("[RealService] No token provided")
             return {"data": [], "page": {"total": 0}}
 
-        try:
-            url = f"{self.base_url}/v1/candidates/"
-            headers = self._get_headers(token)
-            params = {"limit": limit, "offset": offset}
-            
-            print(f"[RealService] Requesting {url} with params {params}...")
-            
-            response = httpx.get(url, headers=headers, params=params, timeout=15.0)
-            
-            print(f"[RealService] Candidates Response Status: {response.status_code}")
-            if response.status_code == 200:
-                data = response.json()
-                # Ensure structure
-                if 'data' not in data:
-                    return {'data': [], 'page': {}}
-                return data
-            else:
-                print(f"[RealService] Candidates Error Body: {response.text}")
-                return {"data": [], "page": {"total": 0}}
-        except Exception as e:
-            print(f"[RealService] Exception fetching candidates: {e}")
-            return {"data": [], "page": {"total": 0}}
+        url = f"{self.base_url}/v1/candidates/"
+        headers = self._get_headers(token)
+        params = {"limit": limit, "offset": offset}
+        
+        max_retries = 3
+        timeout_seconds = 30.0  # Increased from 15.0 to 30.0
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"[RealService] Requesting {url} with params {params} (Attempt {attempt}/{max_retries})...")
+                
+                response = httpx.get(url, headers=headers, params=params, timeout=timeout_seconds)
+                
+                print(f"[RealService] Candidates Response Status: {response.status_code}")
+                if response.status_code == 200:
+                    data = response.json()
+                    # Ensure structure
+                    if 'data' not in data:
+                        return {'data': [], 'page': {}}
+                    return data
+                elif response.status_code >= 500:
+                    # Server error (500, 502, 503, 504), retry
+                    error_msg = f"[RealService] Server Error {response.status_code}: {response.text}"
+                    print(error_msg)
+                    
+                    if response.status_code == 504:
+                         print(f"[RealService] Gateway Timeout detected. Ensuring retry...")
+
+                    if attempt < max_retries:
+                        time.sleep(2 * attempt)
+                        continue
+                    else:
+                        # Raise exception to be caught by caller (503 Service Unavailable)
+                        response.raise_for_status()
+                else:
+                    # Client error (4xx), do not retry
+                    print(f"[RealService] Candidates Error Body: {response.text}")
+                    return {"data": [], "page": {"total": 0}}
+                    
+            except (httpx.RequestError, httpx.TimeoutException) as e:
+                print(f"[RealService] Network Exception fetching candidates (Attempt {attempt}): {e}")
+                if attempt < max_retries:
+                    time.sleep(2 * attempt)
+                    continue
+                else:
+                    # Final attempt failed
+                    print(f"[RealService] All retries failed for candidates fetch.")
+                    # Better to return error structure or raise? 
+                    # Returning empty list mimics "no results" which is confusing.
+                    # Propagating exception allows caller to handle "Service Unavailable".
+                    raise e
+            except Exception as e:
+                print(f"[RealService] Unexpected Exception: {e}")
+                raise e
+                
+        return {"data": [], "page": {"total": 0}}
 
     def get_candidate_by_id(self, token: str, candidate_id: str) -> dict:
         """
