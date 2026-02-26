@@ -1,0 +1,20 @@
+model_list:
+  # Primary Path: NVIDIA AI Foundation (High Performance)
+  - model_name: optimized-router-model
+    litellm_params:
+      model: openai/deepseek-ai/deepseek-v3.2 
+      api_base: https://integrate.api.nvidia.com/v1
+      api_key: "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"
+      rpm: 1000
+
+  # Backup Path: DeepSeek Official API (Cost Efficient Fallback)
+  - model_name: optimized-router-model
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_base: https://api.deepseek.com/v1
+      api_key: "sk-8377e508025f417eaa201aa714eabb0f"
+
+router_settings:
+  routing_strategy: "latency-based-routing"  # Prioritize fastest response
+  redis_host: "localhost"
+  redis_port: 6379

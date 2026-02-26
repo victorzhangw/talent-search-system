@@ -324,24 +324,30 @@ class RAGService:
         # Check specific use cases first (like UC-INT-01 which has its own template)
         uc_id, uc_config = self._get_use_case(query)
         
-        # Logic: 
-        # If it's a "generic" match (UC-GENERAL) or "explanation forced" (UC-EXPLAIN was logic before),
-        # we now override the 'answer_guidence' with our custom role prompt.
-        # If it's a specific UC (e.g. UC-INT-01), we might want to respect its specialized template, 
-        # BUT we still need to apply the Expert Mode style if applicable?
-        # Actually, UC-INT-01 (Interview Guide) is highly specialized.
-        
-        if uc_id == "UC-GENERAL":
-            # Override Generic Guidance with our Role Definition
-            # Create a shallow copy to avoid mutating global config
-            uc_config = uc_config.copy() 
-            uc_config['answer_guidence'] = custom_role_prompt
+        # 【模式優先策略】
+        # Expert / Explanation 角色定義對所有 UC 皆有效。
+        # UC-INT-01 擁有專屬 template_file（面試提問），是唯一的例外，維持原本 UC guidance。
+        # 其餘所有 UC（含 UC-GENERAL）：角色定義為主，UC answer_guidence 作為補充。
+
+        # 不可修改全域 config，永遠建立 shallow copy
+        uc_config = uc_config.copy()
+
+        if uc_id == "UC-INT-01":
+            # 面試提問指南：有專屬 template_file，維持原本完整 guidance，不注入角色定義
+            print(f"[RAG] UC-INT-01 detected: preserving specialized interview template.")
         else:
-            # It's a specific use case (e.g. Interview Guide or specific Competency Check)
-            # We might still want to prepend the Role Definition or keep specific one?
-            # User requirement: "If query matches specific use case (e.g. Interview Guide), prioritize it"
-            # BUT if it's just general chat, we switch between Expert/Explanation.
-            pass
+            # 所有其他 UC（包含 UC-GENERAL、UC-SEL-01、UC-DEV-01、UC-CMP-01 等）
+            # 將 Expert/Explanation 角色定義作為主要指令；若該 UC 有額外 guidance，附加於後
+            original_guidance = uc_config.get('answer_guidence', '').strip()
+            if original_guidance:
+                # 保留 UC 的補充限制，但以角色定義為優先
+                uc_config['answer_guidence'] = (
+                    custom_role_prompt.strip()
+                    + "\n\n【本次問題補充限制】\n"
+                    + original_guidance
+                )
+            else:
+                uc_config['answer_guidence'] = custom_role_prompt
 
         print(f"[RAG] Final Use Case: {uc_id}")
  

@@ -28,8 +28,6 @@
 
 <script setup>
 import { computed } from 'vue';
-import suspendLogo from '@/assets/images/suspend.svg';
-import inuseLogo from '@/assets/images/inuse.svg';
 
 const props = defineProps({
   isOpen: Boolean,
@@ -40,8 +38,36 @@ const props = defineProps({
 })
 
 // Dynamic Logo Source Logic
+const getBaseUrl = () => {
+  // 1. Try explicit configuration from window config
+  if (typeof window !== 'undefined' && window.TRAITTY_WIDGET_CONFIG?.assetBaseUrl) {
+    return window.TRAITTY_WIDGET_CONFIG.assetBaseUrl.replace(/\/$/, '');
+  }
+
+  // 2. In production (IIFE), try to auto-detect based on script tag
+  // We look for the script named 'loader.iife.js' or 'loader.js'
+  if (!import.meta.env.DEV && typeof document !== 'undefined') {
+    const scripts = document.getElementsByTagName('script');
+    for (let i = 0; i < scripts.length; i++) {
+      const src = scripts[i].src;
+      if (src && (src.includes('loader.iife.js') || src.includes('loader.js'))) {
+        // Return the path up to the last slash (directory of the script)
+        return src.substring(0, src.lastIndexOf('/'));
+      }
+    }
+  }
+
+  // 3. Fallback to local relative path (works in Dev or same-origin)
+  return '';
+};
+
 const logoSrc = computed(() => {
-  return props.hasActiveSession ? inuseLogo : suspendLogo;
+  const baseUrl = getBaseUrl();
+  const path = props.hasActiveSession 
+    ? '/images/inuse.svg' 
+    : '/images/suspend.svg';
+    
+  return baseUrl ? `${baseUrl}${path}` : path;
 });
 </script>
 
