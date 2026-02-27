@@ -549,7 +549,8 @@
 
 .candidate-dropdown-modal {
     width: 100%;
-    max-width: 600px;
+    max-width: 800px;
+    /* Increase width for 2 columns */
     height: 85%;
     max-height: 700px;
     background: var(--glass-bg);
@@ -559,6 +560,19 @@
     border-radius: 20px;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
     border: 1px solid var(--glass-border);
+
+    /* Force Two Columns inside Modal */
+    :deep(.list-container) {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.8rem;
+        align-content: start;
+        padding-right: 0.5rem;
+
+        @media (max-width: 768px) {
+            grid-template-columns: 1fr;
+        }
+    }
 
     .modal-header {
         display: flex;
@@ -584,7 +598,14 @@
         border-top: 1px solid var(--glass-border);
         display: flex;
         justify-content: center;
+        gap: 1rem;
         flex-shrink: 0;
+
+        .clear-btn {
+            border-radius: 20px;
+            padding: 0.6rem 1.5rem;
+            min-width: 120px;
+        }
 
         .confirm-btn {
             border-radius: 20px;
@@ -597,10 +618,10 @@
 /* Slide Up Transition */
 .slide-up-enter-active,
 .slide-up-leave-active {
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
 
     .candidate-dropdown-modal {
-        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
 }
 

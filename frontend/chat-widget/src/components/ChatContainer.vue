@@ -156,12 +156,22 @@
                                         :has-more="hasMoreCandidates"
                                         :disabled="false"
                                         :total-count="totalCandidatesCount"
+                                        :initial-selected-ids="selectedCandidateIds"
                                         @change="handleSelectionChange"
                                         @load-more="loadMoreCandidates"
                                     />
                                 </div>
                                 <div class="modal-footer">
-                                    <button class="primary-btn confirm-btn" @click="confirmSelection">確認選取</button>
+                                    <button 
+                                        class="secondary-btn clear-btn" 
+                                        v-if="selectedCandidateIds.length > 0" 
+                                        @click="clearCandidates"
+                                    >
+                                        清除選取
+                                    </button>
+                                    <button class="primary-btn confirm-btn" @click="confirmSelection">
+                                        確認選取 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -321,6 +331,12 @@ const confirmSelection = () => {
     showCandidateDropdown.value = false
     if (selectedCandidateIds.value.length > 0) {
         handleInitialSend()
+    }
+}
+
+const clearCandidates = () => {
+    if (candidateSelectorRef.value && candidateSelectorRef.value.clearSelection) {
+        candidateSelectorRef.value.clearSelection() 
     }
 }
 

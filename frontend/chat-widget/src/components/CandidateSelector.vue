@@ -117,11 +117,15 @@ const props = defineProps({
   totalCount: {
       type: Number,
       default: 0
+  },
+  initialSelectedIds: {
+      type: Array,
+      default: () => []
   }
 })
 
 const emit = defineEmits(['change', 'load-more'])
-const selectedIds = ref([])
+const selectedIds = ref([...props.initialSelectedIds])
 const searchQuery = ref('')
 
 // Filter Logic
@@ -158,6 +162,14 @@ const clearSelection = () => {
     selectedIds.value = []
     emit('change', [])
 }
+
+// Ensure syncing if parent changes it
+watch(() => props.initialSelectedIds, (newVal) => {
+    // Only update if arrays differ in length or content (simple check for our use-case)
+    if (newVal.length !== selectedIds.value.length) {
+        selectedIds.value = [...newVal]
+    }
+}, { deep: true })
 
 // Scroll Detection
 const listContainer = ref(null)
