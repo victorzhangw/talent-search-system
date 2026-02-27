@@ -1,6 +1,6 @@
 
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from ..database.connection import get_db_session
 from ..database.models import ChatSession, ChatMessage
@@ -65,6 +65,18 @@ class SqlSessionStore:
         db = get_db_session()
         try:
             return db.query(ChatSession).filter_by(session_id=session_id).first()
+        finally:
+            db.close()
+
+    def get_user_sessions(self, user_id: str, days: int = 30):
+        db = get_db_session()
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            sessions = db.query(ChatSession).filter(
+                ChatSession.user_id == user_id,
+                ChatSession.started_at >= cutoff_date
+            ).order_by(ChatSession.started_at.desc()).all()
+            return sessions
         finally:
             db.close()
 

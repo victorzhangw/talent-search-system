@@ -13,9 +13,9 @@ if %errorlevel% neq 0 (
 )
 timeout /t 5 /nobreak >nul
 
-echo [2/4] Starting LLM Proxy (Port 4000)...
-start "TalentSearch V2 - LLM Router" cmd /k "call start-llm-proxy-v2.bat"
-timeout /t 3 /nobreak >nul
+REM echo [2/4] Starting LLM Proxy (Port 4000)...
+REM start "TalentSearch V2 - LLM Router" cmd /k "call start-llm-proxy-v2.bat"
+REM timeout /t 3 /nobreak >nul
 
 echo [2.5/4] Starting Backend API...
 start "TalentSearch V2 - Backend" cmd /k "call start-v2-backend.bat"

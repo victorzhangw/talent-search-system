@@ -39,17 +39,28 @@ export function useChatLogic(emit) {
     const showReportModal = ref(false)
     const currentReportCandidate = ref({})
 
-    const quickQuestions = ref([
-        "快速面試提問指南",
-        "工作中主要的優勢與潛力",
-        "在團隊合作中適合的角色",
-        "需注意的管理問題或潛在風險",
-        "如何面對困難、壓力、挑戰",
-        "合適的管理方式與風格",
-        "有效的溝通方法/模式",
-        "展現何種領導風格",
-    ])
+    const quickQuestionCategories = ref({
+        "管理": [
+            "工作中的主要優勢與潛力",
+            "在團隊合作中適合的角色",
+            "需注意的管理問題或潛在風險",
+            "合適的管理方式與風格"
+        ],
+        "招募": [
+            "快速面試提問指南",
+            "如何面對困難、壓力、挑戰",
+            "有效的溝通方法/模式",
+            "展現何種領導風格"
+        ]
+    })
 
+    const selectedQuickQuestionCategory = ref('管理')
+
+    const quickQuestions = computed(() => {
+        return quickQuestionCategories.value[selectedQuickQuestionCategory.value] || []
+    })
+
+    const historySessions = ref({ today: [], past_30_days: [] })
 
     // --- Computed ---
     const currentThemeLabel = computed(() => {
@@ -177,11 +188,59 @@ export function useChatLogic(emit) {
         showReportModal.value = true
     }
 
+    // History Logic
+    const fetchHistory = async () => {
+        try {
+            const { serverRoot } = getApiConfig()
+            const userId = window.TRAITTY_WIDGET_CONFIG?.userEmail || 'anonymous'
+
+            const res = await fetch(`${serverRoot}/chat/history?user_id=${userId}`, {
+                headers: { 'Authorization': `Bearer ${userToken.value}` }
+            })
+            if (res.ok) {
+                historySessions.value = await res.json()
+            }
+        } catch (e) {
+            console.error("[ChatContainer] Failed to load history", e)
+        }
+    }
+
+    const loadHistorySession = async (sessionData) => {
+        const { serverRoot } = getApiConfig()
+        currentSessionId.value = sessionData.session_id
+
+        try {
+            const res = await fetch(`${serverRoot}/chat/${sessionData.session_id}`, {
+                headers: { 'Authorization': `Bearer ${userToken.value}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                // Reconstruct messages array
+                const msgs = data.messages.map(m => ({
+                    role: m.role,
+                    content: m.content
+                }))
+
+                // Keep the initial welcome message from AI if present in DB
+                messages.value = msgs.length > 0 ? msgs : [{ role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }]
+
+                isSelectionLocked.value = true // Assume locked if reviewing history
+                currentTab.value = 'main'
+
+                // If metadata has active IDs, we could theoretically reload candidates here
+            }
+        } catch (e) {
+            console.error("[ChatContainer] Failed to load session details", e)
+        }
+    }
+
     // Login & Init
     const handleLoginSuccess = async (authData) => {
         userToken.value = authData.token
         // Fetch candidates after login
         await fetchCandidates()
+        // Fetch history
+        await fetchHistory()
         currentTab.value = 'main' // Switch to split view
 
         // After login and candidates load, check if we need to restore state (New Tab scenario)
@@ -602,7 +661,10 @@ export function useChatLogic(emit) {
         isInitializing,
         showReportModal,
         currentReportCandidate,
+        quickQuestionCategories,
+        selectedQuickQuestionCategory,
         quickQuestions,
+        historySessions,
 
         // Computed
         currentThemeLabel,
@@ -619,6 +681,8 @@ export function useChatLogic(emit) {
         lockSelectionAndStart,
         resetAndReselect,
         sendMessage,
-        sendQuickMessage
+        sendQuickMessage,
+        fetchHistory,
+        loadHistorySession
     }
 }

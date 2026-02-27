@@ -15,6 +15,4 @@ model_list:
       api_key: "sk-8377e508025f417eaa201aa714eabb0f"
 
 router_settings:
-  routing_strategy: "latency-based-routing"  # Prioritize fastest response
-  redis_host: "localhost"
-  redis_port: 6379
+  routing_strategy: "simple-shuffle"  # Use random load balancing instead of latency-based to avoid Redis dependency

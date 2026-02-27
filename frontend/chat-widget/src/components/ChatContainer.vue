@@ -69,57 +69,120 @@
             />
         </div>
 
-        <!-- Split View (Selection Left + Chat Right) -->
+        <!-- Split View (3-Column Layout) -->
         <div v-else class="split-view" :class="{ 'chat-mode': isSelectionLocked }">
             
-            <!-- LEFT PANEL: Candidate List -->
-            <div class="left-panel" :class="{ 'wide-sidebar': !isSelectionLocked }">
-                <div class="panel-header" v-if="!isSelectionLocked">
-                     <button 
-                        class="primary-btn full-width"
-                        :disabled="selectedCandidateIds.length === 0"
-                        @click="lockSelectionAndStart"
-                     >
-                        開始分析 ({{ selectedCandidateIds.length }})
-                     </button>
+            <!-- LEFT PANEL: History Sidebar -->
+            <div class="left-panel history-sidebar">
+                <div class="history-actions">
+                    <button class="primary-btn full-width new-analysis-btn" @click="resetAndReselect">
+                        <svg class="material-icon small" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> 
+                        開啟新人才解析
+                    </button>
                 </div>
-                <div class="panel-header" v-else>
-                     <button class="secondary-btn full-width" @click="resetAndReselect">
-                        重選候選人
-                     </button>
-                </div>
-                
-                <!-- Selector Wrapper -->
-                <div class="selector-wrapper">
-                    <CandidateSelector 
-                        ref="candidateSelectorRef"
-                        :candidates="candidates"
-                        :is-loading="isLoadingCandidates"
-                        :has-more="hasMoreCandidates"
-                        :disabled="isSelectionLocked"
-                        :total-count="totalCandidatesCount"
-                        @change="handleSelectionChange"
-                        @load-more="loadMoreCandidates"
-                    />
 
-                    <!-- Locked Overlay -->
-                    <div v-if="isSelectionLocked" class="locked-overlay">
-                        <div class="overlay-content">
-                            <!-- Icon: Lock -->
-                            <svg class="material-icon large" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-                            <h3>已進入分析模式</h3>
-                            <p>下方列表已暫時鎖定。</p>
-                            <p style="font-size: 0.8rem; margin-top: 0.5rem;">如需切換候選人，請點擊上方的「重選」按鈕。</p>
+                <div class="history-lists" v-if="historySessions">
+                    <!-- Today -->
+                    <div class="history-group" v-if="historySessions.today && historySessions.today.length > 0">
+                        <div class="group-title">今天</div>
+                        <div 
+                            class="history-item" 
+                            v-for="s in historySessions.today" 
+                            :key="s.session_id" 
+                            @click="loadHistorySession(s)"
+                            :class="{ active: currentSessionId === s.session_id }"
+                        >
+                            {{ s.title }}
+                        </div>
+                    </div>
+                    <!-- Past 30 Days -->
+                    <div class="history-group" v-if="historySessions.past_30_days && historySessions.past_30_days.length > 0">
+                        <div class="group-title">過去30天</div>
+                        <div 
+                            class="history-item" 
+                            v-for="s in historySessions.past_30_days" 
+                            :key="s.session_id" 
+                            @click="loadHistorySession(s)"
+                            :class="{ active: currentSessionId === s.session_id }"
+                        >
+                            {{ s.title }}
                         </div>
                     </div>
                 </div>
+                
+                <div class="quota-info">
+                    <div class="quota-count">
+                        <svg class="material-icon small" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+                        剩餘額度 <span class="highlight">12</span> 次
+                    </div>
+                    <div class="quota-expire">4天後到期</div>
+                </div>
             </div>
 
-            <!-- RIGHT PANEL: Chat Area -->
-            <div class="right-panel">
+            <!-- MIDDLE PANEL: Main Area -->
+            <div class="right-panel main-area">
                 
+                <!-- If Not Locked: Welcome & Candidate Selection -->
+                <div v-if="!isSelectionLocked" class="welcome-container">
+                    <div class="welcome-header">
+                        <div class="magic-icon">✨</div>
+                        <h2><span class="gradient">Traitty Ai</span> 人才解析</h2>
+                        <p class="subtitle">討論履歷、面試結果，或從填答者找尋符合文化的人選。</p>
+                    </div>
+
+                    <div class="instructions">
+                        <ol>
+                            <li>先在下方「選取人才」勾選想了解的人選</li>
+                            <li>點「開始分析」後直接發問，或</li>
+                            <li>從快速提問按鈕選取 Traitty AI 為您規劃的提問</li>
+                        </ol>
+                    </div>
+
+                    <!-- Hidden floating Candidate Selector -->
+                    <div class="candidate-dropdown-modal" v-if="showCandidateDropdown">
+                        <div class="modal-header">
+                            <h3>選取人才 ({{ selectedCandidateIds.length }})</h3>
+                            <button class="icon-btn" @click="showCandidateDropdown = false">
+                                <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <CandidateSelector 
+                                ref="candidateSelectorRef"
+                                :candidates="candidates"
+                                :is-loading="isLoadingCandidates"
+                                :has-more="hasMoreCandidates"
+                                :disabled="false"
+                                :total-count="totalCandidatesCount"
+                                @change="handleSelectionChange"
+                                @load-more="loadMoreCandidates"
+                            />
+                        </div>
+                        <div class="modal-footer">
+                            <button class="primary-btn" @click="showCandidateDropdown = false">確認選取</button>
+                        </div>
+                    </div>
+
+                    <!-- Large Input Box for Welcome Screen -->
+                    <div class="big-input-box">
+                        <textarea 
+                            v-model="inputQuery" 
+                            placeholder="向 Traitty 詢問任何人才相關問題..."
+                        ></textarea>
+                        <div class="input-actions-row">
+                            <button class="select-candidate-btn" @click="showCandidateDropdown = true">
+                                <svg class="material-icon small" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                選取人才 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                            </button>
+                            <button class="send-btn" @click="handleInitialSend" :disabled="!canSendInitial">
+                                <svg class="material-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Chat View -->
-                <div v-if="isSelectionLocked" class="chat-view">
+                <div v-else class="chat-view">
                     <div class="selected-summary">
                         已鎖定: 
                         <span 
@@ -140,20 +203,9 @@
                             :disabled="isTyping"
                         ></textarea>
                         <button class="send-btn" @click="sendMessage" :disabled="!inputQuery.trim() || isTyping">
-                            <!-- Icon: Send -->
                             <svg class="material-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                         </button>
                     </div>
-                </div>
-
-                <!-- Empty State Placeholder -->
-                <div v-else class="empty-layout-placeholder">
-                     <div class="placeholder-content">
-                        <!-- Icon: Touch App / Click -->
-                        <svg class="material-icon large" viewBox="0 0 24 24"><path d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6c0-.83-.67-1.5-1.5-1.5S10 6.67 10 7.5v10.74l-3.43-.72c-.08-.01-.15-.03-.24-.03-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.91-1.38z"/></svg>
-                        <h3>準備開始</h3>
-                        <p>請從左側列表勾選候選人，然後點擊「開始分析」。</p>
-                     </div>
                 </div>
 
             </div>
@@ -161,6 +213,14 @@
             <!-- Right Sidebar -->
             <div v-if="isSelectionLocked" class="quick-sidebar">
                
+                <div class="sidebar-header">
+                    <select v-model="selectedQuickQuestionCategory" class="category-select" :disabled="isTyping">
+                        <option v-for="(questions, category) in quickQuestionCategories" :key="category" :value="category">
+                            {{ category }}提問
+                        </option>
+                    </select>
+                </div>
+
                 <div class="quick-btn-list">
                     <button 
                         v-for="(q, idx) in quickQuestions" 
@@ -190,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import MessageList from './MessageList.vue'
 import CandidateSelector from './CandidateSelector.vue'
 import LoginView from './LoginView.vue'
@@ -227,7 +287,10 @@ const {
     isInitializing,
     showReportModal,
     currentReportCandidate,
+    quickQuestionCategories,
+    selectedQuickQuestionCategory,
     quickQuestions,
+    historySessions,
 
     // Computed
     currentThemeLabel,
@@ -241,11 +304,29 @@ const {
     handleLoginSuccess,
     loadMoreCandidates,
     handleSelectionChange,
-    lockSelectionAndStart: logicLockSelection, // Rename to wrap
+    lockSelectionAndStart: logicLockSelection,
     resetAndReselect: logicResetAndReselect,
     sendMessage,
-    sendQuickMessage
+    sendQuickMessage,
+    loadHistorySession
 } = useChatLogic(emit)
+
+const showCandidateDropdown = ref(false)
+
+const canSendInitial = computed(() => {
+    return selectedCandidateIds.value.length > 0
+})
+
+const handleInitialSend = async () => {
+    if (selectedCandidateIds.value.length > 0) {
+        lockSelectionAndStart()
+        // wait for state update
+        await new Promise(r => setTimeout(r, 100))
+        if (inputQuery.value.trim()) {
+            sendMessage()
+        }
+    }
+}
 
 // Template Ref for CandidateSelector (needed for clearing selection)
 const candidateSelectorRef = ref(null)

@@ -50,8 +50,9 @@ class Config:
     
     # LLM Settings
     DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
-    DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL', 'deepseek-chat')
-    DEEPSEEK_API_BASE = os.getenv('DEEPSEEK_API_BASE', 'https://api.deepseek.com/v1')
+    # Force use of official API, bypassing any dangling environment variables from proxy CMD sessions
+    DEEPSEEK_MODEL = 'deepseek-chat'
+    DEEPSEEK_API_BASE = 'https://api.deepseek.com/v1'
     
     # External API Settings
     TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE', 'https://uat.traitty.com') # Configurable UAT/PROD

@@ -74,32 +74,7 @@ class RAGService:
                     return uc_id, uc_data
         return "UC-GENERAL", self.use_cases["UC-GENERAL"]
 
-    def _determine_mode(self, query: str, input_mode: str) -> str:
-        """
-        Determines the routing mode based on input signal and semantic rules.
-        """
-        # 1. Force override from frontend (e.g. Quick Buttons)
-        if input_mode == 'expert':
-            return 'expert'
-            
-        # 2. Rule-Based Semantic Routing
-        rules = self.mode_rules.get('expert_mode_rules', {})
-        
-        # Combine all keyword lists for checking
-        all_expert_keywords = (
-            rules.get('intent_keywords', []) + 
-            rules.get('phrase_patterns', []) + 
-            rules.get('context_keywords', [])
-        )
-        
-        for kw in all_expert_keywords:
-            if kw in query:
-                print(f"[RAG] Router: Hit Expert Keyword '{kw}' -> Expert Mode")
-                return 'expert'
-                
-        # 3. Default Fallback
-        print(f"[RAG] Router: No Expert keywords found -> Explanation Mode")
-        return 'explanation'
+
  
     def _get_cached_data(self, key):
         import time
@@ -304,12 +279,12 @@ class RAGService:
             })
  
         # 3. Intent Routing & Mode Handling (NEW LOGIC)
-        # Determine actual mode (expert vs explanation)
-        determined_mode = self._determine_mode(query, mode)
-        print(f"[RAG] Input Mode: {mode}, Determined Mode: {determined_mode}")
+        # We now use a unified prompt and delegate intention detection to the LLM itself
+        determined_mode = 'expert' # Fetch high-resolution data from ContextBuilder for LLM
+        print(f"[RAG] Input Mode: {mode}, Using Unified Intent Prompt")
 
-        # Inject Special Prompt Content based on Determined Mode
-        prompt_content_file = 'prompt_explanation_mode.txt' if determined_mode == 'explanation' else 'prompt_expert_mode.txt'
+        # Inject Special Prompt Content based on Unified AI Mode
+        prompt_content_file = 'unified_rag_prompt.txt'
         prompt_content_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', prompt_content_file)
         
         custom_role_prompt = "(Role Definition Missing)"

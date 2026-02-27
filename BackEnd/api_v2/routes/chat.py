@@ -1,5 +1,6 @@
 from flask import Blueprint, request, Response, jsonify, stream_with_context, current_app
 import json
+import threading
 from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
 from ..services.session_store import SqlSessionStore
@@ -11,11 +12,136 @@ bp = Blueprint('chat', __name__, url_prefix='/chat')
 
 rag_service = None
 
+def background_generate_title(session_id, user_query, candidate_names):
+    try:
+        global rag_service
+        if not rag_service: 
+            return
+            
+        # 1. Ask LLM for title
+        prompt = f"請根據以下使用者的提問與選擇的候選人，產生一個 15 字以內的對話標題，不要任何引號或解釋。\n候選人：{', '.join(candidate_names) if candidate_names else '無'}\n提問：{user_query}"
+        
+        messages = [{"role": "user", "content": prompt}]
+        response = rag_service.client.chat.completions.create(
+            model=rag_service.model_name,
+            messages=messages,
+            max_tokens=30,
+            temperature=0.3
+        )
+        title = response.choices[0].message.content.strip().strip('"\'')
+        if len(title) > 15:
+            title = title[:15]
+            
+        # 2. Update DB
+        db = get_db_session()
+        try:
+            session_obj = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
+            if session_obj:
+                meta = dict(session_obj.metadata_ or {})
+                meta['title'] = title
+                
+                # Update candidates info if not present
+                if 'candidates' not in meta and candidate_names:
+                    meta['candidates'] = [{"name": n} for n in candidate_names]
+                    
+                session_obj.metadata_ = meta
+                db.commit()
+                print(f"[Background Title] Updated session {session_id} title to: {title}")
+        except Exception as e:
+            db.rollback()
+            print(f"[Background Title] DB error: {e}")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[Background Title] Error: {e}")
+
 @bp.before_request
 def init_service():
     global rag_service
     if rag_service is None:
         rag_service = RAGService()
+
+@bp.route('/history', methods=['GET', 'OPTIONS'])
+def get_user_history():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id parameter is required'}), 400
+        
+    session_store = SqlSessionStore()
+    sessions = session_store.get_user_sessions(user_id=user_id, days=30)
+    
+    # Format and group by Today vs Past 30 Days
+    from datetime import datetime
+    
+    today_sessions = []
+    past_sessions = []
+    
+    now = datetime.utcnow().date()
+    
+    for s in sessions:
+        s_date = s.started_at.date() if s.started_at else None
+        
+        # Build candidate info summary if possible
+        # metadata_ might have it, or we can just return what we have
+        title = "新對話"
+        if s.metadata_ and isinstance(s.metadata_, dict):
+            # Try to get explicitly saved title
+            saved_title = s.metadata_.get('title')
+            if saved_title:
+                title = saved_title
+            else:
+                # Try to get candidate names or something to act as title
+                cands = s.metadata_.get('candidates', [])
+                if cands:
+                    title = ", ".join([c.get('name', 'Unknown') for c in cands]) + " 分析"
+                
+        # If no explicit metadata candidates, maybe fallback or the frontend handles it
+        # Actually in Traitty, session has metadata_? Let's check when we create session.
+        # Currently we don't save candidates to session metadata. Let's return basic info for now.
+        
+        session_data = {
+            'session_id': s.session_id,
+            'started_at': s.started_at.isoformat() if s.started_at else None,
+            'last_active_at': s.last_active_at.isoformat() if s.last_active_at else None,
+            'status': s.status,
+            'title': title
+        }
+        
+        if s_date == now:
+            today_sessions.append(session_data)
+        else:
+            past_sessions.append(session_data)
+            
+    return jsonify({
+        'today': today_sessions,
+        'past_30_days': past_sessions
+    })
+
+@bp.route('/<session_id>', methods=['GET', 'OPTIONS'])
+def get_session_details(session_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    session_store = SqlSessionStore()
+    session = session_store.get_session(session_id)
+    if not session:
+        return jsonify({'error': 'Not found'}), 404
+        
+    messages = session_store.get_messages(session_id)
+    
+    return jsonify({
+        'session_id': session.session_id,
+        'status': session.status,
+        'metadata': session.metadata_,
+        'messages': [{
+            'role': m.role,
+            'content': m.content,
+            'created_at': m.created_at.isoformat() if m.created_at else None
+        } for m in messages]
+    })
 
 @bp.route('/', methods=['POST'])
 def chat():
@@ -52,6 +178,7 @@ def chat():
             print(">>> [DEBUG] Session store initialized", flush=True)
         
             # Ensure session exists (Upsert logic or Check?)
+            is_new_session = False
             try:
                 # Check if exists
                 existing_session = session_store.get_session(session_id)
@@ -59,6 +186,7 @@ def chat():
                     # Create with user_id
                     print(f"[Chat] Creating new session {session_id} with user_id: '{user_id}'", flush=True)
                     session_store.create_session(session_id=session_id, user_id=user_id)
+                    is_new_session = True
                 else:
                     # Check if we need to update user_id
                     current_db_user_id = existing_session.user_id
@@ -79,6 +207,15 @@ def chat():
                             db.close()
             except Exception as e:
                 print(f"[Chat] Session Init Error: {e}")
+
+            # Fire Background Task for Title Generation if New Session
+            if is_new_session:
+                candidate_names = [c.get('name') for c in candidates_info if 'name' in c]
+                threading.Thread(
+                    target=background_generate_title, 
+                    args=(session_id, query, candidate_names),
+                    daemon=True
+                ).start()
 
             # Log User Message
             session_store.add_message(session_id, 'user', query)
