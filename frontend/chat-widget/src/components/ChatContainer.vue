@@ -139,29 +139,33 @@
                     </div>
 
                     <!-- Hidden floating Candidate Selector -->
-                    <div class="candidate-dropdown-modal" v-if="showCandidateDropdown">
-                        <div class="modal-header">
-                            <h3>選取人才 ({{ selectedCandidateIds.length }})</h3>
-                            <button class="icon-btn" @click="showCandidateDropdown = false">
-                                <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                            </button>
+                    <transition name="slide-up">
+                        <div class="candidate-dropdown-overlay" v-if="showCandidateDropdown" @click.self="showCandidateDropdown = false">
+                            <div class="candidate-dropdown-modal">
+                                <div class="modal-header">
+                                    <h3>選取人才 ({{ selectedCandidateIds.length }})</h3>
+                                    <button class="icon-btn" @click="showCandidateDropdown = false">
+                                        <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <CandidateSelector 
+                                        ref="candidateSelectorRef"
+                                        :candidates="candidates"
+                                        :is-loading="isLoadingCandidates"
+                                        :has-more="hasMoreCandidates"
+                                        :disabled="false"
+                                        :total-count="totalCandidatesCount"
+                                        @change="handleSelectionChange"
+                                        @load-more="loadMoreCandidates"
+                                    />
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="primary-btn confirm-btn" @click="confirmSelection">確認選取</button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="modal-body">
-                            <CandidateSelector 
-                                ref="candidateSelectorRef"
-                                :candidates="candidates"
-                                :is-loading="isLoadingCandidates"
-                                :has-more="hasMoreCandidates"
-                                :disabled="false"
-                                :total-count="totalCandidatesCount"
-                                @change="handleSelectionChange"
-                                @load-more="loadMoreCandidates"
-                            />
-                        </div>
-                        <div class="modal-footer">
-                            <button class="primary-btn" @click="showCandidateDropdown = false">確認選取</button>
-                        </div>
-                    </div>
+                    </transition>
 
                     <!-- Large Input Box for Welcome Screen -->
                     <div class="big-input-box">
@@ -312,6 +316,13 @@ const {
 } = useChatLogic(emit)
 
 const showCandidateDropdown = ref(false)
+
+const confirmSelection = () => {
+    showCandidateDropdown.value = false
+    if (selectedCandidateIds.value.length > 0) {
+        handleInitialSend()
+    }
+}
 
 const canSendInitial = computed(() => {
     return selectedCandidateIds.value.length > 0
