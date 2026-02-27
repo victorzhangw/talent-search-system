@@ -612,6 +612,8 @@ export function useChatLogic(emit) {
         } finally {
             isTyping.value = false
             messages.value[aiMsgIndex].isTyping = false
+            // Update history after message is complete
+            fetchHistory()
         }
     }
 
