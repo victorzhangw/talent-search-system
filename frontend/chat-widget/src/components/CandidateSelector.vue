@@ -49,17 +49,21 @@
         :class="{ active: selectedIds.includes(cand.id), disabled: disabled }"
         @click="!disabled && toggle(cand.id)"
       >
-        <div class="checkbox">
-          <!-- Icon: Check -->
-          <svg v-if="selectedIds.includes(cand.id)" class="material-icon check-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        <div class="avatar-initial" :class="'bg-' + (cand.name ? cand.name.length % 5 : 0)">
+            {{ cand.name ? cand.name.charAt(0).toUpperCase() : '?' }}
         </div>
         
         <div class="info">
           <span class="name">
             {{ cand.name }}
-            <span v-if="cand.position"> - {{ cand.position }}</span>
+            <span v-if="cand.position" class="position"> {{ cand.position }}</span>
             <span v-if="cand.email" class="email">({{ cand.email }})</span>
           </span>
+        </div>
+
+        <div class="checkbox">
+          <!-- Icon: Check -->
+          <svg v-if="selectedIds.includes(cand.id)" class="material-icon check-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
         </div>
       </div>
       
@@ -331,28 +335,52 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  padding: 0.6rem; 
+  padding: 0.8rem; 
   
-  background: rgba(127, 127, 127, 0.05); 
+  background: white; 
   border: 1px solid var(--glass-border);
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+
+  [data-theme="midnight"] & {
+    background: rgba(255, 255, 255, 0.05);
+  }
 
   &:hover {
-    background: rgba(127, 127, 127, 0.1);
+    background: rgba(127, 127, 127, 0.03);
+    border-color: rgba(127, 127, 127, 0.2);
   }
 
   &.active {
-    background: rgba(79, 70, 229, 0.15); 
-    border-color: var(--primary-color);
+    background: rgba(106, 37, 244, 0.03); 
+    border-color: rgba(106, 37, 244, 0.15);
   }
 
   &.disabled {
     opacity: 0.6;
     cursor: not-allowed;
-    background: rgba(127,127,127,0.05); /* Force non-hover look */
+    background: rgba(127,127,127,0.05);
     &:hover { background: rgba(127,127,127,0.05); } 
+  }
+
+  .avatar-initial {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 13px;
+      flex-shrink: 0;
+      
+      &.bg-0 { background: #E0E7FF; color: #4F46E5; }
+      &.bg-1 { background: #FFEDD5; color: #C2410C; }
+      &.bg-2 { background: #DCFCE7; color: #15803D; }
+      &.bg-3 { background: #ECE9FE; color: #6A25F4; }
+      &.bg-4 { background: #E0F2FE; color: #0369A1; }
   }
 
   &.active .checkbox {
@@ -362,19 +390,20 @@ defineExpose({
   }
 
   .checkbox {
-    width: 20px; 
-    height: 20px;
-    border-radius: 5px;
-    border: 2px solid var(--glass-text-secondary);
-    opacity: 0.6;
+    width: 22px; 
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--glass-border);
+    margin-left: auto; /* Push to right */
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white; /* White icon on Primary Color */
+    color: white;
     font-size: 0.8rem;
     flex-shrink: 0;
+    transition: all 0.2s;
     
-    .check-icon { width: 16px; height: 16px; }
+    .check-icon { width: 14px; height: 14px; }
   }
 
   .info {
@@ -382,7 +411,7 @@ defineExpose({
     align-items: center;
     gap: 0.5rem;
     font-size: 0.95rem;
-    min-width: 0; /* Crucial for flex child truncation */
+    min-width: 0;
     flex: 1;
     
     .name { 
@@ -393,12 +422,19 @@ defineExpose({
         text-overflow: ellipsis;
         white-space: nowrap;
         flex: 1; 
+
+        .position {
+            font-size: 0.8rem;
+            color: var(--glass-text-secondary);
+            font-weight: normal;
+            margin-left: 0.3rem;
+        }
         
         .email {
             font-size: 0.75rem;
             color: var(--glass-text-secondary);
             margin-left: 0.5rem;
-            display: none; /* Hidden as requested */
+            display: none; 
         }
     }
   }
