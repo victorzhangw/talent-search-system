@@ -44,3 +44,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    input("\n請按 Enter 鍵離開...")

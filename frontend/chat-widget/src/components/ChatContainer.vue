@@ -72,6 +72,14 @@
         <!-- Split View (3-Column Layout) -->
         <div v-else class="split-view" :class="{ 'chat-mode': isSelectionLocked }">
             
+            <!-- Widget Disabled Overlay -->
+            <div class="disabled-overlay" v-if="!isWidgetEnabled">
+                <div class="disabled-message">
+                    <svg class="material-icon disabled-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    目前方案額度已用盡或無權限使用
+                </div>
+            </div>
+
             <!-- LEFT PANEL: History Sidebar -->
             <div class="left-panel history-sidebar">
                 <div class="history-actions">
@@ -110,12 +118,12 @@
                     </div>
                 </div>
                 
-                <div class="quota-info">
+                <div class="quota-info" v-if="quotaSummary">
                     <div class="quota-count">
                         <svg class="material-icon small" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-                        剩餘額度 <span class="highlight">12</span> 次
+                        剩餘額度 <span class="highlight">{{ quotaSummary.remaining }}</span> 次
                     </div>
-                    <div class="quota-expire">4天後到期</div>
+                    <div class="quota-expire">總計 {{ quotaSummary.total }} 次</div>
                 </div>
             </div>
 
@@ -228,11 +236,21 @@
             <div v-if="isSelectionLocked" class="quick-sidebar">
                
                 <div class="sidebar-header">
-                    <select v-model="selectedQuickQuestionCategory" class="category-select" :disabled="isTyping">
-                        <option v-for="(questions, category) in quickQuestionCategories" :key="category" :value="category">
-                            {{ category }}提問
-                        </option>
-                    </select>
+                    <div class="custom-select-wrapper category-toggle" @click="toggleQuickQuestionCategory">
+                        <!-- 燈泡 Icon -->
+                        <svg class="material-icon select-icon" viewBox="0 0 24 24">
+                            <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/>
+                        </svg>
+                        
+                        <div class="category-name-display">
+                            {{ selectedQuickQuestionCategory }}
+                        </div>
+                        
+                        <!-- 循環切換 Icon / 箭頭 -->
+                        <svg class="material-icon select-caret" viewBox="0 0 24 24" title="點擊切換類別">
+                            <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                        </svg>
+                    </div>
                 </div>
 
                 <div class="quick-btn-list">
@@ -286,6 +304,8 @@ const {
     isSelectionLocked,
     userToken,
     autoLoginError,
+    quotaSummary,
+    isWidgetEnabled,
     messages,
     inputQuery,
     isTyping,
@@ -322,6 +342,7 @@ const {
     resetAndReselect: logicResetAndReselect,
     sendMessage,
     sendQuickMessage,
+    toggleQuickQuestionCategory,
     loadHistorySession
 } = useChatLogic(emit)
 
@@ -426,5 +447,47 @@ const toggleExpand = () => {
         border-left: 1px solid var(--glass-border);
         background: rgba(0, 0, 0, 0.02);
     }
+}
+
+/* Widget Disabled Overlay */
+.disabled-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: inherit;
+
+    .disabled-message {
+        background: var(--surface-color, #ffffff);
+        color: var(--text-color, #333333);
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        font-weight: 500;
+        font-size: 1.1rem;
+
+        .disabled-icon {
+            width: 48px;
+            height: 48px;
+            fill: #ef4444; /* Red color for error/alert */
+        }
+    }
+}
+
+/* Ensure split-view handles absolute overlay correctly */
+.split-view {
+    position: relative;
 }
 </style>

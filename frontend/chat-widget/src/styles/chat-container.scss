@@ -709,22 +709,19 @@
 
 /* Sidebar for quick questions - positioned absolutely or flex? */
 .quick-sidebar {
-    width: 200px;
-    background: rgba(0, 0, 0, 0.02);
-    border-left: 1px solid var(--glass-border);
+    width: 250px;
+    background: #f4f5f9;
+    /* 貼近截圖的淺紫灰色背景 */
+    border-left: none;
+    /* 移除明顯邊框 */
     display: flex;
     flex-direction: column;
-    padding: 1rem;
-    gap: 1rem;
+    padding: 1.5rem 1.2rem;
+    gap: 1.5rem;
     flex-shrink: 0;
 
-    .sidebar-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--primary-color);
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+    [data-theme="midnight"] & {
+        background: rgba(106, 37, 244, 0.05);
     }
 
     @media (max-width: 768px) {
@@ -752,31 +749,67 @@
 
     .sidebar-header {
         margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: center;
+        border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+        padding-bottom: 0.5rem;
 
-        .category-select {
-            width: 100%;
-            padding: 0.5rem;
-            border-radius: 8px;
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            color: var(--glass-text-primary);
-            font-size: 0.85rem;
-            outline: none;
-            cursor: pointer;
+        .custom-select-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.2rem;
+            color: #4a5568;
 
-            &:focus {
-                border-color: var(--primary-color);
+            [data-theme="midnight"] & {
+                color: #e2e8f0;
             }
 
-            option {
-                background: var(--glass-bg);
-                color: #1a1a1a;
-                /* fallback for option dropdowns */
+            /* 覆蓋整個區域的點擊切換選單 */
+            .category-toggle {
+                background: transparent;
+                border: none;
+                color: currentColor;
+                cursor: pointer;
+                padding: 0.5rem 0.5rem;
+                /* 稍微減少左右 padding 給予更多內部空間 */
+                position: relative;
+                z-index: 2;
+                width: 100%;
+                border-radius: 20px;
+                transition: background 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 0.5rem;
+                /* 使用 gap 代替 absolute positioning */
+                user-select: none;
+                /* 防止連點反白 */
+
+                &:hover {
+                    background: rgba(0, 0, 0, 0.05);
+                }
+
+                [data-theme="midnight"] &:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                }
+
+                .category-name-display {
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    flex: 1;
+                    text-align: center;
+                }
             }
 
-            [data-theme="midnight"] & option {
-                background: #1f2937;
-                color: #f9faff;
+            /* 以 Flex 元素取代原本的 absolute 定位避免重疊 */
+            .select-icon,
+            .select-caret {
+                width: 20px;
+                height: 20px;
+                flex-shrink: 0;
+                display: block;
             }
         }
     }
@@ -784,25 +817,35 @@
     .quick-btn-list {
         display: flex;
         flex-direction: column;
-        gap: 0.6em;
+        gap: 1rem;
         overflow-y: auto;
+        padding-bottom: 1rem;
     }
 
     .quick-btn {
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        color: var(--glass-text-primary);
-        padding: 0.6rem;
-        border-radius: 8px;
+        background: #ffffff;
+        border: none;
+        color: #4a5568;
+        padding: 0.8rem 1.2rem;
+        border-radius: 24px;
         text-align: left;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         cursor: pointer;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        /* soft shadow */
         transition: all 0.2s;
 
+        [data-theme="midnight"] & {
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
         &:hover:not(:disabled) {
-            border-color: var(--primary-color);
-            transform: translateX(2px);
-            background: rgba(var(--primary-color), 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+            background: #ffffff;
+            color: var(--primary-color);
         }
     }
 }

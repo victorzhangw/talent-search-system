@@ -9,6 +9,10 @@ export function useChatLogic(emit) {
     const userToken = ref(null)
     const autoLoginError = ref('')
 
+    // Quota and Init State
+    const quotaSummary = ref({ total: 0, used: 0, remaining: 0 })
+    const isWidgetEnabled = ref(true) // Default to true, updated by /v1/init/
+
     const messages = ref([
         { role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }
     ])
@@ -59,6 +63,13 @@ export function useChatLogic(emit) {
     const quickQuestions = computed(() => {
         return quickQuestionCategories.value[selectedQuickQuestionCategory.value] || []
     })
+
+    const toggleQuickQuestionCategory = () => {
+        const keys = Object.keys(quickQuestionCategories.value)
+        const currentIndex = keys.indexOf(selectedQuickQuestionCategory.value)
+        const nextIndex = (currentIndex + 1) % keys.length
+        selectedQuickQuestionCategory.value = keys[nextIndex]
+    }
 
     const historySessions = ref({ today: [], past_30_days: [] })
 
@@ -234,9 +245,47 @@ export function useChatLogic(emit) {
         }
     }
 
+    // Init Data Fetching
+    const fetchInitData = async () => {
+        if (!userToken.value) return;
+
+        try {
+            const { apiBaseUrl } = getApiConfig();
+            // Call the local backend proxy map instead of upstream directly
+            const initUrl = `${apiBaseUrl}/init/`;
+
+            const res = await fetch(initUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${userToken.value}`
+                }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+
+                if (data.quota_summary) {
+                    quotaSummary.value = data.quota_summary;
+                }
+
+                // Widget is enabled if status is true AND remaining quota is > 0
+                isWidgetEnabled.value = data.status === true &&
+                    (data.quota_summary && data.quota_summary.remaining > 0);
+
+            } else {
+                console.warn(`[ChatLogic] /v1/init/ returned status ${res.status}`);
+            }
+        } catch (e) {
+            console.error("[ChatLogic] Failed to fetch init data", e);
+        }
+    }
+
     // Login & Init
     const handleLoginSuccess = async (authData) => {
         userToken.value = authData.token
+        // Fetch Init Data to check quota and widget status
+        await fetchInitData()
         // Fetch candidates after login
         await fetchCandidates()
         // Fetch history
@@ -258,6 +307,7 @@ export function useChatLogic(emit) {
                 // Restore Token if not already set (this bypasses auto-login wait)
                 if (state.token && !userToken.value) {
                     userToken.value = state.token
+                    fetchInitData() // Fetch init data asynchronously
                     // We might need to fetch candidates now if not done yet
                     if (candidates.value.length === 0) fetchCandidates()
                     currentTab.value = 'main'
@@ -648,6 +698,8 @@ export function useChatLogic(emit) {
         isSelectionLocked,
         userToken,
         autoLoginError,
+        quotaSummary,
+        isWidgetEnabled,
         messages,
         inputQuery,
         isTyping,
@@ -684,6 +736,7 @@ export function useChatLogic(emit) {
         resetAndReselect,
         sendMessage,
         sendQuickMessage,
+        toggleQuickQuestionCategory,
         fetchHistory,
         loadHistorySession
     }
