@@ -2,49 +2,43 @@
   <!-- Apply theme to root -->
   <div class="chat-container" :class="{ 'full-page-mode': isFullPage, 'expanded-mode': isExpanded }" :data-theme="currentTheme">
     <!-- Header -->
-    <div class="header">
-      <div class="title">
-        <!-- Icon: psychology (Brain/AI) -->
-        <svg class="material-icon title-icon" viewBox="0 0 24 24">
-            <path d="M6 5.5v13h12v-13H6zm12-1.5c.83 0 1.5.67 1.5 1.5v13c0 .83-.67 1.5-1.5 1.5H6c-.83 0-1.5-.67-1.5-1.5v-13c0-.83.67-1.5 1.5-1.5h12z M13 8.5h-2v2H9v2h2v2h2v-2h2v-2h-2v-2z" fill-rule="evenodd"/>
-            <path d="M0 0h24v24H0z" fill="none"/>
-            <circle cx="14.5" cy="18.5" r="1"/> <circle cx="9.5" cy="5.5" r="1"/> <circle cx="5.5" cy="13.5" r="1"/> <circle cx="18.5" cy="10.5" r="1"/>
-        </svg>
-        Traitty Beta
-      </div>
-      <div class="actions">
-        <button v-if="!isFullPage" class="icon-btn new-tab-btn" @click="openNewTab" title="在新分頁開啟">
+    <div class="header new-layout">
+      
+      <!-- Left: Sidebar/New Tab -->
+      <div class="header-left">
+        <button v-if="!isFullPage" class="icon-btn border-box" @click="openNewTab" title="在新分頁開啟">
+            <!-- Retain open_new icon or use a generic one -->
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
         </button>
+      </div>
 
-        <!-- Dynamic Expand/Collapse Button -->
-        <button v-if="!isFullPage" class="icon-btn expand-btn" @click="toggleExpand" :title="isExpanded ? '恢復預設寬度' : '切換全寬模式'">
-            <!-- Expand Icon -->
-            <svg v-if="!isExpanded" class="material-icon" viewBox="0 0 24 24">
-                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-            </svg>
-            <!-- Collapse Icon -->
-            <svg v-else class="material-icon" viewBox="0 0 24 24">
-                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5h2z"/>
-            </svg>
-        </button>
+      <!-- Center: Title -->
+      <div class="header-center title">
+        <img src="../assets/images/AI DIA.svg" class="title-img-icon" alt="Traitty AI" />
+        Traitty AI
+      </div>
 
-        <!-- Theme Switcher -->
-        <div class="theme-selector">
+      <!-- Right: Actions -->
+      <div class="header-right">
+        <div class="action-pill">
+            <!-- Expand -->
+            <button v-if="!isFullPage" class="icon-btn" @click="toggleExpand" :title="isExpanded ? '恢復預設寬度' : '切換全寬模式'">
+                <svg v-if="!isExpanded" class="material-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                <svg v-else class="material-icon" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5h2z"/></svg>
+            </button>
+            <div class="pill-divider" v-if="!isFullPage"></div>
+            <!-- Theme -->
             <button class="icon-btn theme-btn" @click="cycleTheme" :title="'切換主題: ' + currentThemeLabel">
-                <!-- Dynamic Material Icons for Themes -->
                 <svg v-if="currentTheme === 'light'" class="material-icon" viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.8 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>
                 <svg v-else class="material-icon" viewBox="0 0 24 24"><path d="M11.1 12.08c-2.33-4.51-.5-8.48.53-10.07C6.27 2.2 1.98 6.59 1.98 12c0 .14.02.28.02.42.62-.27 1.29-.42 2-.42 1.66 0 3.18.83 4.1 2.15 1.67.48 2.9 2.02 2.9 3.85 0 1.52-.87 2.83-2.12 3.51.98.32 2.03.5 3.11.5 3.5 0 6.58-1.8 8.37-4.52-2.36.23-6.98-.97-9.26-5.41z"/><path d="M7 16h-.18C6.4 14.84 5.3 14 4 14c-1.66 0-3 1.34-3 3s1.34 3 3 3h3v-4z"/></svg>
             </button>
         </div>
         
-        <!-- Minimize Button (Only in Chat Mode) -->
-        <button v-if="isSelectionLocked" class="icon-btn minimize-btn" @click="$emit('minimize')" title="最小化至按鈕">
+        <!-- Minimize & Close -->
+        <button v-if="isSelectionLocked" class="icon-btn styled-circle" @click="$emit('minimize')" title="最小化至按鈕">
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
         </button>
-
-        <!-- Icon: Close -->
-        <button class="icon-btn close-btn" @click="$emit('close')">
+        <button class="icon-btn styled-circle close-btn" @click="$emit('close')">
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </button>
       </div>
@@ -84,7 +78,7 @@
             <div class="left-panel history-sidebar">
                 <div class="history-actions">
                     <button class="primary-btn full-width new-analysis-btn" @click="resetAndReselect">
-                        <svg class="material-icon small" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> 
+                        <img src="../assets/images/AI star.svg" class="material-icon new-analysis-icon" alt="AI Star" />
                         開啟新人才解析
                     </button>
                 </div>
