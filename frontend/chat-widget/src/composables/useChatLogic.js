@@ -648,6 +648,11 @@ export function useChatLogic(emit) {
                                 messages.value[aiMsgIndex].intent = data.intent
                             } else if (data.type === 'token') {
                                 messages.value[aiMsgIndex].content += data.content
+                            } else if (data.type === 'quota') {
+                                if (data.quota_summary) {
+                                    quotaSummary.value = data.quota_summary
+                                    isWidgetEnabled.value = (data.quota_summary.remaining > 0)
+                                }
                             }
                         } catch (e) { console.error(e) }
                     }
