@@ -150,12 +150,6 @@
                     <transition name="slide-up">
                         <div class="candidate-dropdown-overlay" v-if="showCandidateDropdown" @click.self="showCandidateDropdown = false">
                             <div class="candidate-dropdown-modal">
-                                <div class="modal-header">
-                                    <h3>選取人才 ({{ selectedCandidateIds.length }})</h3>
-                                    <button class="icon-btn" @click="showCandidateDropdown = false">
-                                        <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                                    </button>
-                                </div>
                                 <div class="modal-body">
                                     <CandidateSelector 
                                         ref="candidateSelectorRef"
@@ -176,6 +170,9 @@
                                         @click="clearCandidates"
                                     >
                                         清除選取
+                                    </button>
+                                    <button class="secondary-btn cancel-btn" @click="showCandidateDropdown = false">
+                                        取消
                                     </button>
                                     <button class="primary-btn confirm-btn" @click="confirmSelection">
                                         確認選取 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
@@ -246,9 +243,9 @@
                             {{ selectedQuickQuestionCategory }}
                         </div>
                         
-                        <!-- 循環切換 Icon / 箭頭 -->
+                        <!-- 循環切換 Icon (上下箭頭) -->
                         <svg class="material-icon select-caret" viewBox="0 0 24 24" title="點擊切換類別">
-                            <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                            <path fill="currentColor" d="M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z"/>
                         </svg>
                     </div>
                 </div>

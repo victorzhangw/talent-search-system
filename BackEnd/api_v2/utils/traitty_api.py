@@ -53,9 +53,9 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str):
         "Content-Type": "application/json"
     }
 
-    # 取得含時區的 ISO 格式，例如 "2026-03-05T09:30:00+08:00"
-    now_dt = datetime.now().astimezone()
-    asked_at_str = now_dt.isoformat()
+    # 取得指定格式，例如 "2026-02-28 09:30:00"
+    now_dt = datetime.now()
+    asked_at_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
     report_date_str = now_dt.strftime("%Y-%m-%d")
     
     payload = {
@@ -70,6 +70,26 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str):
         ]
     }
     
-    response = httpx.post(url, headers=headers, json=payload, timeout=15.0)
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = httpx.post(url, headers=headers, json=payload, timeout=15.0)
+        response.raise_for_status()
+        data = response.json()
+        
+        # 驗證回傳格式
+        if not data.get("status"):
+            print(f"[Daily Settlement Error] API Status False. Body: {data}", flush=True)
+            
+        summary = data.get("summary", {})
+        accepted_count = summary.get("accepted", 0)
+        
+        if accepted_count != 1: # 因為我們每次只發送 1 筆 record
+            print(f"[Daily Settlement Warning] Accepted count mismatch! Expected 1, got {accepted_count}. Full Res: {data}", flush=True)
+            
+        return data
+        
+    except Exception as e:
+        # 如果發生 Http Error，盡可能印出錯誤詳細內容
+        err_content = getattr(e, 'response', None)
+        err_text = err_content.text if err_content else str(e)
+        print(f"[Daily Settlement Fatal] Request Failed: {err_text}", flush=True)
+        raise

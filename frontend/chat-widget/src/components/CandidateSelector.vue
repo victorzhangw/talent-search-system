@@ -1,11 +1,6 @@
 <template>
   <div class="candidate-selector">
-    <div class="header-section">
-      <h3>
-        請選擇評估候選人
-        <span class="subtitle"></span>
-      </h3>
-    </div>
+    
 
     <!-- Search & Toolbar -->
     <div class="search-toolbar">
@@ -22,22 +17,26 @@
                 <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             </button>
         </div>
-        
-        <div class="batch-actions" v-if="filteredCandidates.length > 0">
-            <button class="action-link" @click="selectAllFiltered">
-                全選 ({{ filteredCandidates.length }})
-            </button>
-            <span class="divider" v-if="selectedIds.length > 0">|</span>
-            <button class="action-link" v-if="selectedIds.length > 0 && !disabled" @click="clearSelection">
-                清除已選
-            </button>
-        </div>
-    </div>
+        <div class="toolbar-actions">
+            <!-- Stats -->
+            <div class="list-stats">
+               <span v-if="searchQuery">搜尋結果: {{ filteredCandidates.length }} 筆</span>
+               <span v-else>已顯示 {{ candidates.length }} / 共 {{ totalCount }} 筆</span>
+               
+               <span class="centered-selected-text">選取人才 ({{ selectedIds.length }})</span>
+            </div>
 
-    <!-- Stats -->
-    <div class="list-stats">
-       <span v-if="searchQuery">搜尋結果: {{ filteredCandidates.length }} 筆</span>
-       <span v-else>已顯示 {{ candidates.length }} / 共 {{ totalCount }} 筆</span>
+            <!-- Batch Actions -->
+            <div class="batch-actions" v-if="filteredCandidates.length > 0">
+                <button class="action-link" @click="selectAllFiltered">
+                    全選 ({{ filteredCandidates.length }})
+                </button>
+                <span class="divider" v-if="selectedIds.length > 0">|</span>
+                <button class="action-link" v-if="selectedIds.length > 0 && !disabled" @click="clearSelection">
+                    清除已選
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- List -->
@@ -86,10 +85,6 @@
           <span>載入更多...</span>
           <svg class="material-icon small arrow" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
       </div>
-    </div>
-
-    <div class="selected-count">
-      已選擇 {{ selectedIds.length }} 位
     </div>
   </div>
 </template>
@@ -227,14 +222,14 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 1.1rem;
+  padding: 0.8rem;
   color: var(--glass-text-primary);
   overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
 .header-section {
   flex-shrink: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   
   h3 { 
       margin: 0; 
@@ -255,10 +250,10 @@ defineExpose({
 
 .search-toolbar {
     flex-shrink: 0;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 0.5rem;
 }
 
 .search-box {
@@ -287,14 +282,19 @@ defineExpose({
     }
     
     .clear-btn {
-        background: none;
-        border: none;
+        background: transparent;
+        border: 1px solid rgba(127, 127, 127, 0.2);
         color: var(--glass-text-secondary);
         cursor: pointer;
         padding: 0.2rem;
+        border-radius: 50%; /* 改為圓形 */
         display: flex;
         align-items: center;
-        &:hover { color: var(--glass-text-primary); }
+        transition: all 0.2s;
+        &:hover { 
+            color: var(--glass-text-primary); 
+            background: rgba(127, 127, 127, 0.1);
+        }
         .material-icon { width: 16px; height: 16px; }
     }
     
@@ -302,6 +302,13 @@ defineExpose({
         border-color: var(--primary-color);
         background: rgba(127, 127, 127, 0.15);
     }
+}
+
+.toolbar-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0.2rem;
 }
 
 .batch-actions {
@@ -327,8 +334,19 @@ defineExpose({
 .list-stats {
     font-size: 0.8rem;
     color: var(--glass-text-secondary);
-    margin-bottom: 0.5rem;
-    padding-left: 0.2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem; /* 給予間距 */
+}
+
+.centered-selected-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--glass-text-primary);
+    /* 將此元素推到父容器中間 - 使用 absolute 或 flex auto-margin 技巧 */
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .list-container {
@@ -347,7 +365,7 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  padding: 0.8rem; 
+  padding: 0.6rem 0.8rem; 
   
   background: white; 
   border: 1px solid var(--glass-border);
@@ -511,12 +529,4 @@ defineExpose({
   60% {transform: translateY(3px);}
 }
 
-.selected-count {
-    color: var(--glass-text-secondary);
-    font-size: 0.9rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--glass-border);
-    flex-shrink: 0;
-}
 </style>
