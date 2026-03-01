@@ -11,6 +11,7 @@ export function useChatLogic(emit) {
 
     // Quota and Init State
     const quotaSummary = ref({ total: 0, used: 0, remaining: 0 })
+    const remainingDays = ref(null)
     const isWidgetEnabled = ref(true) // Default to true, updated by /v1/init/
 
     const messages = ref([
@@ -267,6 +268,24 @@ export function useChatLogic(emit) {
 
                 if (data.quota_summary) {
                     quotaSummary.value = data.quota_summary;
+                }
+
+                if (data.usable_plans && data.usable_plans.length > 0) {
+                    // Try to parse ends_at to get remaining days
+                    try {
+                        // Replace dashes with slashes for Safari compatibility just in case
+                        const endsAtDate = new Date(data.usable_plans[0].ends_at.replace(/-/g, '/'));
+                        const now = new Date();
+
+                        // To exclude today, we get the time difference and use Math.floor
+                        // Math.floor will effectively drop the fractional day (which is "today")
+                        const diffTime = endsAtDate - now;
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                        remainingDays.value = diffDays > 0 ? diffDays : 0;
+                    } catch (err) {
+                        console.error("Failed to parse remaining days", err);
+                    }
                 }
 
                 // Widget is enabled if status is true AND remaining quota is > 0
@@ -704,6 +723,7 @@ export function useChatLogic(emit) {
         userToken,
         autoLoginError,
         quotaSummary,
+        remainingDays,
         isWidgetEnabled,
         messages,
         inputQuery,

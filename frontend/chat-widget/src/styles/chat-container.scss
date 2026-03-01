@@ -343,18 +343,46 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            margin-bottom: 0.2rem;
+            margin-bottom: 0.4rem;
+
+            .quota-icon {
+                color: #8b5cf6;
+                /* 紫色圖示 */
+                margin-right: -0.2rem;
+            }
+
+            .label {
+                color: var(--glass-text-secondary);
+                font-weight: 500;
+            }
 
             .highlight {
-                color: var(--glass-text-primary);
+                color: #8b5cf6;
+                font-size: 1.1rem;
                 font-weight: 700;
+                margin-left: auto;
+            }
+
+            .unit {
+                color: var(--glass-text-secondary);
+                font-weight: 600;
             }
         }
 
+        .quota-divider {
+            height: 1px;
+            background: var(--glass-border);
+            margin: 0.4rem 0;
+            width: 100%;
+        }
+
         .quota-expire {
-            padding-left: 1.8rem;
-            font-size: 0.75rem;
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--glass-text-secondary);
             opacity: 0.8;
+            font-weight: 500;
+            padding-right: 0.2rem;
         }
     }
 }

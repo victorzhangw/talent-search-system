@@ -114,10 +114,16 @@
                 
                 <div class="quota-info" v-if="quotaSummary">
                     <div class="quota-count">
-                        <svg class="material-icon small" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-                        剩餘額度 <span class="highlight">{{ quotaSummary.remaining }}</span> 次
+                        <svg class="quota-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="8" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="16" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span class="label">剩餘額度</span>
+                        <span class="highlight">{{ quotaSummary.remaining }}</span>
+                        <span class="unit">次</span>
                     </div>
-                    <div class="quota-expire">總計 {{ quotaSummary.total }} 次</div>
+                    <div class="quota-divider"></div>
+                    <div class="quota-expire" v-if="remainingDays !== null">{{ remainingDays }}天後到期</div>
                 </div>
             </div>
 
@@ -304,6 +310,7 @@ const {
     userToken,
     autoLoginError,
     quotaSummary,
+    remainingDays,
     isWidgetEnabled,
     messages,
     inputQuery,
