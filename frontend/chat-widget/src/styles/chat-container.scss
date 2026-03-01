@@ -456,12 +456,25 @@
     position: relative;
 
     .welcome-header {
-        margin-bottom: 2rem;
+        margin-bottom: 0;
 
-        .magic-icon {
-            font-size: 3rem;
+        .magic-icon-wrapper {
             margin-bottom: 1rem;
-            color: var(--primary-color);
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid #e2e8f0;
+            /* 淡灰色外框 */
+            background-color: #f8fafc;
+
+            .magic-icon {
+                width: 40px;
+                height: 40px;
+                /* Optional: SVG color might be controlled within the SVG itself or via CSS filters/masking if needed */
+            }
         }
 
         h2 {
@@ -487,7 +500,7 @@
     .instructions {
         text-align: left;
         color: var(--glass-text-secondary);
-        margin-bottom: 3rem;
+        margin-bottom: 1rem;
 
         ol {
             padding-left: 1.5rem;
@@ -798,6 +811,9 @@
 /* Sidebar for quick questions - positioned absolutely or flex? */
 .quick-sidebar {
     width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+    flex: 0 0 250px;
     background: #f4f5f9;
     /* 貼近截圖的淺紫灰色背景 */
     border-left: none;

@@ -4,11 +4,11 @@
     <!-- Header -->
     <div class="header new-layout">
       
-      <!-- Left: Sidebar/New Tab -->
+      <!-- Left: Sidebar Toggle -->
       <div class="header-left">
-        <button v-if="!isFullPage" class="icon-btn border-box" @click="openNewTab" title="在新分頁開啟">
-            <!-- Retain open_new icon or use a generic one -->
-            <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+        <button v-if="!isFullPage" class="icon-btn border-box" @click="toggleSidebar" :title="isSidebarOpen ? '隱藏側邊欄' : '顯示側邊欄'">
+            <img v-if="isSidebarOpen" src="../assets/images/sidebar_close.svg" class="material-icon" alt="隱藏側邊欄" />
+            <img v-else src="../assets/images/sidebar_open.svg" class="material-icon" alt="顯示側邊欄" />
         </button>
       </div>
 
@@ -23,8 +23,8 @@
         <div class="action-pill">
             <!-- Expand -->
             <button v-if="!isFullPage" class="icon-btn" @click="toggleExpand" :title="isExpanded ? '恢復預設寬度' : '切換全寬模式'">
-                <svg v-if="!isExpanded" class="material-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-                <svg v-else class="material-icon" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-14v3h3v2h-5V5h2z"/></svg>
+                <img v-if="!isExpanded" src="../assets/images/展開箭頭.svg" class="material-icon" alt="展開" />
+                <img v-else src="../assets/images/收起箭頭.svg" class="material-icon" alt="收起" />
             </button>
             <div class="pill-divider" v-if="!isFullPage"></div>
             <!-- Theme -->
@@ -75,7 +75,7 @@
             </div>
 
             <!-- LEFT PANEL: History Sidebar -->
-            <div class="left-panel history-sidebar">
+            <div class="left-panel history-sidebar" v-show="isSidebarOpen">
                 <div class="history-actions">
                     <button class="primary-btn full-width new-analysis-btn" @click="resetAndReselect">
                         <img src="../assets/images/AI star.svg" class="material-icon new-analysis-icon" alt="AI Star" />
@@ -127,7 +127,9 @@
                 <!-- If Not Locked: Welcome & Candidate Selection -->
                 <div v-if="!isSelectionLocked" class="welcome-container">
                     <div class="welcome-header">
-                        <div class="magic-icon">✨</div>
+                        <div class="magic-icon-wrapper">
+                            <img src="@/assets/images/TAI star icon.png" alt="AI Icon" class="magic-icon" />
+                        </div>
                         <h2><span class="gradient">Traitty Ai</span> 人才解析</h2>
                         <p class="subtitle">討論履歷、面試結果，或從填答者找尋符合文化的人選。</p>
                     </div>
@@ -280,6 +282,12 @@ import LoginView from './LoginView.vue'
 import TraitReportModal from './TraitReportModal.vue'
 import { useChatLogic } from '../composables/useChatLogic.js'
 
+const isSidebarOpen = ref(true)
+
+const toggleSidebar = () => {
+    isSidebarOpen.value = !isSidebarOpen.value
+}
+
 const emit = defineEmits(['close'])
 const props = defineProps({
     isFullPage: {
@@ -426,7 +434,7 @@ const toggleExpand = () => {
     }
 
     .right-panel {
-        width: 70% !important;
+        width: 90% !important;
         flex: unset !important;
         display: flex;
         flex-direction: column;
