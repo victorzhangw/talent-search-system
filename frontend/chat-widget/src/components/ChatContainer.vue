@@ -14,7 +14,7 @@
 
       <!-- Center: Title -->
       <div class="header-center title">
-        <img src="../assets/images/AI DIA.svg" class="title-img-icon" alt="Traitty AI" />
+        <img src="../assets/images/TraittyAIIcon-S.svg" class="title-img-icon" alt="Traitty AI" />
         Traitty AI
       </div>
 
@@ -136,7 +136,7 @@
                         <div class="magic-icon-wrapper">
                             <img src="@/assets/images/TAI star icon.png" alt="AI Icon" class="magic-icon" />
                         </div>
-                        <h2><span class="gradient">Traitty Ai</span> 人才解析</h2>
+                        <h2><img src="@/assets/images/TraittyAI.svg" alt="Traitty AI" class="traitty-logo" /> 人才解析</h2>
                         <p class="subtitle">討論履歷、面試結果，或從填答者找尋符合文化的人選。</p>
                     </div>
 
@@ -216,16 +216,26 @@
                     
                     <MessageList :messages="messages" />
 
-                    <div class="input-area">
+                    <div class="chat-input-container">
                         <textarea 
                             v-model="inputQuery" 
                             @keydown.enter.prevent="sendMessage"
-                            placeholder="請提問... (Shift+Enter 換行)"
+                            placeholder="新增問題......"
                             :disabled="isTyping"
+                            class="multi-line-input"
                         ></textarea>
-                        <button class="send-btn" @click="sendMessage" :disabled="!inputQuery.trim() || isTyping">
-                            <svg class="material-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-                        </button>
+                        
+                        <div class="chat-input-footer">
+                            <button class="locked-status-btn" @click="resetAndReselect">
+                                <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                                鎖定 {{ activeConversationCandidatesObjects.length }} 位人選
+                                <!-- <svg class="material-icon dropdown-icon" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg> -->
+                            </button>
+                            
+                            <button class="send-btn primary" @click="sendMessage" :disabled="!inputQuery.trim() || isTyping">
+                                <svg class="material-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M11 21V5.83l-4.59 4.58L5 9l7-7 7 7-1.41 1.41L13 5.83V21h-2z"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -436,7 +446,7 @@ const toggleExpand = () => {
 /* Chat Mode Layout (15% - 70% - 15%) */
 .split-view.chat-mode {
     .left-panel {
-        width: 15% !important;
+        width: 20% !important;
         min-width: 200px;
     }
 

@@ -25,6 +25,22 @@
           <div class="text-content" v-html="renderMarkdown(msg.content)"></div>
           
           <span v-if="msg.isTyping" class="cursor">|</span>
+
+          <!-- Message Actions (Copy, placeholder for Good/Bad) -->
+          <div v-if="!msg.isTyping && index > 0" class="message-actions">
+            <!-- Thumbs up placeholder -->
+            <button class="action-btn" title="Good (功能開發中)">
+              <img src="@/assets/images/chat-Good.svg" class="action-icon" alt="Good" />
+            </button>
+            <!-- Thumbs down placeholder -->
+            <button class="action-btn" title="Bad (功能開發中)">
+              <img src="@/assets/images/chat-Bad.svg" class="action-icon" alt="Bad" />
+            </button>
+            <!-- Copy button -->
+            <button class="action-btn" @click="copyText(msg.content)" title="複製內容">
+              <img src="@/assets/images/chat-copy.svg" class="action-icon" alt="Copy" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -57,6 +73,17 @@ const scrollToBottom = async () => {
 const renderMarkdown = (text) => {
   if (!text) return ''
   return marked.parse(text)
+}
+
+const copyText = async (text) => {
+  try {
+    // Strip markdown formatting approximately or just copy raw. We'll copy raw for now, 
+    // or we could create a temporary div to grab innerText if we want plain text.
+    await navigator.clipboard.writeText(text)
+    // Optional: show a small toast or change icon briefly
+  } catch (err) {
+    console.error('Failed to copy text: ', err)
+  }
 }
 </script>
 
