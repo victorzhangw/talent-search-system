@@ -28,12 +28,12 @@
 
           <!-- Message Actions (Copy, placeholder for Good/Bad) -->
           <div v-if="!msg.isTyping && index > 0" class="message-actions">
-            <!-- Thumbs up placeholder -->
-            <button class="action-btn" title="Good (功能開發中)">
+            <!-- Thumbs up -->
+            <button class="action-btn" :class="{ 'active': msg.rating === 1 }" @click="handleRate(msg, 1)" title="Good">
               <img src="@/assets/images/chat-Good.svg" class="action-icon" alt="Good" />
             </button>
-            <!-- Thumbs down placeholder -->
-            <button class="action-btn" title="Bad (功能開發中)">
+            <!-- Thumbs down -->
+            <button class="action-btn" :class="{ 'active': msg.rating === -1 }" @click="handleRate(msg, -1)" title="Bad">
               <img src="@/assets/images/chat-Bad.svg" class="action-icon" alt="Bad" />
             </button>
             <!-- Copy button -->
@@ -57,7 +57,22 @@ const props = defineProps({
   messages: Array
 })
 
+const emit = defineEmits(['rateMessage'])
+
 const listRef = ref(null)
+
+const handleRate = async (msg, rating) => {
+  // If already rated to the same, maybe un-rate (0)
+  const newRating = msg.rating === rating ? 0 : rating
+  
+  // Optimistic update
+  msg.rating = newRating
+  
+  // Call API
+  if (msg.id) {
+    emit('rateMessage', msg.id, newRating)
+  }
+}
 
 // Auto-scroll to bottom
 watch(() => props.messages.length, () => scrollToBottom())

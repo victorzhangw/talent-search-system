@@ -55,9 +55,28 @@ class SqlSessionStore:
             )
             
             db.commit()
+            db.refresh(msg)
+            return msg.id
         except Exception as e:
             db.rollback()
             print(f"[SessionStore] Add Message Failed: {e}")
+            return None
+        finally:
+            db.close()
+
+    def update_message_rating(self, message_id: int, rating: int):
+        db = get_db_session()
+        try:
+            msg = db.query(ChatMessage).filter_by(id=message_id).first()
+            if msg:
+                msg.rating = rating
+                db.commit()
+                return True
+            return False
+        except Exception as e:
+            db.rollback()
+            print(f"[SessionStore] Update Rating Failed: {e}")
+            return False
         finally:
             db.close()
 
@@ -74,8 +93,8 @@ class SqlSessionStore:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
             sessions = db.query(ChatSession).filter(
                 ChatSession.user_id == user_id,
-                ChatSession.started_at >= cutoff_date
-            ).order_by(ChatSession.started_at.desc()).all()
+                ChatSession.last_active_at >= cutoff_date
+            ).order_by(ChatSession.last_active_at.desc()).all()
             return sessions
         finally:
             db.close()

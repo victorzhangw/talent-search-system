@@ -46,16 +46,18 @@ export function useChatLogic(emit) {
 
     const quickQuestionCategories = ref({
         "管理": [
-            "工作中的主要優勢與潛力",
-            "在團隊合作中適合的角色",
-            "需注意的管理問題或潛在風險",
-            "合適的管理方式與風格"
+
+            "如何面對困難、壓力、挑戰",
+            "合適的管理方式與風格",
+            "有效的溝通方法/模式",
+            "展現何種領導風格"
         ],
         "招募": [
             "快速面試提問指南",
-            "如何面對困難、壓力、挑戰",
-            "有效的溝通方法/模式",
-            "展現何種領導風格"
+            "工作中的主要優勢與潛力",
+            "在團隊合作中適合的角色",
+            "需注意的管理問題或潛在風險"
+
         ]
     })
 
@@ -672,22 +674,52 @@ export function useChatLogic(emit) {
                                     quotaSummary.value = data.quota_summary
                                     isWidgetEnabled.value = (data.quota_summary.remaining > 0)
                                 }
+                            } else if (data.type === 'message_id') {
+                                messages.value[aiMsgIndex].id = data.id
                             }
                         } catch (e) { console.error(e) }
                     }
                 }
             }
-        } catch (error) {
-            if (error.name === 'AbortError' || error.message === 'TIMEOUT_RESPONSE') {
-                messages.value[aiMsgIndex].content = "Traitty暫時沒回應，請稍等一下"
-            } else {
-                messages.value[aiMsgIndex].content = "系統錯誤。"
-            }
+        } catch (e) {
+            console.error(e)
+            messages.value[aiMsgIndex].content += "\n\n(發生錯誤，請重試)"
         } finally {
-            isTyping.value = false
             messages.value[aiMsgIndex].isTyping = false
-            // Update history after message is complete
-            fetchHistory()
+            isTyping.value = false
+
+            // Save state to Session Storage
+            try {
+                sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(activeConversationCandidateIds.value))
+                sessionStorage.setItem('traitty_session_messages', JSON.stringify(messages.value))
+                sessionStorage.setItem('traitty_session_id', currentSessionId.value)
+            } catch (e) { }
+        }
+    }
+
+    const rateMessage = async (messageId, rating) => {
+        if (!messageId) return false
+
+        try {
+            const { serverRoot } = getApiConfig()
+            const res = await fetch(`${serverRoot}/chat/message/${messageId}/rating`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken.value}`
+                },
+                body: JSON.stringify({ rating })
+            })
+
+            if (res.ok) {
+                return true
+            } else {
+                console.error("Failed to rate message:", await res.text())
+                return false
+            }
+        } catch (e) {
+            console.error("Error rating message:", e)
+            return false
         }
     }
 
@@ -763,6 +795,7 @@ export function useChatLogic(emit) {
         sendQuickMessage,
         toggleQuickQuestionCategory,
         fetchHistory,
-        loadHistorySession
+        loadHistorySession,
+        rateMessage
     }
 }

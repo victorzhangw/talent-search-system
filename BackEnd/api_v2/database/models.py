@@ -42,6 +42,7 @@ class ChatMessage(Base):
     # New requirement: Token Usage
     token_usage = Column(Integer, default=0)
     model_name = Column(String(50))
+    rating = Column(Integer, default=0) # 1 for Good, -1 for Bad, 0 for None
     
     created_at = Column(DateTime, default=datetime.utcnow)
     

@@ -214,7 +214,7 @@
                         </span>
                     </div>
                     
-                    <MessageList :messages="messages" />
+                    <MessageList :messages="messages" @rate-message="rateMessage" />
 
                     <div class="chat-input-container">
                         <textarea 
@@ -359,7 +359,8 @@ const {
     sendMessage,
     sendQuickMessage,
     toggleQuickQuestionCategory,
-    loadHistorySession
+    loadHistorySession,
+    rateMessage
 } = useChatLogic(emit)
 
 const showCandidateDropdown = ref(false)

@@ -73,16 +73,19 @@ def get_user_history():
     session_store = SqlSessionStore()
     sessions = session_store.get_user_sessions(user_id=user_id, days=30)
     
-    # Format and group by Today vs Past 30 Days
-    from datetime import datetime
+    # Format and group by Today vs Past 30 Days (using UTC+8 and last_active_at)
+    from datetime import datetime, timedelta
     
     today_sessions = []
     past_sessions = []
     
-    now = datetime.utcnow().date()
+    # Taiwan Time UTC+8
+    now_utc8 = (datetime.utcnow() + timedelta(hours=8)).date()
     
     for s in sessions:
-        s_date = s.started_at.date() if s.started_at else None
+        active_time = s.last_active_at if s.last_active_at else s.started_at
+        s_date_utc8 = (active_time + timedelta(hours=8)).date() if active_time else None
+
         
         # Build candidate info summary if possible
         # metadata_ might have it, or we can just return what we have
@@ -110,7 +113,7 @@ def get_user_history():
             'title': title
         }
         
-        if s_date == now:
+        if s_date_utc8 == now_utc8:
             today_sessions.append(session_data)
         else:
             past_sessions.append(session_data)
@@ -137,11 +140,32 @@ def get_session_details(session_id):
         'status': session.status,
         'metadata': session.metadata_,
         'messages': [{
+            'id': m.id,
             'role': m.role,
             'content': m.content,
+            'rating': getattr(m, 'rating', 0),
             'created_at': m.created_at.isoformat() if m.created_at else None
         } for m in messages]
     })
+
+@bp.route('/message/<int:message_id>/rating', methods=['PUT', 'OPTIONS'])
+def update_message_rating(message_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    data = request.get_json()
+    if not data or 'rating' not in data:
+        return jsonify({'error': 'rating is required'}), 400
+        
+    rating = int(data['rating'])
+    
+    session_store = SqlSessionStore()
+    success = session_store.update_message_rating(message_id, rating)
+    
+    if success:
+        return jsonify({'status': 'success', 'message_id': message_id, 'rating': rating})
+    else:
+        return jsonify({'error': 'Message not found or update failed'}), 404
 
 @bp.route('/', methods=['POST'])
 def chat():
@@ -285,13 +309,16 @@ def chat():
             
             # We store total tokens for simple billing schema, or separate?
             # Model has 'token_usage' int. Let's store total.
-            session_store.add_message(
+            msg_id = session_store.add_message(
                 session_id, 
                 'assistant', 
                 full_assistant_content, 
                 token_usage=(prompt_tokens + completion_tokens),
                 model_name='deepseek-chat'
             )
+            
+            if msg_id:
+                yield f"data: {json.dumps({'type': 'message_id', 'id': msg_id})}\n\n"
             
             # --- 扣除額度並即時同步回傳給前端 ---
             try:
