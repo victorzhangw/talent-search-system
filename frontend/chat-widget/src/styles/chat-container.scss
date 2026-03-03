@@ -491,6 +491,23 @@
     background: var(--glass-bg);
 }
 
+@media (max-width: 768px) {
+    .right-panel {
+        flex: 1;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+    }
+
+    .split-view,
+    .main-layout,
+    .chat-view {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+    }
+}
+
 .welcome-container {
     flex: 1;
     display: flex;
