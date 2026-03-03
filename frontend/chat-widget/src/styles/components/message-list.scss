@@ -44,6 +44,10 @@
         border-bottom-right-radius: 4px;
         font-size: 0.95rem;
         line-height: 1.5;
+
+        @media (max-width: 768px) {
+            font-size: 0.6rem;
+        }
     }
 
     &.ai {
@@ -72,6 +76,11 @@
         .text-content {
             font-size: 0.95rem;
             line-height: 1.6;
+
+            @media (max-width: 768px) {
+                font-size: 0.6rem;
+                line-height: 1.5;
+            }
 
             /* Markdown Styles */
             :deep(p) {
@@ -142,7 +151,7 @@
 .message-actions {
     display: flex;
     gap: 0.5rem;
-    margin-top: 0.5rem;
+    margin-top: 0.1rem;
     justify-content: flex-end;
 
     .action-btn {

@@ -266,8 +266,11 @@
                 
                 <!-- Mobile only Header -->
                 <div class="mobile-popover-header" v-if="showMobileQuickQuestions">
-                    <svg class="material-icon" viewBox="0 0 24 24"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/></svg>
-                    <span>點擊快速取得 Traitty AI 專業解析</span>
+                    <div class="header-left-content">
+                        <svg class="material-icon" viewBox="0 0 24 24"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/></svg>
+                        <span>點擊取得 Traitty 專業解析</span>
+                    </div>
+                    <button class="close-popover-btn" @click="showMobileQuickQuestions = false">✕</button>
                 </div>
 
                 <!-- Desktop Category Dropdown -->
@@ -340,7 +343,7 @@ import { ref, computed } from 'vue'
 import MessageList from './MessageList.vue'
 import CandidateSelector from './CandidateSelector.vue'
 
-const isSummaryCollapsed = ref(true)
+const isSummaryCollapsed = ref(window.innerWidth <= 768)
 import LoginView from './LoginView.vue'
 import TraitReportModal from './TraitReportModal.vue'
 import { useChatLogic } from '../composables/useChatLogic.js'
@@ -521,7 +524,7 @@ const toggleExpand = () => {
 
     .quick-sidebar {
         width: 15% !important;
-        min-width: 150px;
+        min-width: 240px;
         border-left: 1px solid var(--glass-border);
         background: rgba(0, 0, 0, 0.02);
     }
