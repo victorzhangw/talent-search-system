@@ -2,6 +2,16 @@
   <div class="candidate-selector">
     
 
+    <!-- Mobile Selected Tags Block (Hidden on Desktop) -->
+    <div class="mobile-selected-tags" v-if="selectedIds.length > 0">
+       
+        <div class="tags-list">
+            <span class="selected-tag" v-for="id in selectedIds" :key="id" @click="toggle(id)">
+                {{ getCandidateName(id) }} <svg class="tag-close-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </span>
+        </div>
+    </div>
+
     <!-- Search & Toolbar -->
     <div class="search-toolbar">
         <div class="search-box">
@@ -136,6 +146,11 @@ const filteredCandidates = computed(() => {
     })
 })
 
+const getCandidateName = (id) => {
+    const cand = props.candidates.find(c => c.id === id);
+    return cand ? cand.name : 'Unknown';
+}
+
 const toggle = (id) => {
   if (selectedIds.value.includes(id)) {
     selectedIds.value = selectedIds.value.filter(x => x !== id)
@@ -222,7 +237,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0.8rem;
+  padding: 0.4rem;
   color: var(--glass-text-primary);
   overflow-x: hidden; /* Prevent horizontal scroll */
 }
@@ -248,6 +263,50 @@ defineExpose({
   }
 }
 
+.mobile-selected-tags {
+    display: none;
+    @media (max-width: 768px) {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0 0.5rem 0.5rem;
+        border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+        margin-bottom: 0.5rem;
+    }
+    
+    .tags-header {
+        font-size: 0.85rem;
+        color: var(--glass-text-secondary);
+        font-weight: 500;
+    }
+    
+    .tags-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
+    .selected-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.1rem;
+        background: rgba(106, 37, 244, 0.1);
+        border: 1px solid rgba(106, 37, 244, 0.2);
+        color: var(--primary-color);
+        padding: 0.2rem 0.2rem;
+        border-radius: 16px;
+        font-size: 0.5rem;
+        cursor: pointer;
+        
+        .tag-close-icon {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+            opacity: 0.7;
+        }
+    }
+}
+
 .search-toolbar {
     flex-shrink: 0;
     margin-bottom: 0.5rem;
@@ -266,6 +325,10 @@ defineExpose({
     padding: 0 0.8rem;
     height: 40px;
     
+    @media (max-width: 768px) {
+        height: 30px;
+    }
+    
     .icon { opacity: 0.6; margin-right: 0.5rem; width: 18px; height: 18px; }
     
     input {
@@ -277,6 +340,10 @@ defineExpose({
         outline: none;
         font-family: inherit;
         font-size: 0.95rem;
+
+        @media (max-width: 768px) {
+            font-size: 0.65rem;
+        }
         
         &::placeholder { color: var(--glass-text-secondary); opacity: 0.7; }
     }
@@ -309,6 +376,13 @@ defineExpose({
     justify-content: space-between;
     align-items: center;
     padding: 0 0.2rem;
+    
+    @media (max-width: 768px) {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+        position: relative;
+    }
 }
 
 .batch-actions {
@@ -316,6 +390,10 @@ defineExpose({
     align-items: center;
     gap: 0.8rem;
     font-size: 0.85rem;
+    
+    @media (max-width: 768px) {
+        display: none !important; /* Hide select all / clear on mobile */
+    }
     
     .action-link {
         background: none;
@@ -337,6 +415,10 @@ defineExpose({
     display: flex;
     align-items: center;
     gap: 1.5rem; /* 給予間距 */
+    
+    @media (max-width: 768px) {
+        display: none !important;
+    }
 }
 
 .centered-selected-text {
@@ -347,6 +429,17 @@ defineExpose({
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
+    
+    @media (max-width: 768px) {
+        position: static;
+        transform: none;
+        width: 100%;
+        text-align: center;
+        margin-top: 0.5rem;
+        font-size: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
 }
 
 .list-container {
@@ -364,8 +457,12 @@ defineExpose({
 .candidate-item {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.3rem;
   padding: 0.6rem 0.8rem; 
+  
+  @media (max-width: 768px) {
+      padding: 0.2rem 0.3rem;
+  }
   
   background: white; 
   border: 1px solid var(--glass-border);
@@ -406,6 +503,10 @@ defineExpose({
       font-size: 13px;
       flex-shrink: 0;
       
+      @media (max-width: 768px) {
+          display: none !important;
+      }
+      
       &.bg-0 { background: #E0E7FF; color: #4F46E5; }
       &.bg-1 { background: #FFEDD5; color: #C2410C; }
       &.bg-2 { background: #DCFCE7; color: #15803D; }
@@ -424,7 +525,7 @@ defineExpose({
     height: 22px;
     border-radius: 50%;
     border: 2px solid var(--glass-border);
-    margin-left: auto; /* Push to right */
+    margin-left: auto; /* Push to right by default on desktop */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -432,6 +533,14 @@ defineExpose({
     font-size: 0.8rem;
     flex-shrink: 0;
     transition: all 0.2s;
+    
+    @media (max-width: 768px) {
+        width: 18px;
+        height: 18px;
+        order: -1;          /* Force to the left side */
+        margin-left: 0;     /* Remove desktop push-right */
+        margin-right: 0.5rem;
+    }
     
     .check-icon { width: 14px; height: 14px; }
   }
@@ -444,10 +553,25 @@ defineExpose({
     min-width: 0;
     flex: 1;
     
+    @media (max-width: 768px) {
+        font-size: 0.85rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.1rem;
+    }
+    
     .name { 
         font-weight: 500; 
         font-size: 0.95rem;
         color: var(--glass-text-primary); 
+        
+        @media (max-width: 768px) {
+            font-size: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.1rem;
+        }
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -458,13 +582,22 @@ defineExpose({
             color: var(--glass-text-secondary);
             font-weight: normal;
             margin-left: 0.3rem;
+            
+            @media (max-width: 768px) {
+                margin-left: 0;
+            }
         }
         
         .email {
-            font-size: 0.75rem;
+            font-size: 0.5rem;
             color: var(--glass-text-secondary);
             margin-left: 0.5rem;
             display: none; 
+            
+            @media (max-width: 768px) {
+                display: block;
+                margin-left: 0;
+            }
         }
     }
   }

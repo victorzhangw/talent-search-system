@@ -231,8 +231,10 @@ export function useChatLogic(emit) {
                 const data = await res.json()
                 // Reconstruct messages array
                 const msgs = data.messages.map(m => ({
+                    id: m.id,
                     role: m.role,
-                    content: m.content
+                    content: m.content,
+                    rating: m.rating || 0
                 }))
 
                 // Keep the initial welcome message from AI if present in DB

@@ -22,7 +22,7 @@
       <div class="header-right">
         <div class="action-pill">
             <!-- Expand -->
-            <button v-if="!isFullPage" class="icon-btn" @click="toggleExpand" :title="isExpanded ? '恢復預設寬度' : '切換全寬模式'">
+            <button v-if="!isFullPage" class="icon-btn desktop-only" @click="toggleExpand" :title="isExpanded ? '恢復預設寬度' : '切換全寬模式'">
                 <img v-if="!isExpanded" src="../assets/images/展開箭頭.svg" class="material-icon" alt="展開" />
                 <img v-else src="../assets/images/收起箭頭.svg" class="material-icon" alt="收起" />
             </button>
@@ -177,7 +177,7 @@
                                         取消
                                     </button>
                                     <button class="primary-btn confirm-btn" @click="confirmSelection">
-                                        確認選取 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                                        <span class="desktop-only">確認選取</span><span class="mobile-only">確認</span> {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
                                     </button>
                                 </div>
                             </div>
@@ -188,7 +188,8 @@
                     <div class="big-input-box">
                         <textarea 
                             v-model="inputQuery" 
-                            placeholder="向 Traitty 詢問任何人才相關問題..."
+                            :placeholder="selectedCandidateIds.length > 0 ? '向 Traitty 詢問任何人才相關問題...' : '進入對話後，需開啟新人才解析方能選擇其他人選。'"
+                            :disabled="selectedCandidateIds.length === 0"
                         ></textarea>
                         <div class="input-actions-row">
                             <button class="select-candidate-btn" @click="showCandidateDropdown = true">
@@ -204,14 +205,28 @@
 
                 <!-- Chat View -->
                 <div v-else class="chat-view">
-                    <div class="selected-summary">
-                        已鎖定: 
-                        <span 
-                            v-for="(cand, idx) in activeConversationCandidatesObjects" 
-                            :key="cand.id"
-                        >
-                            {{ cand.name }}<span v-if="idx < activeConversationCandidatesObjects.length - 1">, </span>
-                        </span>
+                    <div class="selected-summary" :class="{ 'collapsed': isSummaryCollapsed }">
+                        <div class="summary-header" @click="isSummaryCollapsed = !isSummaryCollapsed">
+                            <span class="header-title">
+                                <svg class="material-icon toggle-icon" viewBox="0 0 24 24">
+                                    <path v-if="isSummaryCollapsed" d="M8 5v14l11-7z" />
+                                    <path v-else d="M7 10l5 5 5-5z" />
+                                </svg>
+                                分析對象 ({{ activeConversationCandidatesObjects.length }})
+                            </span>
+                            <svg class="material-icon edit-icon" viewBox="0 0 24 24" @click.stop="resetAndReselect" title="重新選取">
+                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                            </svg>
+                        </div>
+                        <div class="summary-tags" v-show="!isSummaryCollapsed">
+                            <span 
+                                class="selected-tag"
+                                v-for="(cand, idx) in activeConversationCandidatesObjects" 
+                                :key="cand.id"
+                            >
+                                {{ cand.name }} <span class="remove-tag" @click.stop="resetAndReselect">✕</span>
+                            </span>
+                        </div>
                     </div>
                     
                     <MessageList :messages="messages" @rate-message="rateMessage" />
@@ -231,6 +246,11 @@
                                 鎖定 {{ activeConversationCandidatesObjects.length }} 位人選
                                 <!-- <svg class="material-icon dropdown-icon" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg> -->
                             </button>
+
+                            <button class="locked-status-btn mobile-quick-btn" @click="showMobileQuickQuestions = !showMobileQuickQuestions" :class="{ 'active': showMobileQuickQuestions }">
+                                快速提問
+                                <svg class="material-icon small" viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
+                            </button>
                             
                             <button class="send-btn primary" @click="sendMessage" :disabled="!inputQuery.trim() || isTyping">
                                 <svg class="material-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M11 21V5.83l-4.59 4.58L5 9l7-7 7 7-1.41 1.41L13 5.83V21h-2z"/></svg>
@@ -241,37 +261,62 @@
 
             </div>
 
-            <!-- Right Sidebar -->
-            <div v-if="isSelectionLocked" class="quick-sidebar">
-               
-                <div class="sidebar-header">
+            <!-- Right Sidebar / Mobile Popover -->
+            <div v-if="isSelectionLocked" class="quick-sidebar" :class="{ 'show-mobile-popover': showMobileQuickQuestions }">
+                
+                <!-- Mobile only Header -->
+                <div class="mobile-popover-header" v-if="showMobileQuickQuestions">
+                    <svg class="material-icon" viewBox="0 0 24 24"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/></svg>
+                    <span>點擊快速取得 Traitty AI 專業解析</span>
+                </div>
+
+                <!-- Desktop Category Dropdown -->
+                <div class="sidebar-header" v-show="!showMobileQuickQuestions">
                     <div class="custom-select-wrapper category-toggle" @click="toggleQuickQuestionCategory">
-                        <!-- 燈泡 Icon -->
                         <svg class="material-icon select-icon" viewBox="0 0 24 24">
                             <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/>
                         </svg>
-                        
-                        <div class="category-name-display">
-                            {{ selectedQuickQuestionCategory }}
-                        </div>
-                        
-                        <!-- 循環切換 Icon (上下箭頭) -->
+                        <div class="category-name-display">{{ selectedQuickQuestionCategory }}</div>
                         <svg class="material-icon select-caret" viewBox="0 0 24 24" title="點擊切換類別">
                             <path fill="currentColor" d="M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z"/>
                         </svg>
                     </div>
                 </div>
 
-                <div class="quick-btn-list">
+                <!-- Desktop Quick Questions List -->
+                <div class="quick-btn-list" v-show="!showMobileQuickQuestions">
                     <button 
                         v-for="(q, idx) in quickQuestions" 
-                        :key="idx" 
+                        :key="'desktop-'+idx" 
                         class="quick-btn"
                         @click="sendQuickMessage(q)"
                         :disabled="isTyping"
                     >
                         {{ q }}
                     </button>
+                </div>
+
+                <!-- Mobile All Categories List -->
+                <div class="mobile-all-categories-list" v-if="showMobileQuickQuestions">
+                    <div class="category-group" v-for="(qs, catName) in quickQuestionCategories" :key="'cat-'+catName">
+                        <div class="category-group-title">
+                            <svg class="material-icon cat-icon" viewBox="0 0 24 24">
+                                <path v-if="catName === '招募'" d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/>
+                                <path v-else-if="catName === '管理'" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                                <path v-else d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                            </svg>
+                            {{ catName }}
+                        </div>
+                        <button 
+                            v-for="(q, idx) in qs" 
+                            :key="'mobile-'+catName+'-'+idx" 
+                            class="quick-btn rounded-pill"
+                            @click="sendQuickMessage(q); showMobileQuickQuestions = false"
+                            :disabled="isTyping"
+                        >
+                            {{ q }}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -294,6 +339,8 @@
 import { ref, computed } from 'vue'
 import MessageList from './MessageList.vue'
 import CandidateSelector from './CandidateSelector.vue'
+
+const isSummaryCollapsed = ref(true)
 import LoginView from './LoginView.vue'
 import TraitReportModal from './TraitReportModal.vue'
 import { useChatLogic } from '../composables/useChatLogic.js'
@@ -364,6 +411,7 @@ const {
 } = useChatLogic(emit)
 
 const showCandidateDropdown = ref(false)
+const showMobileQuickQuestions = ref(false)
 
 const confirmSelection = () => {
     showCandidateDropdown.value = false
@@ -426,6 +474,19 @@ const toggleExpand = () => {
 
 .new-tab-btn {
     display: none !important;
+}
+
+.desktop-only {
+    @media (max-width: 768px) {
+        display: none !important;
+    }
+}
+
+.mobile-only {
+    display: none !important;
+    @media (max-width: 768px) {
+        display: inline-block !important;
+    }
 }
 
 .chat-container.expanded-mode {
