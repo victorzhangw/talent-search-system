@@ -1420,7 +1420,7 @@
         }
 
         .send-btn.primary {
-            background: #8b5cf6;
+            background: #6A25f4;
             color: white;
             border: none;
             border-radius: 50%;
@@ -1442,6 +1442,11 @@
                 background: #cbd5e1;
                 cursor: not-allowed;
                 box-shadow: none;
+            }
+
+            .material-icon {
+                color: white;
+                fill: white;
             }
 
             .material-icon {
