@@ -14,11 +14,18 @@ export function useChatLogic(emit) {
     const remainingDays = ref(null)
     const isWidgetEnabled = ref(true) // Default to true, updated by /v1/init/
 
-    const messages = ref([
-        { role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }
-    ])
-    const inputQuery = ref('')
-    const isTyping = ref(false)
+    const showWelcomeMessage = ref(false);
+    const messages = ref(showWelcomeMessage.value ? [{ role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }] : []);
+    const inputQuery = ref('');
+    const isTyping = ref(false);
+
+    // Helper to show the welcome message when needed
+    const toggleWelcomeMessage = (show = true) => {
+        showWelcomeMessage.value = show;
+        if (show && messages.value.length === 0) {
+            messages.value = [{ role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }];
+        }
+    };
 
     const candidates = ref([])
     // UI Selection State
