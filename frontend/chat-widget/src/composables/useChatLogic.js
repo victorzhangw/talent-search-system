@@ -518,7 +518,7 @@ export function useChatLogic(emit) {
 
     const resetAndReselect = () => {
         // Reset Chat
-        messages.value = [{ role: 'ai', content: '您好！我是您的人才評鑑助手。請先選擇候選人，我將為您提供特質分析與建議。' }]
+        messages.value = showWelcomeMessage.value ? [{ role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }] : []
         currentSessionId.value = crypto.randomUUID()
         inputQuery.value = ''
 
