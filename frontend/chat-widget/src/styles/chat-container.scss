@@ -842,6 +842,18 @@
             border-radius: 20px;
             padding: 0.6rem 3rem;
             min-width: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+
+            .material-icon {
+
+                /* Hide SVG on mobile */
+                @media (max-width: 768px) {
+                    display: none !important;
+                }
+            }
 
             @media (max-width: 768px) {
                 min-width: 120px;
