@@ -47,7 +47,7 @@
     }
 
     /* Default Widget Border Radius */
-    border-radius: 16px;
+    border-radius: 32px;
 
     display: flex;
     flex-direction: column;
@@ -559,7 +559,7 @@
         }
 
         h2 {
-            font-size: 2rem;
+            font-size: 1.8rem;
             margin-bottom: 0.5rem;
             color: var(--glass-text-primary);
             display: flex;

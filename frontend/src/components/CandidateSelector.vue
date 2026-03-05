@@ -267,7 +267,7 @@ watch(
   width: 100%;
   padding: 10px 16px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 32px;
   font-size: 14px;
   transition: all 0.2s;
 }

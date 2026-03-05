@@ -321,7 +321,7 @@ defineExpose({
     align-items: center;
     background: rgba(127, 127, 127, 0.1);
     border: 1px solid var(--glass-border);
-    border-radius: 8px;
+    border-radius: 32px;
     padding: 0 0.8rem;
     height: 40px;
     

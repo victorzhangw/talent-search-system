@@ -176,7 +176,8 @@
                                         取消
                                     </button>
                                     <button class="primary-btn confirm-btn" @click="confirmSelection">
-                                        <span class="desktop-only">確認選取</span><span class="mobile-only">確認</span> {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                                        <img src="../assets/images/AI star.svg" class="material-icon small" alt="AI Star" />
+                                        <span class="desktop-only">開始分析</span><span class="mobile-only">確認</span> {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
                                     </button>
                                 </div>
                             </div>
