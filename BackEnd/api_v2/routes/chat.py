@@ -278,6 +278,7 @@ def chat():
             
             full_assistant_content = ""
             total_usage = None
+            has_llm_error = False
             
             try:
                 for chunk in response_stream:
@@ -292,12 +293,15 @@ def chat():
                         content = delta.content
                         if content:
                             full_assistant_content += content
+                            if "⚠️ 系統提示：AI 服務暫時無法連線" in content or "由於 LLM 連線失敗" in content:
+                                has_llm_error = True
                             yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
             except Exception as e:
                 print(f"[Streaming Error] {e}", flush=True)  # ADDED FLUSH
                 import traceback
                 traceback.print_exc()
                 err_msg = "\n\n(連線中斷: 請稍後再試)"
+                has_llm_error = True
                 yield f"data: {json.dumps({'type': 'token', 'content': err_msg})}\n\n"
             
             # Log Assistant Message & Usage
@@ -321,30 +325,33 @@ def chat():
                 yield f"data: {json.dumps({'type': 'message_id', 'id': msg_id})}\n\n"
             
             # --- 扣除額度並即時同步回傳給前端 ---
-            try:
-                from ..utils.traitty_api import fetch_init_data, find_active_plan, submit_daily_settlement
-                if user_id and user_id != 'anonymous':
-                    # 1. 取得最新方案清單
-                    init_data = fetch_init_data(user_id)
-                    usable_plans = init_data.get('usable_plans', [])
-                    plan_id = find_active_plan(usable_plans)
-                    
-                    if plan_id:
-                        # 2. 發送 Daily Settlement 扣款請求
-                        print(f"[Daily Settlement] Deducting quota for plan: {plan_id}, user: {user_id}", flush=True)
-                        submit_daily_settlement(user_id, plan_id, session_id)
+            if not has_llm_error:
+                try:
+                    from ..utils.traitty_api import fetch_init_data, find_active_plan, submit_daily_settlement
+                    if user_id and user_id != 'anonymous':
+                        # 1. 取得最新方案清單
+                        init_data = fetch_init_data(user_id)
+                        usable_plans = init_data.get('usable_plans', [])
+                        plan_id = find_active_plan(usable_plans)
                         
-                        # 3. 扣款成功後，重新查詢最新 quota_summary 推給前端
-                        post_settle_data = fetch_init_data(user_id)
-                        new_quota = post_settle_data.get('quota_summary')
-                        
-                        if new_quota:
-                            yield f"data: {json.dumps({'type': 'quota', 'quota_summary': new_quota})}\n\n"
-                            print("[Daily Settlement] Successfully refreshed quota and synced to frontend", flush=True)
-                    else:
-                        print(f"[Daily Settlement] No valid usable plan found for user {user_id}", flush=True)
-            except Exception as quota_e:
-                print(f"[Daily Settlement Error] Failed to deduct quota or sync: {quota_e}", flush=True)
+                        if plan_id:
+                            # 2. 發送 Daily Settlement 扣款請求
+                            print(f"[Daily Settlement] Deducting quota for plan: {plan_id}, user: {user_id}", flush=True)
+                            submit_daily_settlement(user_id, plan_id, session_id)
+                            
+                            # 3. 扣款成功後，重新查詢最新 quota_summary 推給前端
+                            post_settle_data = fetch_init_data(user_id)
+                            new_quota = post_settle_data.get('quota_summary')
+                            
+                            if new_quota:
+                                yield f"data: {json.dumps({'type': 'quota', 'quota_summary': new_quota})}\n\n"
+                                print("[Daily Settlement] Successfully refreshed quota and synced to frontend", flush=True)
+                        else:
+                            print(f"[Daily Settlement] No valid usable plan found for user {user_id}", flush=True)
+                except Exception as quota_e:
+                    print(f"[Daily Settlement Error] Failed to deduct quota or sync: {quota_e}", flush=True)
+            else:
+                print(f"[Daily Settlement] Skipped quota deduction due to LLM error flag for session: {session_id}", flush=True)
 
             yield "data: [DONE]\n\n"
         except Exception as outer_e:
