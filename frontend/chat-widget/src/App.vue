@@ -11,22 +11,24 @@
     </transition>
     
     <!-- Backdrop Overlay to block parent page clicks -->
-    <transition name="fade">
-      <div 
-        v-if="isOpen && !isFullPageMode" 
-        class="widget-modal-backdrop"
-        @click="isOpen = true" 
-      ></div>
-    </transition>
-    
-    <transition name="fade">
-      <ChatContainer 
-        v-if="isOpen" 
-        :is-full-page="isFullPageMode" 
-        @close="handleClose" 
-        @minimize="handleMinimize"
-      />
-    </transition>
+    <Teleport to="body">
+      <transition name="fade">
+        <div 
+          v-if="isOpen && !isFullPageMode" 
+          class="widget-modal-backdrop"
+          @click="isOpen = true" 
+        ></div>
+      </transition>
+      
+      <transition name="fade">
+        <ChatContainer 
+          v-if="isOpen" 
+          :is-full-page="isFullPageMode" 
+          @close="handleClose" 
+          @minimize="handleMinimize"
+        />
+      </transition>
+    </Teleport>
   </div>
 </template>
 
