@@ -192,8 +192,8 @@
                         ></textarea>
                         <div class="input-actions-row">
                             <button class="select-candidate-btn" @click="showCandidateDropdown = true">
-                                <svg class="material-icon small" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                                 選取人才 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                                <img src="../assets/images/human-search.svg" class="material-icon small" alt="搜尋" />
                             </button>
                             <button class="send-btn" @click="handleInitialSend" :disabled="!canSendInitial">
                                 <svg class="material-icon" viewBox="0 0 15 15">
