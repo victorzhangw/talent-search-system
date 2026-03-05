@@ -1,10 +1,21 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'src/assets/images/*',
+          dest: 'assets/images'
+        }
+      ]
+    })
+  ],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
@@ -35,6 +46,10 @@ export default defineConfig({
         // Force CSS to be injected or extracted. 
         // For a single file widget, inline CSS or a single css file is good.
         // Vite by default emits style.css. 
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'style.css') return 'loader.css';
+          return assetInfo.name;
+        },
       }
     },
     // Ensure CSS is included or handled

@@ -301,7 +301,7 @@
             justify-content: center;
             gap: 0.5rem;
             border-radius: 20px;
-            background: linear-gradient(90deg, #7c3afa 0%, #4670f6 100%);
+            background: linear-gradient(90deg, #692ff3 0%, #517BE6 100%);
             border: none;
 
             .new-analysis-icon {
@@ -310,8 +310,8 @@
             }
 
             &:hover {
-                filter: brightness(1.1);
-                background: linear-gradient(90deg, #7c3afa 0%, #4670f6 100%);
+                filter: brightness(1.2);
+                background: linear-gradient(90deg, #692ff3 0%, #517BE6 100%);
                 /* maintain gradient on hover */
                 border-color: transparent;
             }
