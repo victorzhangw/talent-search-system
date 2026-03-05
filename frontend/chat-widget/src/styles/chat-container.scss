@@ -1303,7 +1303,7 @@
             background: rgba(79, 70, 229, 0.1);
             color: var(--primary-color);
             padding: 0.3rem 0.6rem;
-            border-radius: 4px;
+            border-radius: 32px;
             font-size: 0.8rem;
             gap: 0.4rem;
 
@@ -1314,7 +1314,7 @@
 
             .remove-tag {
                 cursor: pointer;
-                font-size: 0.9rem;
+                font-size: 0.7rem;
                 opacity: 0.7;
 
                 &:hover {

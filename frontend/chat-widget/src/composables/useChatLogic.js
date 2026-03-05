@@ -539,6 +539,22 @@ export function useChatLogic(emit) {
         selectedCandidateIds.value = [] // Should be empty already
     }
 
+    const removeCandidate = (candidateIdToRemove) => {
+        activeConversationCandidateIds.value = activeConversationCandidateIds.value.filter(id => id !== candidateIdToRemove)
+
+        if (activeConversationCandidateIds.value.length === 0) {
+            resetAndReselect()
+        } else {
+            try {
+                sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(activeConversationCandidateIds.value))
+                const activeCands = candidates.value.filter(c => activeConversationCandidateIds.value.includes(c.candidate_id))
+                sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(activeCands))
+            } catch (e) {
+                console.error('[ChatLogic] Failed to update Session Storage on remove:', e)
+            }
+        }
+    }
+
     const performAutoLogin = async (email) => {
         const { serverRoot } = getApiConfig()
         const maxRetries = 3
@@ -800,6 +816,7 @@ export function useChatLogic(emit) {
         handleSelectionChange,
         lockSelectionAndStart,
         resetAndReselect,
+        removeCandidate,
         sendMessage,
         sendQuickMessage,
         toggleQuickQuestionCategory,

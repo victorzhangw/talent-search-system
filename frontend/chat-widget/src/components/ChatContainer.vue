@@ -165,13 +165,7 @@
                                     />
                                 </div>
                                 <div class="modal-footer">
-                                    <button 
-                                        class="secondary-btn clear-btn" 
-                                        v-if="selectedCandidateIds.length > 0" 
-                                        @click="clearCandidates"
-                                    >
-                                        清除選取
-                                    </button>
+                                   
                                     <button class="secondary-btn cancel-btn" @click="showCandidateDropdown = false">
                                         取消
                                     </button>
@@ -207,26 +201,22 @@
 
                 <!-- Chat View -->
                 <div v-else class="chat-view">
-                    <div class="selected-summary" :class="{ 'collapsed': isSummaryCollapsed }">
-                        <div class="summary-header" @click="isSummaryCollapsed = !isSummaryCollapsed">
+                    <div class="selected-summary">
+                        <div class="summary-header">
                             <span class="header-title">
-                                <svg class="material-icon toggle-icon" viewBox="0 0 24 24">
-                                    <path v-if="isSummaryCollapsed" d="M8 5v14l11-7z" />
-                                    <path v-else d="M7 10l5 5 5-5z" />
-                                </svg>
                                 分析對象 ({{ activeConversationCandidatesObjects.length }})
                             </span>
                             <svg class="material-icon edit-icon" viewBox="0 0 24 24" @click.stop="resetAndReselect" title="重新選取">
                                 <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                             </svg>
                         </div>
-                        <div class="summary-tags" v-show="!isSummaryCollapsed">
+                        <div class="summary-tags">
                             <span 
                                 class="selected-tag"
                                 v-for="(cand, idx) in activeConversationCandidatesObjects" 
                                 :key="cand.id"
                             >
-                                {{ cand.name }} <span class="remove-tag" @click.stop="resetAndReselect">✕</span>
+                                {{ cand.name }} <span class="remove-tag" @click.stop="removeCandidate(cand.id)">✕</span>
                             </span>
                         </div>
                     </div>
@@ -298,7 +288,6 @@ import MessageList from './MessageList.vue'
 import CandidateSelector from './CandidateSelector.vue'
 import QuickQuestionPanel from './QuickQuestionPanel.vue'
 
-const isSummaryCollapsed = ref(window.innerWidth <= 768)
 import LoginView from './LoginView.vue'
 import TraitReportModal from './TraitReportModal.vue'
 import { useChatLogic } from '../composables/useChatLogic.js'
@@ -361,6 +350,7 @@ const {
     handleSelectionChange,
     lockSelectionAndStart: logicLockSelection,
     resetAndReselect: logicResetAndReselect,
+    removeCandidate,
     sendMessage,
     sendQuickMessage,
     toggleQuickQuestionCategory,
