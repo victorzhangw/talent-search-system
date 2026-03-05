@@ -10,6 +10,15 @@
       />
     </transition>
     
+    <!-- Backdrop Overlay to block parent page clicks -->
+    <transition name="fade">
+      <div 
+        v-if="isOpen && !isFullPageMode" 
+        class="widget-modal-backdrop"
+        @click="isOpen = true" 
+      ></div>
+    </transition>
+    
     <transition name="fade">
       <ChatContainer 
         v-if="isOpen" 
@@ -88,5 +97,27 @@ onMounted(() => {
   *, *::before, *::after {
     box-sizing: border-box;
   }
+}
+
+.widget-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 9998; /* Just below the chat container's 9999 */
+}
+
+/* Base fade transition for both the launcher, overlay, and container if needed */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
