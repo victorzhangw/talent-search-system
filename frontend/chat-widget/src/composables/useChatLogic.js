@@ -549,6 +549,12 @@ export function useChatLogic(emit) {
                 sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(activeConversationCandidateIds.value))
                 const activeCands = candidates.value.filter(c => activeConversationCandidateIds.value.includes(c.candidate_id))
                 sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(activeCands))
+
+                // Push Helper Message upon update
+                messages.value.push({
+                    role: 'ai',
+                    content: `已更新分析對象。目前鎖定 ${activeConversationCandidateIds.value.length} 位候選人。您現在可以針對他們進行提問。`
+                })
             } catch (e) {
                 console.error('[ChatLogic] Failed to update Session Storage on remove:', e)
             }
