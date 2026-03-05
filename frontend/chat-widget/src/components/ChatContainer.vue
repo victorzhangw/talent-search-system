@@ -36,7 +36,9 @@
         
         <!-- Minimize & Close -->
         <button v-if="isSelectionLocked" class="icon-btn styled-circle" @click="$emit('minimize')" title="最小化至按鈕">
-            <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+            <svg class="material-icon" viewBox="0 0 15 15">
+    <path d="M6.0625 14.75V5.04167L1.85417 9.25L0 7.375L7.375 0L14.75 7.375L12.8958 9.25L8.6875 5.04167V14.75H6.0625Z" fill="white"/>
+</svg>
         </button>
         <button class="icon-btn styled-circle close-btn" @click="$emit('close')">
             <svg class="material-icon" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -197,7 +199,9 @@
                                 選取人才 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
                             </button>
                             <button class="send-btn" @click="handleInitialSend" :disabled="!canSendInitial">
-                                <svg class="material-icon" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                                <svg class="material-icon" viewBox="0 0 15 15">
+  <path d="M6.0625 14.75V5.04167L1.85417 9.25L0 7.375L7.375 0L14.75 7.375L12.8958 9.25L8.6875 5.04167V14.75H6.0625Z" fill="white"/>
+</svg>
                             </button>
                         </div>
                     </div>
@@ -262,7 +266,17 @@
             </div>
 
             <!-- Right Sidebar / Mobile Popover -->
-            <div v-if="isSelectionLocked" class="quick-sidebar" :class="{ 'show-mobile-popover': showMobileQuickQuestions }">
+            <QuickQuestionPanel
+  :isSelectionLocked="isSelectionLocked"
+  :showMobileQuickQuestions="showMobileQuickQuestions"
+  :quickQuestionCategories="quickQuestionCategories"
+  :selectedQuickQuestionCategory="selectedQuickQuestionCategory"
+  :quickQuestions="quickQuestions"
+  :isTyping="isTyping"
+  @update:showMobileQuickQuestions="showMobileQuickQuestions = $event"
+  @toggleCategory="toggleQuickQuestionCategory"
+  @sendQuick="sendQuickMessage"
+/>
                 
                 <!-- Mobile only Header -->
                 <div class="mobile-popover-header" v-if="showMobileQuickQuestions">
