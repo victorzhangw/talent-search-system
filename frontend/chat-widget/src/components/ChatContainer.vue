@@ -450,6 +450,9 @@ const toggleExpand = () => {
     .left-panel {
         width: 20% !important;
         min-width: 200px;
+        @media (max-width: 768px) {
+            width: 100% !important;
+        }
     }
 
     .right-panel {
@@ -457,6 +460,10 @@ const toggleExpand = () => {
         flex: unset !important;
         display: flex;
         flex-direction: column;
+        @media (max-width: 768px) {
+            width: 100% !important;
+            flex: 1 !important;
+        }
     }
 
     .quick-sidebar {

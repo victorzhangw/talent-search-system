@@ -170,10 +170,20 @@
         font-size: 1.1rem;
         color: var(--glass-text-primary);
         gap: 0.4rem;
+        white-space: nowrap;
+
+        @media (max-width: 768px) {
+            font-size: 0.9rem;
+        }
 
         .title-img-icon {
             width: 24px;
             height: 24px;
+
+            @media (max-width: 768px) {
+                width: 18px;
+                height: 18px;
+            }
         }
     }
 
