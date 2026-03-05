@@ -118,6 +118,10 @@
     .header-right {
         justify-content: flex-end;
         gap: 24px;
+
+        @media (max-width: 768px) {
+            gap: 12px;
+        }
     }
 
     .header-center {
@@ -142,8 +146,20 @@
         height: 35px;
         /* Matches Figma size */
 
+        @media (max-width: 768px) {
+            height: 28px;
+            padding: 0.1rem 0.2rem;
+        }
+
         .icon-btn {
             background: transparent;
+
+            .material-icon {
+                @media (max-width: 768px) {
+                    width: 18px;
+                    height: 18px;
+                }
+            }
         }
 
         .pill-divider {
@@ -151,6 +167,11 @@
             height: 16px;
             background: var(--glass-border);
             margin: 0 0.5rem;
+
+            @media (max-width: 768px) {
+                height: 12px;
+                margin: 0 0.3rem;
+            }
         }
     }
 
@@ -163,6 +184,18 @@
         display: flex;
         align-items: center;
         justify-content: center;
+
+        @media (max-width: 768px) {
+            width: 28px;
+            height: 28px;
+        }
+
+        .material-icon {
+            @media (max-width: 768px) {
+                width: 16px;
+                height: 16px;
+            }
+        }
     }
 
     .title {
