@@ -91,7 +91,6 @@ function sendQuick(q) {
 }
 </script>
 
-<style scoped>
-/* 這裡可以保留原本在 chat-container.scss 中的 quick‑sidebar 相關樣式，
-   若需要覆寫可在此加入 */
+<style lang="scss" scoped>
+@use '../styles/chat-container.scss';
 </style>
