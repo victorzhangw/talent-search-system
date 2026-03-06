@@ -47,6 +47,11 @@ export function useChatLogic(emit) {
     const currentSessionId = ref(crypto.randomUUID())
     const isInitializing = ref(true)
 
+    // Preview Logic (Option A)
+    const previewMessages = ref([])
+    const showPreviewPanel = ref(false)
+    const previewSessionData = ref(null)
+
     // Modal Logic
     const showReportModal = ref(false)
     const currentReportCandidate = ref({})
@@ -228,7 +233,11 @@ export function useChatLogic(emit) {
 
     const loadHistorySession = async (sessionData) => {
         const { serverRoot } = getApiConfig()
-        currentSessionId.value = sessionData.session_id
+
+        // Option A: Load into Preview Panel instead of overriding main chat
+        previewSessionData.value = sessionData
+        showPreviewPanel.value = true
+        previewMessages.value = [] // clear previous or set loading state
 
         try {
             const res = await fetch(`${serverRoot}/chat/${sessionData.session_id}`, {
@@ -244,16 +253,10 @@ export function useChatLogic(emit) {
                     rating: m.rating || 0
                 }))
 
-                // Keep the initial welcome message from AI if present in DB
-                messages.value = msgs.length > 0 ? msgs : [{ role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }]
-
-                isSelectionLocked.value = true // Assume locked if reviewing history
-                currentTab.value = 'main'
-
-                // If metadata has active IDs, we could theoretically reload candidates here
+                previewMessages.value = msgs.length > 0 ? msgs : [{ role: 'ai', content: '（尚無對話紀錄）' }]
             }
         } catch (e) {
-            console.error("[ChatContainer] Failed to load session details", e)
+            console.error("[ChatContainer] Failed to load session details for preview", e)
         }
     }
 
@@ -803,9 +806,18 @@ export function useChatLogic(emit) {
         isInitializing,
         showReportModal,
         currentReportCandidate,
+
+        // Option A States
+        previewMessages,
+        showPreviewPanel,
+        previewSessionData,
+
+        // Quick Questions
         quickQuestionCategories,
         selectedQuickQuestionCategory,
         quickQuestions,
+
+        // History
         historySessions,
 
         // Computed

@@ -1366,6 +1366,112 @@
     flex: 1;
     width: 100%;
     min-height: 0;
+    position: relative;
+    /* ensure absolute children stay within */
+    overflow: hidden;
+
+    .history-preview-drawer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 400px;
+        /* Occupies a portion of the chat on desktop */
+        background: #ffffff;
+        box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid var(--glass-border);
+
+        [data-theme="midnight"] & {
+            background: rgba(30, 30, 40, 0.98);
+        }
+
+        @media (max-width: 768px) {
+            max-width: 100%;
+            border-left: none;
+        }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.2rem;
+            background: rgba(244, 245, 249, 1);
+            border-bottom: 1px solid var(--glass-border);
+
+            [data-theme="midnight"] & {
+                background: rgba(40, 40, 50, 1);
+            }
+
+            .drawer-title {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--glass-text-primary);
+
+                .material-icon {
+                    width: 20px;
+                    height: 20px;
+                    fill: #6b7280;
+                }
+
+                .preview-badge {
+                    font-size: 0.7rem;
+                    background: #eef2ff;
+                    color: #4f46e5;
+                    padding: 0.15rem 0.5rem;
+                    border-radius: 12px;
+                    font-weight: 500;
+                }
+            }
+
+            .close-drawer-btn {
+                background: none;
+                border: none;
+                font-size: 1.2rem;
+                cursor: pointer;
+                color: #6b7280;
+                padding: 0.2rem;
+
+                &:hover {
+                    color: var(--primary-color);
+                }
+            }
+        }
+
+        .drawer-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            position: relative;
+
+            .preview-warning {
+                text-align: center;
+                font-size: 0.8rem;
+                color: #6b7280;
+                padding: 1rem;
+                background: #fdfbf7;
+                border-top: 1px solid #f3f4f6;
+            }
+        }
+    }
+
+    /* Vue Transition */
+    .slide-in-right-enter-active,
+    .slide-in-right-leave-active {
+        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .slide-in-right-enter-from,
+    .slide-in-right-leave-to {
+        transform: translateX(100%);
+    }
 }
 
 .selected-summary {
