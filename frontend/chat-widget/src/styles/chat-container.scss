@@ -1049,38 +1049,47 @@
 }
 
 @mixin quick-sidebar-popover-style {
-    display: none !important;
-    /* Hide by default on single-column mode or mobile */
+    display: flex !important;
+    position: absolute;
+    bottom: 120px;
+    /* Float above the input container */
+    left: 20% !important;
+    right: auto !important;
+    transform: translateX(-50%) translateY(15px);
+    width: 100% !important;
+    max-width: 320px !important;
+    margin: 0 auto;
+    border-radius: 16px;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    border: 1px solid var(--glass-border);
+    padding: 0;
+    height: auto;
+    flex-direction: column;
+    overflow: hidden;
+
+    /* Hidden popover state by default */
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
 
     &.show-mobile-popover {
-        display: flex !important;
-        position: absolute;
-        bottom: 120px;
-        /* Float above the input container */
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    [data-theme="midnight"] & {
+        background: rgba(30, 30, 40, 0.98);
+    }
+
+    @media (max-width: 768px) {
+        max-width: 270px !important;
         left: 50% !important;
-        right: auto !important;
-        transform: translateX(-50%);
-        width: 100% !important;
-        max-width: 320px !important;
-        margin: 0 auto;
-        border-radius: 16px;
-        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
-        background: rgba(255, 255, 255, 0.98);
-        backdrop-filter: blur(10px);
-        z-index: 100;
-        border: 1px solid var(--glass-border);
-        padding: 0;
-        height: auto;
-        flex-direction: column;
-        overflow: hidden;
-
-        [data-theme="midnight"] & {
-            background: rgba(30, 30, 40, 0.98);
-        }
-
-        @media (max-width: 768px) {
-            max-width: 270px !important;
-        }
     }
 
     .mobile-popover-header {
