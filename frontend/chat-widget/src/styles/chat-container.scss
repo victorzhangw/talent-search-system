@@ -1509,19 +1509,20 @@
         margin-top: 0.5rem;
         gap: 0.4rem;
         flex-wrap: nowrap;
-        /* Do not wrap */
+        /* Do not wrap on desktop */
+
+        @media (max-width: 768px) {
+            flex-wrap: wrap;
+            /* Allow grouping to wrap on mobile if needed */
+        }
 
         .left-actions {
             display: flex;
             align-items: center;
             gap: 0.6rem;
             flex: 1;
-            overflow-x: auto;
-            scrollbar-width: none;
-
-            &::-webkit-scrollbar {
-                display: none;
-            }
+            flex-wrap: wrap;
+            /* Let the buttons inside wrap naturally */
         }
 
         .locked-status-wrapper {
@@ -1741,6 +1742,12 @@
             white-space: nowrap;
             flex-shrink: 0;
 
+            .dropdown-icon {
+                width: 14px;
+                height: 14px;
+                margin-left: -0.1rem;
+            }
+
             @media (max-width: 768px) {
                 padding: 0.3rem 0.6rem;
                 font-size: 0.75rem;
@@ -1767,12 +1774,6 @@
                 width: 16px;
                 height: 16px;
                 fill: currentColor;
-            }
-
-            .dropdown-icon {
-                width: 14px;
-                height: 14px;
-                margin-left: -0.1rem;
             }
 
             &.mobile-quick-btn {
