@@ -216,7 +216,7 @@
                     <MessageList :messages="messages" @rate-message="rateMessage" />
 
                     <!-- HISTORY PREVIEW DRAWER (Option A) -->
-                    <transition name="slide-in-right">
+                    <transition name="slide-in-left">
                         <div v-show="showPreviewPanel" class="history-preview-drawer">
                             <div class="drawer-header">
                                 <div class="drawer-title">

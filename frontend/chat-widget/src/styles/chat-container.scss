@@ -1373,17 +1373,17 @@
     .history-preview-drawer {
         position: absolute;
         top: 0;
-        right: 0;
+        left: 0;
         bottom: 0;
         width: 100%;
-        max-width: 400px;
-        /* Occupies a portion of the chat on desktop */
+        max-width: 550px;
+        /* Increased from 400px per request */
         background: #ffffff;
-        box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
         z-index: 1000;
         display: flex;
         flex-direction: column;
-        border-left: 1px solid var(--glass-border);
+        border-right: 1px solid var(--glass-border);
 
         [data-theme="midnight"] & {
             background: rgba(30, 30, 40, 0.98);
@@ -1391,7 +1391,7 @@
 
         @media (max-width: 768px) {
             max-width: 100%;
-            border-left: none;
+            border-right: none;
         }
 
         .drawer-header {
@@ -1463,14 +1463,14 @@
     }
 
     /* Vue Transition */
-    .slide-in-right-enter-active,
-    .slide-in-right-leave-active {
+    .slide-in-left-enter-active,
+    .slide-in-left-leave-active {
         transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     }
 
-    .slide-in-right-enter-from,
-    .slide-in-right-leave-to {
-        transform: translateX(100%);
+    .slide-in-left-enter-from,
+    .slide-in-left-leave-to {
+        transform: translateX(-100%);
     }
 }
 
