@@ -1470,7 +1470,8 @@
     flex-shrink: 0;
 
     @media (max-width: 768px) {
-        margin: 0.6rem 0.6rem 1rem 0.6rem;
+        margin: 0.6rem 0.4rem 1rem 0.4rem;
+        padding: 0.8rem 0.6rem;
     }
 
     &:focus-within {
@@ -1521,8 +1522,13 @@
             align-items: center;
             gap: 0.6rem;
             flex: 1;
-            flex-wrap: wrap;
-            /* Let the buttons inside wrap naturally */
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+
+            &::-webkit-scrollbar {
+                display: none;
+            }
         }
 
         .locked-status-wrapper {
@@ -1812,6 +1818,11 @@
             &:hover:not(:disabled) {
                 background: #7c3aed;
                 transform: scale(1.05);
+            }
+
+            @media (max-width: 768px) {
+                width: 30px;
+                height: 30px;
             }
 
             &:disabled {
