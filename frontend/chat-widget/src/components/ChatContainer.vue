@@ -166,12 +166,13 @@
                                 </div>
                                 <div class="modal-footer">
                                    
-                                    <button class="secondary-btn cancel-btn" @click="showCandidateDropdown = false">
-                                        取消
-                                    </button>
+                                   
                                     <button class="primary-btn confirm-btn" @click="confirmSelection">
                                         <img src="../assets/images/AI star.svg" class="material-icon small" alt="AI Star" />
                                         <span class="desktop-only">開始分析</span><span class="mobile-only">確認</span> {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                                    </button>
+                                     <button class="secondary-btn cancel-btn" @click="showCandidateDropdown = false">
+                                        關閉視窗
                                     </button>
                                 </div>
                             </div>
@@ -186,14 +187,24 @@
                             :disabled="selectedCandidateIds.length === 0"
                         ></textarea>
                         <div class="input-actions-row">
-                            <button class="select-candidate-btn" @click="showCandidateDropdown = true">
-                                選取人才 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
-                                <img src="../assets/images/human-search.svg" class="material-icon small" alt="搜尋" />
-                            </button>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <button class="select-candidate-btn" @click="showCandidateDropdown = true">
+                                    選取人才 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                                    <img src="../assets/images/human-search.svg" class="material-icon small" alt="搜尋" />
+                                </button>
+                                <button class="welcome-quick-btn" 
+                                    @click="showMobileQuickQuestions = !showMobileQuickQuestions" 
+                                    :class="{ 'active': showMobileQuickQuestions }" 
+                                    :disabled="selectedCandidateIds.length === 0"
+                                    title="需先選取人才才能提問">
+                                    快速提問
+                                    <svg class="material-icon small" viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
+                                </button>
+                            </div>
                             <button class="send-btn" @click="handleInitialSend" :disabled="!canSendInitial">
                                 <svg class="material-icon" viewBox="0 0 15 15">
-  <path d="M6.0625 14.75V5.04167L1.85417 9.25L0 7.375L7.375 0L14.75 7.375L12.8958 9.25L8.6875 5.04167V14.75H6.0625Z" fill="white"/>
-</svg>
+                                  <path d="M6.0625 14.75V5.04167L1.85417 9.25L0 7.375L7.375 0L14.75 7.375L12.8958 9.25L8.6875 5.04167V14.75H6.0625Z" fill="white"/>
+                                </svg>
                             </button>
                         </div>
                     </div>
@@ -201,18 +212,7 @@
 
                 <!-- Chat View -->
                 <div v-else class="chat-view">
-                    <div class="selected-summary">
-                        <div class="summary-tags">
-                            <span 
-                                class="selected-tag"
-                                v-for="(cand, idx) in activeConversationCandidatesObjects" 
-                                :key="cand.id"
-                            >
-                                {{ cand.name }} <span class="remove-tag" @click.stop="removeCandidate(cand.id)">✕</span>
-                            </span>
-                        </div>
-                    </div>
-                    
+                    <!-- Selected summary removed per request -->
                     <MessageList :messages="messages" @rate-message="rateMessage" />
 
                     <div class="chat-input-container">
@@ -225,11 +225,45 @@
                         ></textarea>
                         
                         <div class="chat-input-footer">
-                            <button class="locked-status-btn" @click="resetAndReselect">
-                                <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-                                鎖定 {{ activeConversationCandidatesObjects.length }} 位人選
-                                <!-- <svg class="material-icon dropdown-icon" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg> -->
-                            </button>
+                            <div class="locked-status-wrapper">
+                                <button class="locked-status-btn" @click="showLockedCandidates = !showLockedCandidates" :class="{ 'active': showLockedCandidates }">
+                                    <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                                    鎖定 {{ activeConversationCandidatesObjects.length }} 位人選
+                                </button>
+                                
+                                <transition name="fade">
+                                    <div v-if="showLockedCandidates" class="locked-candidates-dropdown">
+                                        <div class="dropdown-info-header">
+                                            <div class="info-content">
+                                                <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                                                <span>點擊「新人才解析」按鈕方能開啟對話。</span>
+                                            </div>
+                                            <button class="close-dropdown-btn" @click.stop="showLockedCandidates = false">✕</button>
+                                        </div>
+                                        <div class="dropdown-list">
+                                            <div class="candidate-row" v-for="cand in activeConversationCandidatesObjects" :key="cand.id">
+                                                <div class="list-avatar-initial" :class="'bg-' + (cand.name ? cand.name.length % 5 : 0)">
+                                                    {{ cand.name ? cand.name.charAt(0).toUpperCase() : '?' }}
+                                                </div>
+                                                <div class="candidate-info">
+                                                    <span class="name">{{ cand.name }} <span v-if="cand.position" class="position">{{ cand.position }}</span></span>
+                                                </div>
+                                                <button class="remove-btn" @click.stop="removeCandidate(cand.id)" title="移除">
+                                                    <svg width="14" height="2" viewBox="0 0 14 2" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <rect width="14" height="2" rx="1" fill="#EF4444"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="dropdown-footer">
+                                            <button class="primary-btn new-analysis-btn" @click="resetAndReselect">
+                                                <img src="../assets/images/reopen-circle.svg" class="material-icon new-analysis-icon" alt="Reopen" />
+                                                開啟新人才解析
+                                            </button>
+                                        </div>
+                                    </div>
+                                </transition>
+                            </div>
 
                             <button class="locked-status-btn mobile-quick-btn" @click="showMobileQuickQuestions = !showMobileQuickQuestions" :class="{ 'active': showMobileQuickQuestions }">
                                 快速提問
@@ -255,7 +289,7 @@
   :isTyping="isTyping"
   @update:showMobileQuickQuestions="showMobileQuickQuestions = $event"
   @toggleCategory="toggleQuickQuestionCategory"
-  @sendQuick="sendQuickMessage"
+  @sendQuick="handleSendQuick"
 />
 
 
@@ -352,6 +386,7 @@ const {
 
 const showCandidateDropdown = ref(false)
 const showMobileQuickQuestions = ref(false)
+const showLockedCandidates = ref(false)
 
 const confirmSelection = () => {
     showCandidateDropdown.value = false
@@ -381,6 +416,15 @@ const handleInitialSend = async () => {
     }
 }
 
+const handleSendQuick = async (q) => {
+    if (!isSelectionLocked.value) {
+        if (selectedCandidateIds.value.length === 0) return;
+        lockSelectionAndStart();
+        await new Promise(r => setTimeout(r, 100)); // wait for lock
+    }
+    sendQuickMessage(q);
+}
+
 // Template Ref for CandidateSelector (needed for clearing selection)
 const candidateSelectorRef = ref(null)
 
@@ -399,6 +443,8 @@ const resetAndReselect = () => {
     if (candidateSelectorRef.value && candidateSelectorRef.value.clearSelection) {
         candidateSelectorRef.value.clearSelection() 
     }
+    showLockedCandidates.value = false
+    showMobileQuickQuestions.value = false
 }
 
 // Full Width Toggle Logic

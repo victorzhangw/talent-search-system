@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isSelectionLocked" class="quick-sidebar" :class="{ 'show-mobile-popover': showMobileQuickQuestions }">
+  <div class="quick-sidebar" :class="{ 'show-mobile-popover': showMobileQuickQuestions }">
     <!-- Mobile only Header -->
     <div class="mobile-popover-header" v-if="showMobileQuickQuestions">
       <div class="header-left-content">
