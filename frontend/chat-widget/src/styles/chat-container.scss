@@ -1523,12 +1523,6 @@
             gap: 0.6rem;
             flex: 1;
             flex-wrap: nowrap;
-            overflow-x: auto;
-            scrollbar-width: none;
-
-            &::-webkit-scrollbar {
-                display: none;
-            }
         }
 
         .locked-status-wrapper {
