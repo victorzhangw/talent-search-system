@@ -1079,7 +1079,7 @@
         }
 
         @media (max-width: 768px) {
-            max-width: 250px !important;
+            max-width: 270px !important;
         }
     }
 
@@ -1097,8 +1097,12 @@
             align-items: center;
             gap: 0.5rem;
             font-size: 0.8rem;
-            font-weight: 600;
+            font-weight: 500;
             color: var(--glass-text-primary);
+
+            @media (max-width: 768px) {
+                font-size: 0.7rem;
+            }
 
             .material-icon {
                 width: 18px;
@@ -1110,7 +1114,8 @@
         .close-popover-btn {
             background: none;
             border: none;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
+            font-weight: 900;
             line-height: 1;
             cursor: pointer;
             color: #6b7280;
@@ -1177,6 +1182,10 @@
         text-align: center;
         font-size: 0.85rem;
         padding: 0.5rem 0.8rem;
+
+        @media (max-width: 768px) {
+            padding: 0.5rem 0.7rem;
+        }
 
         &.rounded-pill {
             font-size: 0.8rem;
