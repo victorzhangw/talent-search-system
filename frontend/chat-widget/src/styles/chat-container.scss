@@ -1374,7 +1374,8 @@
         position: absolute;
         top: 0;
         left: 0;
-        bottom: 0;
+        bottom: 1.5rem;
+        /* Raised slightly from the bottom */
         width: 100%;
         max-width: 550px;
         /* Increased from 400px per request */
@@ -1384,6 +1385,7 @@
         display: flex;
         flex-direction: column;
         border-right: 1px solid var(--glass-border);
+        border-bottom-right-radius: 16px;
 
         [data-theme="midnight"] & {
             background: rgba(30, 30, 40, 0.98);
@@ -1450,6 +1452,21 @@
             flex-direction: column;
             overflow-y: auto;
             position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+
+            &::-webkit-scrollbar {
+                width: 6px;
+            }
+
+            &::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            &::-webkit-scrollbar-thumb {
+                background-color: #cbd5e1;
+                border-radius: 10px;
+            }
 
             .preview-warning {
                 text-align: center;
