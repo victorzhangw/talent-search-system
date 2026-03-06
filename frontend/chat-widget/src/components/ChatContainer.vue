@@ -193,7 +193,7 @@
                                     <img src="../assets/images/human-search.svg" class="material-icon small" alt="搜尋" />
                                 </button>
                                 <button class="welcome-quick-btn" 
-                                    @click="showMobileQuickQuestions = !showMobileQuickQuestions" 
+                                    @click="toggleMobileQuickQuestions" 
                                     :class="{ 'active': showMobileQuickQuestions }" 
                                     :disabled="selectedCandidateIds.length === 0"
                                     title="需先選取人才才能提問">
@@ -226,7 +226,7 @@
                         
                         <div class="chat-input-footer">
                             <div class="locked-status-wrapper">
-                                <button class="locked-status-btn" @click="showLockedCandidates = !showLockedCandidates" :class="{ 'active': showLockedCandidates }">
+                                <button class="locked-status-btn" @click="toggleLockedCandidates" :class="{ 'active': showLockedCandidates }">
                                     <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
                                     鎖定 {{ activeConversationCandidatesObjects.length }} 位人選
                                 </button>
@@ -265,7 +265,7 @@
                                 </transition>
                             </div>
 
-                            <button class="locked-status-btn mobile-quick-btn" @click="showMobileQuickQuestions = !showMobileQuickQuestions" :class="{ 'active': showMobileQuickQuestions }">
+                            <button class="locked-status-btn mobile-quick-btn" @click="toggleMobileQuickQuestions" :class="{ 'active': showMobileQuickQuestions }">
                                 快速提問
                                 <svg class="material-icon small" viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
                             </button>
@@ -388,6 +388,20 @@ const showCandidateDropdown = ref(false)
 const showMobileQuickQuestions = ref(false)
 const showLockedCandidates = ref(false)
 
+const toggleLockedCandidates = () => {
+    showLockedCandidates.value = !showLockedCandidates.value
+    if (showLockedCandidates.value) {
+        showMobileQuickQuestions.value = false
+    }
+}
+
+const toggleMobileQuickQuestions = () => {
+    showMobileQuickQuestions.value = !showMobileQuickQuestions.value
+    if (showMobileQuickQuestions.value) {
+        showLockedCandidates.value = false
+    }
+}
+
 const confirmSelection = () => {
     showCandidateDropdown.value = false
     if (selectedCandidateIds.value.length > 0) {
@@ -451,6 +465,10 @@ const resetAndReselect = () => {
 const isExpanded = ref(false)
 const toggleExpand = () => {
     isExpanded.value = !isExpanded.value
+    if (isExpanded.value) {
+        showMobileQuickQuestions.value = false
+        showLockedCandidates.value = false
+    }
 }
 
 </script>
