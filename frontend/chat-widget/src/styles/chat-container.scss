@@ -1370,6 +1370,17 @@
     /* ensure absolute children stay within */
     overflow: hidden;
 
+    .history-preview-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(2px);
+        z-index: 999;
+    }
+
     .history-preview-drawer {
         position: absolute;
         top: 0;
@@ -1379,12 +1390,15 @@
         width: 100%;
         max-width: 550px;
         /* Increased from 400px per request */
-        background: #ffffff;
-        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(6px);
+        box-shadow:
+            0 10px 30px rgba(0, 0, 0, 0.12),
+            0 4px 12px rgba(0, 0, 0, 0.08);
         z-index: 1000;
         display: flex;
         flex-direction: column;
-        border-right: 1px solid var(--glass-border);
+        border-right: 1px solid rgba(255, 255, 255, 0.6);
         border-bottom-right-radius: 16px;
 
         [data-theme="midnight"] & {
@@ -1400,7 +1414,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.2rem;
+            padding: 0.6rem 1rem;
             background: rgba(244, 245, 249, 1);
             border-bottom: 1px solid var(--glass-border);
 
