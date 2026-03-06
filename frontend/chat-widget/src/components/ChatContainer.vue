@@ -376,6 +376,8 @@ const {
     isInitializing,
     showReportModal,
     currentReportCandidate,
+    previewMessages,
+    showPreviewPanel,
     quickQuestionCategories,
     selectedQuickQuestionCategory,
     quickQuestions,

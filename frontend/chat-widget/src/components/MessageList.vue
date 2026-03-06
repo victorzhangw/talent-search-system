@@ -54,7 +54,10 @@ import { marked } from 'marked'
 import traittyAvatar from '@/assets/images/traitty-avatar.svg'
 
 const props = defineProps({
-  messages: Array
+  messages: {
+    type: Array,
+    default: () => []
+  }
 })
 
 const emit = defineEmits(['rateMessage'])
@@ -75,8 +78,8 @@ const handleRate = async (msg, rating) => {
 }
 
 // Auto-scroll to bottom
-watch(() => props.messages.length, () => scrollToBottom())
-watch(() => props.messages[props.messages.length - 1]?.content, () => scrollToBottom())
+watch(() => props.messages?.length, () => scrollToBottom())
+watch(() => props.messages?.[props.messages?.length - 1]?.content, () => scrollToBottom())
 
 const scrollToBottom = async () => {
   await nextTick()
