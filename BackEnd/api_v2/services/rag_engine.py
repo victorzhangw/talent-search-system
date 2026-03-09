@@ -1,6 +1,7 @@
 import json
 import os
 import openai
+import logging
 from typing import List, Dict, Any, Optional
 from flask import current_app
 from .integration_base import IntegrationServiceInterface
@@ -8,6 +9,16 @@ from .integration_mock import MockIntegrationService
 from .integration_real import RealIntegrationService
 from .context_builder import ContextBuilder 
 from ..utils.token_generator import generate_upstream_token
+from ..utils.logger import get_daily_logger
+
+def get_rag_logger():
+    return get_daily_logger("RAG_Logger", "rag_service.log", level=logging.DEBUG)
+
+def get_prompt_logger():
+    formatter_str = "\n============================================================\nTIME: %(asctime)s\n%(message)s\n============================================================"
+    return get_daily_logger("RAG_Prompt_Logger", "prompts.log", level=logging.INFO, formatter_str=formatter_str)
+
+rag_logger = get_rag_logger()
 
 class RAGService:
     def __init__(self):
@@ -22,7 +33,7 @@ class RAGService:
             with open(rules_path, 'r', encoding='utf-8') as f:
                 self.mode_rules = json.load(f)
         else:
-             print("[RAG] Warning: mode_rules.json not found.")
+             rag_logger.warning("mode_rules.json not found.")
              self.mode_rules = {}
 
         # 2. Setup Integration Service
@@ -33,28 +44,27 @@ class RAGService:
             self.integration_service = MockIntegrationService()
             
         # 3. Setup LLM Client (DeepSeek / MockConfig)
-        # 3. Setup LLM Client
         api_key = current_app.config.get('DEEPSEEK_API_KEY')
         api_base = current_app.config.get('DEEPSEEK_API_BASE')
         self.model_name = current_app.config.get('DEEPSEEK_MODEL', 'deepseek-chat')
         
         # Fallback: Retry loading .env if key is missing (Hotfix for loading issue)
         if not api_key:
-             print("[RAG] WARNING: DEEPSEEK_API_KEY is None. Attempting to reload .env manually...")
+             rag_logger.warning("DEEPSEEK_API_KEY is None. Attempting to reload .env manually...")
              try:
                  from dotenv import load_dotenv
                  env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
                  load_dotenv(env_path, override=True)
                  api_key = os.getenv('DEEPSEEK_API_KEY')
              except Exception as e:
-                 print(f"[RAG] .env reload failed: {e}")
+                 rag_logger.error(f".env reload failed: {e}", exc_info=True)
 
         # Final Safety Check: Use dummy key to prevent crash, let call_llm handle authentication error
         if not api_key:
-             print("[RAG] CRITICAL: Still no API KEY. Using dummy key to prevent startup crash.")
+             rag_logger.error("CRITICAL: Still no API KEY. Using dummy key to prevent startup crash.", exc_info=False)
              api_key = "sk-dummy-key-for-init"
 
-        print(f"[RAG] Init LLM - Base: {api_base}, Key: {api_key[:5]}...")
+        rag_logger.info(f"Init LLM - Base: {api_base}, Key: {api_key[:5]}...")
         
         self.client = openai.OpenAI(
             api_key=api_key,
@@ -74,8 +84,6 @@ class RAGService:
                     return uc_id, uc_data
         return "UC-GENERAL", self.use_cases["UC-GENERAL"]
 
-
- 
     def _get_cached_data(self, key):
         import time
         if key in self._context_cache:
@@ -98,14 +106,6 @@ class RAGService:
         """
         Orchestrates the Full RAG Flow:
         Token -> Data Fetch (Cache/API) -> Context -> LLM
-        
-        Args:
-            query: User's question
-            candidate_ids: List of candidate IDs
-            session_id: Session identifier for caching
-            candidates_info: Optional. Full candidate info from frontend (includes name, position, etc.)
-            trait_reports: Optional. Trait reports from frontend Session Storage (keyed by candidate_id)
-            mode: 'expert', 'explanation' (legacy), or 'auto' (new).
         """
         
         # Cache Key Strategy: Session ID + Candidate IDs hash
@@ -118,23 +118,23 @@ class RAGService:
         cached_context_data = self._get_cached_data(cache_key)
         
         if cached_context_data:
-            print(f"[RAG] Cache HIT for key: {cache_key}")
+            rag_logger.info(f"Cache HIT for key: {cache_key}")
             enterprise_data = cached_context_data['enterprise_data']
             final_candidates_data = cached_context_data['final_candidates_data']
         else:
-            print(f"[RAG] Cache MISS for key: {cache_key}. Fetching upstream...")
+            rag_logger.info(f"Cache MISS for key: {cache_key}. Fetching upstream...")
             # 1. Generate Fresh Token for Upstream
             user_email = "eva@wepredict.io" 
             upstream_token = generate_upstream_token(user_email)
             
             # 2. Fetch Data (Parallelizable, but sync for now)
-            print(f"[RAG] Orchestrating Data Fetch for {len(candidate_ids)} candidates...")
+            rag_logger.info(f"Orchestrating Data Fetch for {len(candidate_ids)} candidates...")
             
             # A. Enterprise Context
             enterprise_data = {}
             if isinstance(self.integration_service, RealIntegrationService):
                 enterprise_data = self.integration_service.resolve_enterprise(upstream_token) or {}
-                print(f"[RAG] Enterprise: {enterprise_data.get('enterprise_name')}")
+                rag_logger.info(f"Enterprise: {enterprise_data.get('enterprise_name')}")
             
             # B. Candidates Basic Info
             # NEW: Prioritize frontend-provided candidate info
@@ -142,13 +142,13 @@ class RAGService:
             
             if candidates_info:
                 # Use frontend-provided data (preferred)
-                print(f"[RAG] Using {len(candidates_info)} candidates from frontend")
+                rag_logger.info(f"Using {len(candidates_info)} candidates from frontend")
                 target_candidates_basic = candidates_info
                 for c in target_candidates_basic:
-                    print(f"[RAG-DEBUG] Frontend candidate: id={c.get('candidate_id')}, name='{c.get('name')}', position='{c.get('position')}'", flush=True)
+                    rag_logger.debug(f"Frontend candidate: id={c.get('candidate_id')}, name='{c.get('name')}', position='{c.get('position')}'")
             else:
                 # Fallback: Fetch from API
-                print(f"[RAG] No frontend candidate info. Fetching from API...")
+                rag_logger.info(f"No frontend candidate info. Fetching from API...")
                 try:
                     cand_resp = self.integration_service.get_candidates(upstream_token, limit=100)
                     
@@ -157,10 +157,8 @@ class RAGService:
                     else:
                         all_candidates = cand_resp
                 except Exception as e:
-                    print(f"[RAG] Critical Error fetching candidates from upstream: {e}")
+                    rag_logger.error(f"Critical Error fetching candidates from upstream: {e}", exc_info=True)
                     # Decide: crashes here (stopping flow) or continue with empty candidates?
-                    # If we continue with empty candidates, the LLM will say "I don't see any candidates".
-                    # This is slightly better than a hard 500 crash.
                     all_candidates = []
                     
                 def to_str(v): return str(v) if v is not None else ""
@@ -170,12 +168,12 @@ class RAGService:
                     cid = to_str(c.get('candidate_id'))
                     if cid in target_ids_str:
                         target_candidates_basic.append(c)
-                        print(f"[RAG-DEBUG] Found candidate {cid}: name='{c.get('name')}', position='{c.get('position')}'", flush=True)
+                        rag_logger.debug(f"Found candidate {cid}: name='{c.get('name')}', position='{c.get('position')}'")
 
             # C. Detailed Assessments (Batch)
             # NEW: Check if trait_reports are provided from frontend
             if trait_reports:
-                print(f"[RAG] ✅ Using trait reports from frontend for {len(trait_reports)} candidates")
+                rag_logger.info(f"✅ Using trait reports from frontend for {len(trait_reports)} candidates")
                 
                 # Merge trait reports with candidate basic info
                 final_candidates_data = []
@@ -186,17 +184,11 @@ class RAGService:
                     # Get trait report from frontend data
                     if cand_id in trait_reports:
                         report = trait_reports[cand_id]
-                        print(f"[RAG] Found trait report for candidate {cand_id}: {len(report.get('traits', []))} traits")
+                        rag_logger.info(f"Found trait report for candidate {cand_id}: {len(report.get('traits', []))} traits")
                         
                         # Convert frontend report format to expected format
-                        # Frontend format: { assessment_id, traits: [...], assessment_date }
-                        # Expected format: { assessment: { trait_results: {...} } }
-                        
-                        # Convert traits array to trait_results dict
                         trait_results = {}
                         for trait in report.get('traits', []):
-                            # Use trait name as key (not ideal, but works for now)
-                            # Better would be to use trait_id, but frontend doesn't have it
                             trait_name = trait.get('name', 'Unknown')
                             trait_results[trait_name] = {
                                 'score': trait.get('score', 0),
@@ -210,15 +202,15 @@ class RAGService:
                             'completion_time': report.get('assessment_date', 'N/A')
                         }
                     else:
-                        print(f"[RAG] WARNING: No trait report found for candidate {cand_id}")
+                        rag_logger.warning(f"No trait report found for candidate {cand_id}")
                     
                     final_candidates_data.append(merged)
                 
-                print(f"[RAG] Merged {len(final_candidates_data)} candidates with trait reports")
+                rag_logger.info(f"Merged {len(final_candidates_data)} candidates with trait reports")
                 
             else:
                 # Fallback: Fetch assessments from upstream API (original logic)
-                print(f"[RAG] No trait reports from frontend. Fetching from upstream API...")
+                rag_logger.info(f"No trait reports from frontend. Fetching from upstream API...")
                 
                 assessment_ids = []
                 cand_map = {}
@@ -236,18 +228,18 @@ class RAGService:
                         assessment_ids.append(aid)
                         cand_map[str(aid)] = cand.get('name', 'Unknown')
                     else:
-                        print(f"[RAG] Skipped candidate {cand.get('name')} - No Assessment ID. Data: {lat}")
+                        rag_logger.warning(f"Skipped candidate {cand.get('name')} - No Assessment ID. Data: {lat}")
                 
                 assessment_ids = list(set([aid for aid in assessment_ids if aid]))
-                print(f"[RAG] Prepared Assessment IDs: {assessment_ids} for candidates: {list(cand_map.values())}")
+                rag_logger.info(f"Prepared Assessment IDs: {assessment_ids} for candidates: {list(cand_map.values())}")
 
                 assessments_list = []
                 if assessment_ids and isinstance(self.integration_service, RealIntegrationService):
                     try:
                         assessments_list = self.integration_service.get_assessments(upstream_token, assessment_ids)
-                        print(f"[RAG] Fetched {len(assessments_list)} assessments.")
+                        rag_logger.info(f"Fetched {len(assessments_list)} assessments.")
                     except Exception as e:
-                        print(f"[RAG] Assessments Fetch Failed: {e}")
+                        rag_logger.error(f"Assessments Fetch Failed: {e}", exc_info=True)
                 
                 # D. Merge Data
                 final_candidates_data = []
@@ -269,7 +261,7 @@ class RAGService:
                         merged['assessment'] = my_asmt_data.get('assessment', {}) 
                     
                     final_candidates_data.append(merged)
-                    print(f"[RAG-DEBUG] Final merged candidate: id={merged.get('candidate_id')}, name='{merged.get('name')}', has_assessment={bool(my_asmt_data)}", flush=True)
+                    rag_logger.debug(f"Final merged candidate: id={merged.get('candidate_id')}, name='{merged.get('name')}', has_assessment={bool(my_asmt_data)}")
 
             
             # Save to Cache
@@ -281,7 +273,7 @@ class RAGService:
         # 3. Intent Routing & Mode Handling (NEW LOGIC)
         # We now use a unified prompt and delegate intention detection to the LLM itself
         determined_mode = 'expert' # Fetch high-resolution data from ContextBuilder for LLM
-        print(f"[RAG] Input Mode: {mode}, Using Unified Intent Prompt")
+        rag_logger.info(f"Input Mode: {mode}, Using Unified Intent Prompt")
 
         # Inject Special Prompt Content based on Unified AI Mode
         prompt_content_file = 'unified_rag_prompt.txt'
@@ -293,29 +285,18 @@ class RAGService:
                 custom_role_prompt = f.read()
 
         # Decide on Base Use Case Configuration
-        # If the query matches a specific use case (e.g., Interview Guide), use it.
-        # Otherwise, use a Generic Use Case and override its guidance.
-        
-        # Check specific use cases first (like UC-INT-01 which has its own template)
         uc_id, uc_config = self._get_use_case(query)
         
-        # 【模式優先策略】
-        # Expert / Explanation 角色定義對所有 UC 皆有效。
-        # UC-INT-01 擁有專屬 template_file（面試提問），是唯一的例外，維持原本 UC guidance。
-        # 其餘所有 UC（含 UC-GENERAL）：角色定義為主，UC answer_guidence 作為補充。
-
         # 不可修改全域 config，永遠建立 shallow copy
         uc_config = uc_config.copy()
 
         if uc_id == "UC-INT-01":
             # 面試提問指南：有專屬 template_file，維持原本完整 guidance，不注入角色定義
-            print(f"[RAG] UC-INT-01 detected: preserving specialized interview template.")
+            rag_logger.info(f"UC-INT-01 detected: preserving specialized interview template.")
         else:
             # 所有其他 UC（包含 UC-GENERAL、UC-SEL-01、UC-DEV-01、UC-CMP-01 等）
-            # 將 Expert/Explanation 角色定義作為主要指令；若該 UC 有額外 guidance，附加於後
             original_guidance = uc_config.get('answer_guidence', '').strip()
             if original_guidance:
-                # 保留 UC 的補充限制，但以角色定義為優先
                 uc_config['answer_guidence'] = (
                     custom_role_prompt.strip()
                     + "\n\n【本次問題補充限制】\n"
@@ -324,10 +305,9 @@ class RAGService:
             else:
                 uc_config['answer_guidence'] = custom_role_prompt
 
-        print(f"[RAG] Final Use Case: {uc_id}")
+        rag_logger.info(f"Final Use Case: {uc_id}")
  
         # 4. Build Context
-        # Pass Mode to ContextBuilder to select correct wording (Friendly vs Standard)
         builder = ContextBuilder(uc_config)
         rag_context = builder.build(enterprise_data, final_candidates_data, mode=determined_mode)
  
@@ -356,13 +336,12 @@ class RAGService:
         import os
         
         # Determine which template file to load
-        # Default: rag_system_prompt.txt
         template_filename = 'rag_system_prompt.txt'
         
         # Override if specified in prompt_config
         if 'prompt_config' in uc_config and 'template_file' in uc_config['prompt_config']:
             template_filename = uc_config['prompt_config']['template_file']
-            print(f"[RAG] Using specialized prompt template: {template_filename}")
+            rag_logger.info(f"Using specialized prompt template: {template_filename}")
             
         prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', template_filename)
         
@@ -370,12 +349,11 @@ class RAGService:
             with open(prompt_path, 'r', encoding='utf-8') as f:
                 template = f.read()
         except Exception as e:
-            print(f"[RAG] Error loading prompt template: {e}")
+            rag_logger.error(f"Error loading prompt template: {e}", exc_info=True)
             # Fallback (Emergency simple prompt to avoid crash)
             return f"System Error: Prompt template missing. Context: {rag_context['base_analysis']}"
 
         # Format variables
-        # Note: We use .format(**dict) style but ensure keys match template placeholders
         try:
             sys_prompt = template.format(
                 enterprise_context=rag_context.get('enterprise_context', ''),
@@ -388,42 +366,29 @@ class RAGService:
             )
             return sys_prompt
         except KeyError as e:
-            print(f"[RAG] Prompt formatting error: Missing key {e}")
+            rag_logger.error(f"Prompt formatting error: Missing key {e}", exc_info=True)
             return f"System Error: Prompt key error {e}"
 
     def _log_prompt(self, session_id, uc_id, sys_prompt, user_query):
-        """ Log the prompt to a file for audit/debugging """
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-            
-        log_file = os.path.join(log_dir, 'prompts.log')
-        
-        entry = f"""
-{'='*60}
-TIME: {timestamp}
-SESSION: {session_id} | USE_CASE: {uc_id}
-{'='*60}
-[SYSTEM PROMPT]
-{sys_prompt}
-
-[USER QUERY]
-{user_query}
-{'='*60}
-"""
+        """ Log the prompt using standard logging """
         try:
-            with open(log_file, 'a', encoding='utf-8') as f:
-                f.write(entry)
+            prompt_logger = get_prompt_logger()
+            log_message = (
+                f"SESSION: {session_id} | USE_CASE: {uc_id}\n"
+                f"============================================================\n"
+                f"[SYSTEM PROMPT]\n{sys_prompt}\n\n"
+                f"[USER QUERY]\n{user_query}"
+            )
+            prompt_logger.info(log_message)
         except Exception as e:
-            print(f"[Log] Failed to write prompt log: {e}")
+            rag_logger.error(f"Failed to write prompt log using logger: {e}", exc_info=True)
+            print(f"[Log] Failed to write prompt log using logger: {e}")
 
     def _call_llm(self, sys_prompt, query, uc_id, session_id="unknown"):
         # Log the prompt before calling
         self._log_prompt(session_id, uc_id, sys_prompt, query)
         
-        print(f"--- DEBUG RAG SYSTEM PROMPT ---\n{sys_prompt}\n-------------------------")
+        rag_logger.debug(f"--- DEBUG RAG SYSTEM PROMPT ---\n{sys_prompt}\n-------------------------")
         
         messages = [
             {"role": "system", "content": sys_prompt.strip()},
@@ -431,7 +396,7 @@ SESSION: {session_id} | USE_CASE: {uc_id}
         ]
 
         try:
-            print(f"[LLM] Calling DeepSeek API with model '{self.model_name}'...")
+            rag_logger.info(f"Calling DeepSeek API with model '{self.model_name}'...")
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
@@ -440,10 +405,9 @@ SESSION: {session_id} | USE_CASE: {uc_id}
             )
             return response, uc_id
         except Exception as e:
-            print(f"LLM Call Failed: {e}")
+            rag_logger.error(f"LLM Call Failed: {e}", exc_info=True)
             # Use 'yield from' if this was a generator, but here we return the generator object
             return self._mock_stream_fallback(error_msg=str(e)), uc_id
-
 
     def _mock_stream_fallback(self, error_msg=None):
         class MockChunk: 

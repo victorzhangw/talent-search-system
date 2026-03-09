@@ -2,6 +2,14 @@ import httpx
 from datetime import datetime
 from flask import current_app
 from .token_generator import generate_upstream_token
+import logging
+import os
+from .logger import get_daily_logger
+
+def get_traitty_logger():
+    return get_daily_logger("TraittyAPI_Logger", "traitty_api.log", level=logging.INFO)
+
+api_logger = get_traitty_logger()
 
 def fetch_init_data(email: str):
     """
@@ -77,13 +85,13 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str):
         
         # 驗證回傳格式
         if not data.get("status"):
-            print(f"[Daily Settlement Error] API Status False. Body: {data}", flush=True)
+            api_logger.error(f"[Daily Settlement Error] API Status False. Body: {data}")
             
         summary = data.get("summary", {})
         accepted_count = summary.get("accepted", 0)
         
         if accepted_count != 1: # 因為我們每次只發送 1 筆 record
-            print(f"[Daily Settlement Warning] Accepted count mismatch! Expected 1, got {accepted_count}. Full Res: {data}", flush=True)
+            api_logger.warning(f"[Daily Settlement Warning] Accepted count mismatch! Expected 1, got {accepted_count}. Full Res: {data}")
             
         return data
         
@@ -91,5 +99,5 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str):
         # 如果發生 Http Error，盡可能印出錯誤詳細內容
         err_content = getattr(e, 'response', None)
         err_text = err_content.text if err_content else str(e)
-        print(f"[Daily Settlement Fatal] Request Failed: {err_text}", flush=True)
+        api_logger.error(f"[Daily Settlement Fatal] Request Failed: {err_text}", exc_info=True)
         raise

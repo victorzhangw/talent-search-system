@@ -82,9 +82,20 @@ class ContextBuilder:
                     continue
 
                 # 2. Key Mapping (Name -> DB Trait ID)
+                project_abbrev = asmt.get('project_name_abbreviation', 'CIA')
+                
+                # First try with project-specific prefix to avoid mixing e.g., ANI_02 and CIA_18 (both 'Resilience')
+                # Also trim whitespace because excel imports might contain trailing spaces causing missing traits
                 trait_def = db_session.query(TraitDefinition).filter(
-                    func.lower(TraitDefinition.name_en) == func.lower(trait_name_en)
+                    func.trim(func.lower(TraitDefinition.name_en)) == func.trim(func.lower(trait_name_en)),
+                    TraitDefinition.trait_id.like(f"{project_abbrev}_%")
                 ).first()
+                
+                # Fallback: if not found with project prefix, try without it just in case
+                if not trait_def:
+                    trait_def = db_session.query(TraitDefinition).filter(
+                        func.trim(func.lower(TraitDefinition.name_en)) == func.trim(func.lower(trait_name_en))
+                    ).first()
                 
                 if not trait_def:
                     continue

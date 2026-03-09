@@ -2,7 +2,14 @@ import os
 import jwt
 import time
 import uuid
+import logging
 from flask import current_app
+from .logger import get_daily_logger
+
+def get_token_logger():
+    return get_daily_logger("TokenGenerator", "token_generator.log", level=logging.INFO)
+
+token_logger = get_token_logger()
 
 def generate_upstream_token(user_email: str) -> str:
     """
@@ -11,7 +18,7 @@ def generate_upstream_token(user_email: str) -> str:
     """
     secret = os.getenv('PARTY_A_PLUGIN_SECRET', "traitty_ai_api")
     if secret == "traitty_ai_api":
-        print("WARNING: Using default insecure secret 'traitty_ai_api'. Set PARTY_A_PLUGIN_SECRET in .env")
+        token_logger.warning("Using default insecure secret 'traitty_ai_api'. Set PARTY_A_PLUGIN_SECRET in .env")
     
     payload = {
       "email": user_email,

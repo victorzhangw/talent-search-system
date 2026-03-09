@@ -5,6 +5,11 @@ IIS WSGI 入口點
 """
 import sys
 import os
+import logging
+from utils.logger import get_daily_logger
+
+def get_wsgi_logger():
+    return get_daily_logger("WSGI_Logger", "wsgi.log", level=logging.ERROR)
 
 # 將當前目錄加入 sys.path，確保能導入 app 模組
 # 假設此檔案位於應用程式根目錄 (例如 C:\inetpub\wwwroot\TalentChatAPI)
@@ -18,11 +23,13 @@ try:
     # 建立應用實例
     # wfastcgi 會尋找並執行此變數
     app = create_app()
-except ImportError:
-    # 如果找不到 app 模組，可能是路徑問題，嘗試上一層或其他修正
-    # 但在標準部署結構下，app.py 應與 wsgi.py 同層
+except ImportError as ie:
+    # 紀錄載入模組錯誤
+    logger = get_wsgi_logger()
+    logger.error(f"ImportError while loading app: {ie}", exc_info=True)
     raise
 except Exception as e:
     # 紀錄初始化錯誤
-    print(f"Error creating app: {e}")
+    logger = get_wsgi_logger()
+    logger.error(f"Error creating app: {e}", exc_info=True)
     raise

@@ -202,7 +202,7 @@ def chat():
             print(">>> [DEBUG] Session store initialized", flush=True)
         
             # Ensure session exists (Upsert logic or Check?)
-            is_new_session = False
+            needs_title_generation = False
             try:
                 # Check if exists
                 existing_session = session_store.get_session(session_id)
@@ -210,12 +210,18 @@ def chat():
                     # Create with user_id
                     print(f"[Chat] Creating new session {session_id} with user_id: '{user_id}'", flush=True)
                     session_store.create_session(session_id=session_id, user_id=user_id)
-                    is_new_session = True
+                    needs_title_generation = True
                 else:
                     # Check if we need to update user_id
                     current_db_user_id = existing_session.user_id
                     print(f"[Chat] Found existing session {session_id}. DB user_id: '{current_db_user_id}'. Request user_id: '{user_id}'", flush=True)
                      
+                    # 檢查現有 Session 是否缺少 title
+                    meta = existing_session.metadata_ or {}
+                    if not meta.get('title'):
+                        print(f"[Chat] Existing session {session_id} is missing a title. Will generate one.", flush=True)
+                        needs_title_generation = True
+                        
                     if user_id and current_db_user_id != user_id:
                         # Update user_id if it was missing or changed
                         print(f"[Chat] Updating session {session_id} user_id from '{current_db_user_id}' to '{user_id}'", flush=True)
@@ -232,8 +238,8 @@ def chat():
             except Exception as e:
                 print(f"[Chat] Session Init Error: {e}")
 
-            # Fire Background Task for Title Generation if New Session
-            if is_new_session:
+            # Fire Background Task for Title Generation
+            if needs_title_generation:
                 candidate_names = [c.get('name') for c in candidates_info if 'name' in c]
                 threading.Thread(
                     target=background_generate_title, 

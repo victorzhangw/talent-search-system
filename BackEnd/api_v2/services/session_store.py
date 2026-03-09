@@ -1,9 +1,16 @@
-
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import json
+import logging
+import os
 from ..database.connection import get_db_session
 from ..database.models import ChatSession, ChatMessage
+from ..utils.logger import get_daily_logger
+
+def get_session_logger():
+    return get_daily_logger("SessionStore_Logger", "session_store.log", level=logging.INFO)
+
+session_logger = get_session_logger()
 
 class SqlSessionStore:
     def __init__(self):
@@ -26,7 +33,7 @@ class SqlSessionStore:
             return session
         except Exception as e:
             db.rollback()
-            print(f"[SessionStore] Create Session Failed: {e}")
+            session_logger.error(f"Create Session Failed: {e}", exc_info=True)
             raise
         finally:
             db.close()
@@ -34,11 +41,6 @@ class SqlSessionStore:
     def add_message(self, session_id: str, role: str, content: str, token_usage: int = 0, model_name: str = None):
         db = get_db_session()
         try:
-            # Verify session exists
-            # session = db.query(ChatSession).filter_by(session_id=session_id).first()
-            # If not exists, maybe create? Or fail? 
-            # Chat flow: Frontend sends session_id. If new, we create it.
-            
             msg = ChatMessage(
                 session_id=session_id,
                 role=role,
@@ -49,7 +51,6 @@ class SqlSessionStore:
             )
             db.add(msg)
             
-            # Update parent session last_active
             db.query(ChatSession).filter_by(session_id=session_id).update(
                 {"last_active_at": datetime.utcnow()}
             )
@@ -59,7 +60,7 @@ class SqlSessionStore:
             return msg.id
         except Exception as e:
             db.rollback()
-            print(f"[SessionStore] Add Message Failed: {e}")
+            session_logger.error(f"Add Message Failed: {e}", exc_info=True)
             return None
         finally:
             db.close()
@@ -75,7 +76,7 @@ class SqlSessionStore:
             return False
         except Exception as e:
             db.rollback()
-            print(f"[SessionStore] Update Rating Failed: {e}")
+            session_logger.error(f"Update Rating Failed: {e}", exc_info=True)
             return False
         finally:
             db.close()
@@ -113,13 +114,12 @@ class SqlSessionStore:
             if session:
                 if session.metadata_ is None:
                     session.metadata_ = {}
-                # Merge or replace? Let's merge shallowly
                 current = dict(session.metadata_) if session.metadata_ else {}
                 current.update(metadata)
                 session.metadata_ = current
                 db.commit()
         except Exception as e:
             db.rollback()
-            print(f"[SessionStore] Update Metadata Failed: {e}")
+            session_logger.error(f"Update Metadata Failed: {e}", exc_info=True)
         finally:
             db.close()
