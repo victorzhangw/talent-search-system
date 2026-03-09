@@ -47,10 +47,32 @@ def find_active_plan(usable_plans: list):
     # 若無精準匹配，回傳第一個 plan_id 確保不為空
     return usable_plans[0]['plan_id']
 
+from ..database.connection import get_db_session
+from ..database.models import DailySettlementRecord
+
 def submit_daily_settlement(email: str, plan_id: int, session_id: str):
     """
-    呼叫 daily-settlement 扣抵額度
+    呼叫 daily-settlement 扣抵額度，並先在資料庫記錄狀態以防遺失。
     """
+    db = get_db_session()
+    
+    # 1. 建立 Pending 紀錄到資料庫
+    record = DailySettlementRecord(
+        user_id=email,
+        plan_id=plan_id,
+        session_id=session_id,
+        status='PENDING'
+    )
+    try:
+        db.add(record)
+        db.commit()
+    except Exception as dbe:
+        db.rollback()
+        api_logger.error(f"[Daily Settlement] DB Insert Failed: {dbe}")
+        # 如果寫入資料庫失敗，仍然繼續嘗試發送 API (盡量不影響扣抵邏輯)
+        pass
+
+    # 2. 準備呼叫 API
     upstream_token = generate_upstream_token(email)
     base_url = current_app.config.get('TRAITTY_API_BASE', 'https://uat.traitty.com')
     url = f"{base_url}/v1/ai/usage/daily-settlement"
@@ -86,12 +108,22 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str):
         # 驗證回傳格式
         if not data.get("status"):
             api_logger.error(f"[Daily Settlement Error] API Status False. Body: {data}")
+            raise Exception(f"API returned status false: {data}")
             
         summary = data.get("summary", {})
         accepted_count = summary.get("accepted", 0)
         
         if accepted_count != 1: # 因為我們每次只發送 1 筆 record
             api_logger.warning(f"[Daily Settlement Warning] Accepted count mismatch! Expected 1, got {accepted_count}. Full Res: {data}")
+
+        # 3. 成功，更新資料庫狀態
+        if record.id:
+            try:
+                record.status = 'SYNCED'
+                db.commit()
+            except Exception as dbe:
+                db.rollback()
+                api_logger.error(f"[Daily Settlement] DB Update SYNCED Failed: {dbe}")
             
         return data
         
@@ -100,4 +132,18 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str):
         err_content = getattr(e, 'response', None)
         err_text = err_content.text if err_content else str(e)
         api_logger.error(f"[Daily Settlement Fatal] Request Failed: {err_text}", exc_info=True)
+        
+        # 4. 失敗，更新資料庫狀態以便日後補送
+        if record.id:
+            try:
+                record.status = 'FAILED'
+                record.last_error = err_text
+                db.commit()
+            except Exception as dbe:
+                db.rollback()
+                api_logger.error(f"[Daily Settlement] DB Update FAILED Failed: {dbe}")
+                
         raise
+    finally:
+        db.close()
+

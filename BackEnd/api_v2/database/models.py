@@ -84,3 +84,18 @@ class TraitInteraction(Base):
     trigger_trait_id = Column(String(50))
     trigger_band = Column(String(10))
     narrative = Column(Text)
+
+# --- API Usage & Settlement ---
+class DailySettlementRecord(Base):
+    __tablename__ = 'daily_settlements'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(50), index=True, nullable=False) # e.g. email
+    plan_id = Column(Integer, nullable=False)
+    session_id = Column(String(64), nullable=False) # external_event_id
+    status = Column(String(20), default='PENDING', index=True) # PENDING, SYNCED, FAILED
+    retry_count = Column(Integer, default=0)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

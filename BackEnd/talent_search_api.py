@@ -44,7 +44,7 @@ DB_CONFIG = {
     'ssh_private_key_file': os.getenv('DB_SSH_PRIVATE_KEY_FILE', PRIVATE_KEY_PATH),  # 本地
     'db_host': os.getenv('DB_HOST', 'localhost'),
     'db_port': int(os.getenv('DB_PORT', '5432')),
-    'db_name': os.getenv('DB_NAME', 'projectdb'),
+    'db_name': os.getenv('DB_NAME', 'ai_chatbot_v2'),
     'db_user': os.getenv('DB_USER', 'projectuser'),
     'db_password': os.getenv('DB_PASSWORD', 'projectpass')
 }

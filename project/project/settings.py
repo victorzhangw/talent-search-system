@@ -300,7 +300,7 @@ CRAWLER_SETTINGS = {
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "projectdb"),
+        "NAME": os.getenv("POSTGRES_DB", "ai_chatbot_v2"),
         "USER": os.getenv("POSTGRES_USER", "projectuser"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD", "projectpass"),
         "HOST": os.getenv("POSTGRES_HOST", "localhost"),

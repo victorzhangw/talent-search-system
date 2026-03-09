@@ -41,7 +41,7 @@
 | `DB_SSH_PRIVATE_KEY_FILE` | SSH 私鑰文件名              | `private-key-openssh.pem` |
 | `DB_HOST`                 | 資料庫主機（通過 SSH 隧道） | `localhost`               |
 | `DB_PORT`                 | 資料庫端口                  | `5432`                    |
-| `DB_NAME`                 | 資料庫名稱                  | `projectdb`               |
+| `DB_NAME`                 | 資料庫名稱                  | `ai_chatbot_v2`               |
 | `DB_USER`                 | 資料庫用戶                  | `projectuser`             |
 | `DB_PASSWORD`             | 資料庫密碼                  | `your_password`           |
 
