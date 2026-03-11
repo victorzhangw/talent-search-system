@@ -165,9 +165,9 @@ const toggle = (id) => {
   if (selectedIds.value.includes(id)) {
     selectedIds.value = selectedIds.value.filter(x => x !== id)
   } else {
-    selectedIds.value.push(id)
+    selectedIds.value = [...selectedIds.value, id]  // 不可變方式，確保 Vue 可偵測變化
   }
-  emit('change', selectedIds.value)
+  emit('change', [...selectedIds.value])  // 傳出副本避免外部共用引用
 }
 
 // Batch Actions
@@ -184,9 +184,16 @@ const clearSelection = () => {
 }
 
 // Ensure syncing if parent changes it
-watch(() => props.initialSelectedIds, (newVal) => {
-    // Only update if arrays differ in length or content (simple check for our use-case)
-    if (newVal.length !== selectedIds.value.length) {
+watch(() => props.initialSelectedIds, (newVal, oldVal) => {
+    // 防止當 newVal 是空陣列（畫面重渲染產生的新引用）但使用者已有選取時，被重置
+    if (newVal.length === 0 && selectedIds.value.length > 0) {
+        // 父元件傳入空 ref/字面量 []，不應清除使用者已選取的項目
+        return
+    }
+    // 使用內容比較，避免不必要的同步
+    const isSame = newVal.length === selectedIds.value.length &&
+                   newVal.every(id => selectedIds.value.includes(id))
+    if (!isSame) {
         selectedIds.value = [...newVal]
     }
 }, { deep: true })

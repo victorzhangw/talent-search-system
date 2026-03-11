@@ -334,7 +334,7 @@
                                     :has-more="hasMoreCandidates"
                                     :disabled="false"
                                     :total-count="totalCandidatesCount"
-                                    :initial-selected-ids="[]"
+                                    :initial-selected-ids="addModalInitialIds"
                                     :locked-ids="activeConversationCandidateIds"
                                     @change="handleAddCandidateChange"
                                     @load-more="loadMoreCandidates"
@@ -543,6 +543,8 @@ const showAddCandidateModal = ref(false)
 const newSelectedCandidateIds = ref([])
 const addCandidateSelectorRef = ref(null)
 const isAddingCandidates = ref(false)
+// 固定空陣列 ref，避免字面量 [] 導致子元件 watch 重複觸發重置
+const addModalInitialIds = ref([])
 
 const handleAddCandidateChange = (ids) => {
     newSelectedCandidateIds.value = ids
