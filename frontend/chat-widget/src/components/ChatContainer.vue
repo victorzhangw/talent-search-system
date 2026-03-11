@@ -276,6 +276,12 @@
                                                         </svg>
                                                     </button>
                                                 </div>
+                                                
+                                                <!-- 增加候選人按鈕 -->
+                                                <button class="add-candidate-btn" @click.stop="showAddCandidateModal = true; showLockedCandidates = false">
+                                                    <svg class="material-icon small" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                                    增加候選人
+                                                </button>
                                             </div>
                                             <div class="dropdown-footer">
                                                 <button class="primary-btn new-analysis-btn" @click="resetAndReselect">
@@ -314,6 +320,41 @@
   @toggleCategory="toggleQuickQuestionCategory"
   @sendQuick="handleSendQuick"
 />
+
+                <!-- 增加候選人 Modal -->
+                <transition name="slide-up">
+                    <div class="candidate-dropdown-overlay" v-if="showAddCandidateModal" @click.self="showAddCandidateModal = false">
+                        <div class="candidate-dropdown-modal">
+                            
+                            <div class="modal-body">
+                                <CandidateSelector
+                                    ref="addCandidateSelectorRef"
+                                    :candidates="candidates"
+                                    :is-loading="isLoadingCandidates"
+                                    :has-more="hasMoreCandidates"
+                                    :disabled="false"
+                                    :total-count="totalCandidatesCount"
+                                    :initial-selected-ids="[]"
+                                    :locked-ids="activeConversationCandidateIds"
+                                    @change="handleAddCandidateChange"
+                                    @load-more="loadMoreCandidates"
+                                />
+                            </div>
+                            <div class="modal-footer">
+                                <button 
+                                    class="primary-btn confirm-btn" 
+                                    @click="confirmAddCandidates"
+                                    :disabled="newSelectedCandidateIds.length === 0 || isAddingCandidates"
+                                >
+                                    <svg v-if="!isAddingCandidates" class="material-icon small" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                    <div v-else class="btn-spinner"></div>
+                                    {{ isAddingCandidates ? '獲取報告中...' : `確認新增 (${newSelectedCandidateIds.length})` }}
+                                </button>
+                                <button class="secondary-btn cancel-btn" @click="showAddCandidateModal = false">關閉</button>
+                            </div>
+                        </div>
+                    </div>
+                </transition>
 
 
         </div>
@@ -402,6 +443,7 @@ const {
     lockSelectionAndStart: logicLockSelection,
     resetAndReselect: logicResetAndReselect,
     removeCandidate,
+    addCandidates: logicAddCandidates,
     sendMessage,
     sendQuickMessage,
     toggleQuickQuestionCategory,
@@ -493,6 +535,31 @@ const toggleExpand = () => {
     if (isExpanded.value) {
         showMobileQuickQuestions.value = false
         showLockedCandidates.value = false
+    }
+}
+
+// 增加候選人 Modal 狀態
+const showAddCandidateModal = ref(false)
+const newSelectedCandidateIds = ref([])
+const addCandidateSelectorRef = ref(null)
+const isAddingCandidates = ref(false)
+
+const handleAddCandidateChange = (ids) => {
+    newSelectedCandidateIds.value = ids
+}
+
+const confirmAddCandidates = async () => {
+    if (newSelectedCandidateIds.value.length === 0) return
+    isAddingCandidates.value = true
+    try {
+        await logicAddCandidates(newSelectedCandidateIds.value)
+        showAddCandidateModal.value = false
+        newSelectedCandidateIds.value = []
+        if (addCandidateSelectorRef.value?.clearSelection) {
+            addCandidateSelectorRef.value.clearSelection()
+        }
+    } finally {
+        isAddingCandidates.value = false
     }
 }
 

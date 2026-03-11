@@ -209,6 +209,53 @@ export function useChatLogic(emit) {
         }
     }
 
+    // 增量模式：只抓新增候選人的報告，並合併到現有 sessionStorage
+    const fetchBatchTraitReportsIncremental = async (newCandidates) => {
+        const { apiBaseUrl } = getApiConfig()
+
+        const assessmentIds = newCandidates
+            .map(c => c.latest_assessment?.assessment_id)
+            .filter(id => id != null)
+
+        if (assessmentIds.length === 0) return
+
+        try {
+            const res = await fetch(`${apiBaseUrl}/reports/batch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken.value}`
+                },
+                body: JSON.stringify({ assessment_ids: assessmentIds })
+            })
+
+            if (!res.ok) throw new Error(`Incremental batch reports failed: ${res.status}`)
+
+            const data = await res.json()
+
+            // 讀取現有報告，合併新的
+            let existingReports = {}
+            try {
+                const cached = sessionStorage.getItem('traitty_batch_reports')
+                if (cached) existingReports = JSON.parse(cached)
+            } catch (e) {}
+
+            data.reports.forEach(report => {
+                const candidate = newCandidates.find(
+                    c => c.latest_assessment?.assessment_id === report.assessment_id
+                )
+                if (candidate) {
+                    existingReports[candidate.candidate_id] = report
+                }
+            })
+
+            sessionStorage.setItem('traitty_batch_reports', JSON.stringify(existingReports))
+            console.log('[ChatLogic] ✅ Incremental reports merged to Session Storage')
+        } catch (e) {
+            console.error('[ChatLogic] ❌ Failed to fetch incremental reports:', e)
+        }
+    }
+
     const openReport = (cand) => {
         currentReportCandidate.value = cand
         showReportModal.value = true
@@ -564,6 +611,42 @@ export function useChatLogic(emit) {
         }
     }
 
+    // 在對話中新增候選人（增量）
+    const addCandidates = async (newIds) => {
+        if (!newIds || newIds.length === 0) return
+
+        // 過濾掉已在對話中的人
+        const realNewIds = newIds.filter(id => !activeConversationCandidateIds.value.includes(id))
+        if (realNewIds.length === 0) return
+
+        // 找出新增候選人的完整物件
+        const newCandidateObjects = candidates.value.filter(c => realNewIds.includes(c.candidate_id))
+
+        // 將新 IDs 合併到現有對話
+        const mergedIds = [...activeConversationCandidateIds.value, ...realNewIds]
+
+        // 僅對新增候選人抓報告（增量）
+        await fetchBatchTraitReportsIncremental(newCandidateObjects)
+
+        // 更新 state
+        activeConversationCandidateIds.value = mergedIds
+
+        // 更新 sessionStorage
+        try {
+            sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(mergedIds))
+            const allActiveCands = candidates.value.filter(c => mergedIds.includes(c.candidate_id))
+            sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(allActiveCands))
+        } catch (e) {
+            console.error('[ChatLogic] Failed to update session storage on add:', e)
+        }
+
+        // AI 提示訊息
+        messages.value.push({
+            role: 'ai',
+            content: `已新增 ${realNewIds.length} 位候選人，目前共鎖定 ${mergedIds.length} 位。您可繼續針對他們發問。`
+        })
+    }
+
     const performAutoLogin = async (email) => {
         const { serverRoot } = getApiConfig()
         const maxRetries = 3
@@ -835,6 +918,7 @@ export function useChatLogic(emit) {
         lockSelectionAndStart,
         resetAndReselect,
         removeCandidate,
+        addCandidates,
         sendMessage,
         sendQuickMessage,
         toggleQuickQuestionCategory,

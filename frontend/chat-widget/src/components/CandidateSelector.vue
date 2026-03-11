@@ -55,8 +55,12 @@
         v-for="cand in filteredCandidates" 
         :key="cand.id" 
         class="candidate-item"
-        :class="{ active: selectedIds.includes(cand.id), disabled: disabled }"
-        @click="!disabled && toggle(cand.id)"
+        :class="{ 
+          active: selectedIds.includes(cand.id) || lockedIds.includes(cand.id), 
+          locked: lockedIds.includes(cand.id),
+          disabled: disabled 
+        }"
+        @click="!disabled && !lockedIds.includes(cand.id) && toggle(cand.id)"
       >
         <div class="avatar-initial" :class="'bg-' + (cand.name ? cand.name.length % 5 : 0)">
             {{ cand.name ? cand.name.charAt(0).toUpperCase() : '?' }}
@@ -71,8 +75,10 @@
         </div>
 
         <div class="checkbox">
-          <!-- Icon: Check -->
-          <svg v-if="selectedIds.includes(cand.id)" class="material-icon check-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          <!-- 已鎖定狀态：顯示鎖頭圖示 -->
+          <svg v-if="lockedIds.includes(cand.id)" class="material-icon lock-icon" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          <!-- 已選取狀态：顯示勾選圖示 -->
+          <svg v-else-if="selectedIds.includes(cand.id)" class="material-icon check-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
         </div>
       </div>
       
@@ -126,6 +132,10 @@ const props = defineProps({
   initialSelectedIds: {
       type: Array,
       default: () => []
+  },
+  lockedIds: {
+      type: Array,
+      default: () => []  // 已鎖定（已在對話中）的候選人 ID，顯示為鎖定且不可再選
   }
 })
 
@@ -483,6 +493,21 @@ defineExpose({
   &.active {
     background: rgba(106, 37, 244, 0.03); 
     border-color: rgba(106, 37, 244, 0.15);
+  }
+
+  &.locked {
+    opacity: 0.85;
+    cursor: not-allowed;
+    background: rgba(106, 37, 244, 0.04);
+    border-color: rgba(106, 37, 244, 0.2);
+    &:hover { background: rgba(106, 37, 244, 0.04); }
+
+    .lock-icon {
+      width: 14px;
+      height: 14px;
+      fill: #6A25F4;
+      opacity: 0.7;
+    }
   }
 
   &.disabled {
