@@ -129,6 +129,26 @@
             <!-- MIDDLE PANEL: Main Area -->
             <div class="right-panel main-area">
                 
+                <!-- HISTORY PREVIEW DRAWER (Option A) moved here so it can be seen in both welcome screen and chat screen -->
+                <transition name="fade">
+                    <div v-if="showPreviewPanel" class="history-preview-overlay" @click="showPreviewPanel = false"></div>
+                </transition>
+
+                <transition name="slide-in-left">
+                    <div v-show="showPreviewPanel" class="history-preview-drawer">
+                        <div class="drawer-header">
+                            <div class="drawer-title">
+                                <svg class="material-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                                歷史紀錄預覽 <span class="preview-badge">唯讀</span>
+                            </div>
+                            <button class="close-drawer-btn" @click="showPreviewPanel = false">✕</button>
+                        </div>
+                        <div class="drawer-content">
+                            <MessageList :messages="previewMessages" />
+                        </div>
+                    </div>
+                </transition>
+
                 <!-- If Not Locked: Welcome & Candidate Selection -->
                 <div v-if="!isSelectionLocked" class="welcome-container">
                     <div class="welcome-header">
@@ -215,26 +235,6 @@
                     <!-- Selected summary removed per request -->
                     <MessageList :messages="messages" @rate-message="rateMessage" />
 
-                    <!-- HISTORY PREVIEW DRAWER (Option A) -->
-                    <transition name="fade">
-                        <div v-if="showPreviewPanel" class="history-preview-overlay" @click="showPreviewPanel = false"></div>
-                    </transition>
-
-                    <transition name="slide-in-left">
-                        <div v-show="showPreviewPanel" class="history-preview-drawer">
-                            <div class="drawer-header">
-                                <div class="drawer-title">
-                                    <svg class="material-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                                    歷史紀錄預覽 <span class="preview-badge">唯讀</span>
-                                </div>
-                                <button class="close-drawer-btn" @click="showPreviewPanel = false">✕</button>
-                            </div>
-                            <div class="drawer-content">
-                                <MessageList :messages="previewMessages" />
-                            </div>
-                        </div>
-                    </transition>
-
                     <div class="chat-input-container">
                         <textarea 
                             v-model="inputQuery" 
@@ -258,7 +258,7 @@
                                             <div class="dropdown-info-header">
                                                 <div class="info-content">
                                                     <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-                                                    <span>點擊「新人才解析」按鈕方能開啟對話。</span>
+                                                    <span>開啟新人才解析，方能『選擇其他人選』</span>
                                                 </div>
                                                 <button class="close-dropdown-btn" @click.stop="showLockedCandidates = false">✕</button>
                                             </div>
@@ -487,7 +487,7 @@ const resetAndReselect = () => {
 }
 
 // Full Width Toggle Logic
-const isExpanded = ref(false)
+const isExpanded = ref(true)
 const toggleExpand = () => {
     isExpanded.value = !isExpanded.value
     if (isExpanded.value) {
@@ -534,18 +534,18 @@ const toggleExpand = () => {
         width: 100%;
     }
 }
-/* Chat Mode Layout (15% - 70% - 15%) */
+/* Chat Mode Layout — left 15% / chat 93% / quick 12% */
 .split-view.chat-mode {
     .left-panel {
-        width: 20% !important;
-        min-width: 200px;
+        width: 15% !important;    /* ← 原 20%，縮小歷史側欄 */
+        min-width: 160px;          /* ← 原 200px */
         @media (max-width: 768px) {
             width: 100% !important;
         }
     }
 
     .right-panel {
-        width: 90% !important;
+        width: 93% !important;     /* ← 原 90%，增加聊天區寬度 */
         flex: unset !important;
         display: flex;
         flex-direction: column;
@@ -556,8 +556,8 @@ const toggleExpand = () => {
     }
 
     .quick-sidebar {
-        width: 15% !important;
-        min-width: 240px;
+        width: 12% !important;     /* ← 原 15%，縮小快速提問側欄 */
+        min-width: 200px;          /* ← 原 240px */
         border-left: 1px solid var(--glass-border);
         background: rgba(0, 0, 0, 0.02);
     }

@@ -12,13 +12,9 @@
     <!-- Desktop Category Dropdown -->
     <div class="sidebar-header" v-show="!showMobileQuickQuestions">
       <div class="custom-select-wrapper category-toggle" @click="toggleCategory">
-        <svg class="material-icon select-icon" viewBox="0 0 24 24">
-          <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/>
-        </svg>
+        <img src="../assets/images/bulb.svg" class="material-icon select-icon" alt="提問類別" />
         <div class="category-name-display">{{ selectedQuickQuestionCategory }}</div>
-        <svg class="material-icon select-caret" viewBox="0 0 24 24" title="點擊切換類別">
-          <path fill="currentColor" d="M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z"/>
-        </svg>
+        <img src="../assets/images/swithquicks.svg" class="material-icon select-caret" alt="切換類別" />
       </div>
     </div>
 
