@@ -114,9 +114,9 @@
                 
                 <div class="quota-info" v-if="quotaSummary">
                     <div class="quota-count">
-                        <svg class="quota-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6.93221 10.4067C6.61492 10.4679 6.28666 10.5 5.95056 10.5C3.21645 10.5 1 8.37335 1 5.75C1 3.12665 3.21645 1 5.95056 1C6.28666 1 6.61492 1.03213 6.93221 1.09338M16.8333 5.75C16.8333 8.37335 14.6169 10.5 11.8828 10.5C9.14863 10.5 6.93221 8.37335 6.93221 5.75C6.93221 3.12665 9.14863 1 11.8828 1C14.6169 1 16.8333 3.12665 16.8333 5.75Z" stroke="#6A25F4" stroke-opacity="0.7" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
+                        <svg width="18" height="12" viewBox="0 0 18 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M6.93221 10.4067C6.61492 10.4679 6.28666 10.5 5.95056 10.5C3.21645 10.5 1 8.37335 1 5.75C1 3.12665 3.21645 1 5.95056 1C6.28666 1 6.61492 1.03213 6.93221 1.09338M16.8333 5.75C16.8333 8.37335 14.6169 10.5 11.8828 10.5C9.14863 10.5 6.93221 8.37335 6.93221 5.75C6.93221 3.12665 9.14863 1 11.8828 1C14.6169 1 16.8333 3.12665 16.8333 5.75Z" stroke="#6A25F4" stroke-opacity="0.7" stroke-width="2" stroke-linecap="round"/>
+</svg>
                         <span class="label">剩餘額度</span>
                         <span class="highlight">{{ quotaSummary.remaining }}</span>
                         <span class="unit">次</span>
