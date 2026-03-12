@@ -688,6 +688,11 @@ const confirmAddCandidates = async () => {
         font-weight: 500;
         font-size: 1.1rem;
 
+        [data-theme="midnight"] & {
+            background: rgba(30, 30, 40, 0.98);
+            color: var(--glass-text-primary);
+        }
+
         .disabled-icon {
             width: 48px;
             height: 48px;

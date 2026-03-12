@@ -125,7 +125,10 @@ onMounted(async () => {
 }
 
 .report-modal {
-    background: white; /* Clean white for business look */
+    background: var(--surface-color, #ffffff);
+    [data-theme="midnight"] & {
+        background: rgba(30, 30, 40, 0.98);
+    }
     width: 600px;
     max-width: 90%;
     max-height: 80vh;
@@ -134,8 +137,9 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    font-family: 'Segoe UI', sans-serif;
-    color: #333;
+    font-family: inherit;
+    color: var(--glass-text-primary, #333);
+    border: 1px solid var(--glass-border);
 }
 
 
@@ -144,14 +148,14 @@ onMounted(async () => {
     justify-content: space-between;
     align-items: center;
     padding: 0.8rem 1rem; /* Reduced padding */
-    border-bottom: 1px solid #eee;
-    background: #f8f9fa;
+    border-bottom: 1px solid var(--glass-border, #eee);
+    background: rgba(127, 127, 127, 0.05);
 }
 
 .modal-header h3 {
     margin: 0;
     font-size: 1rem; /* Smaller font */
-    color: #2c3e50;
+    color: var(--glass-text-primary, #2c3e50);
     font-weight: 600;
 }
 
@@ -171,7 +175,7 @@ onMounted(async () => {
 .loading-state, .error-text {
     text-align: center;
     padding: 2rem;
-    color: #666;
+    color: var(--glass-text-secondary, #666);
 }
 
 .meta-row {
@@ -190,15 +194,15 @@ onMounted(async () => {
 .trait-table th {
     text-align: left;
     padding: 0.4rem 0.5rem; /* Compact padding */
-    border-bottom: 2px solid #eee;
-    color: #555;
+    border-bottom: 2px solid var(--glass-border, #eee);
+    color: var(--glass-text-secondary, #555);
     font-weight: 600;
     font-size: 12px; /* Smaller font */
 }
 
 .trait-table td {
     padding: 0.25rem 0.5rem; /* Very compact padding */
-    border-bottom: 1px solid #f5f5f5;
+    border-bottom: 1px dashed var(--glass-border, #f5f5f5);
     vertical-align: middle;
 }
 
@@ -237,10 +241,10 @@ onMounted(async () => {
 }
 
 .badged-text {
-    background: #f3f4f6;
-    padding: 1px 6px;
+    background: rgba(127, 127, 127, 0.1);
+    padding: 1px 12px;
     border-radius: 10px;
     font-size: 0.75rem;
-    color: #555;
+    color: var(--glass-text-secondary, #555);
 }
 </style>
