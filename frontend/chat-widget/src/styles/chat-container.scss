@@ -1699,7 +1699,7 @@
                 }
 
                 @media (max-width: 768px) {
-                    width: 280px;
+                    width: 320px;
                 }
 
                 .dropdown-info-header {
@@ -1711,6 +1711,10 @@
                     justify-content: space-between;
                     align-items: center;
                     border-bottom: 1px solid var(--glass-border);
+
+                    @media (max-width: 768px) {
+                        font-size: 0.6rem;
+                    }
 
                     .info-content {
                         display: flex;
@@ -1733,6 +1737,10 @@
 
                         &:hover {
                             color: var(--primary-color);
+                        }
+
+                        @media (max-width: 768px) {
+                            font-size: 0.9rem;
                         }
                     }
 
@@ -1838,7 +1846,9 @@
                                 background: rgba(239, 68, 68, 0.1);
                             }
                         }
-                    } // End of .candidate-row
+                    }
+
+                    // End of .candidate-row
 
                     // 增加候選人按鈕，貼在列表最下方
                     .add-candidate-btn {
