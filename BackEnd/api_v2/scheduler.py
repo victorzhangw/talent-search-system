@@ -60,6 +60,9 @@ def process_pending_and_failed_records():
                 asked_at_str = asked_dt.strftime("%Y-%m-%d %H:%M:%S")
                 report_date_str = asked_dt.strftime("%Y-%m-%d")
 
+                # 從資料庫取出乾淨的欄位動態組裝
+                event_id_str = f"{record.session_id}_{record.message_id}" if getattr(record, 'message_id', None) else record.session_id
+
                 payload = {
                     "provider": "tratty api", 
                     "report_date": report_date_str,
@@ -67,7 +70,7 @@ def process_pending_and_failed_records():
                         {
                             "plan_id": record.plan_id,
                             "asked_at": asked_at_str,
-                            "external_event_id": record.session_id
+                            "external_event_id": event_id_str
                         }
                     ]
                 }

@@ -92,7 +92,8 @@ class DailySettlementRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(50), index=True, nullable=False) # e.g. email
     plan_id = Column(Integer, nullable=False)
-    session_id = Column(String(64), nullable=False) # external_event_id
+    session_id = Column(String(64), nullable=False) # external_event_id mapping base
+    message_id = Column(String(255), nullable=True) # Optional message_id for deduplication
     status = Column(String(20), default='PENDING', index=True) # PENDING, SYNCED, FAILED
     retry_count = Column(Integer, default=0)
     last_error = Column(Text, nullable=True)

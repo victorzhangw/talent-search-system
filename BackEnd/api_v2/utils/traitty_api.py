@@ -63,7 +63,8 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str, message_i
     record = DailySettlementRecord(
         user_id=email,
         plan_id=plan_id,
-        session_id=event_id_str, # 這裡存入組合後的 key 以便對齊
+        session_id=session_id, # 單純存入 UUID
+        message_id=message_id, # 獨立存入 message_id 確保資料乾淨
         status='PENDING'
     )
     try:
