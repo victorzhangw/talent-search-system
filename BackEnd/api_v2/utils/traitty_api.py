@@ -50,17 +50,20 @@ def find_active_plan(usable_plans: list):
 from ..database.connection import get_db_session
 from ..database.models import DailySettlementRecord
 
-def submit_daily_settlement(email: str, plan_id: int, session_id: str):
+def submit_daily_settlement(email: str, plan_id: int, session_id: str, message_id: str = None):
     """
     呼叫 daily-settlement 扣抵額度，並先在資料庫記錄狀態以防遺失。
+    若帶有 message_id，則組合為 external_event_id，確保同一 session 內的每一次問答都是獨立扣點。
     """
     db = get_db_session()
     
+    event_id_str = f"{session_id}_{message_id}" if message_id else session_id
+
     # 1. 建立 Pending 紀錄到資料庫
     record = DailySettlementRecord(
         user_id=email,
         plan_id=plan_id,
-        session_id=session_id,
+        session_id=event_id_str, # 這裡存入組合後的 key 以便對齊
         status='PENDING'
     )
     try:
@@ -95,7 +98,7 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str):
             {
                 "plan_id": plan_id,
                 "asked_at": asked_at_str,
-                "external_event_id": session_id
+                "external_event_id": event_id_str
             }
         ]
     }

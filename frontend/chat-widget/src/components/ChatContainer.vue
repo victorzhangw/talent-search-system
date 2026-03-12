@@ -5,7 +5,7 @@
     <div class="header new-layout">
       
       <!-- Left: Sidebar Toggle -->
-      <div class="header-left">
+      <div class="header-left mobile-visible">
         <button v-if="!isFullPage" class="icon-btn border-box" @click="toggleSidebar" :title="isSidebarOpen ? '隱藏側邊欄' : '顯示側邊欄'">
             <img v-if="isSidebarOpen" src="../assets/images/sidebar_close.svg" class="material-icon" alt="隱藏側邊欄" />
             <img v-else src="../assets/images/sidebar_open.svg" class="material-icon" alt="顯示側邊欄" />
@@ -145,6 +145,10 @@
                         </div>
                         <div class="drawer-content">
                             <MessageList :messages="previewMessages" />
+                        </div>
+                        <div class="preview-footer">
+                            <button class="secondary-btn" @click="showPreviewPanel = false">🔙 返回當前對話</button>
+                            
                         </div>
                     </div>
                 </transition>
@@ -369,6 +373,18 @@
         @close="showReportModal = false"
     />
 
+    <!-- Mobile History Drawer -->
+    <HistoryDrawer 
+        v-model="showMobileHistoryDrawer"
+        :historySessions="historySessions"
+        :currentSessionId="currentSessionId"
+        :isLoading="historyIsLoading"
+        :hasMore="historyHasMore"
+        @load-more="loadMoreHistory"
+        @select-session="loadHistorySession"
+        @new-analysis="resetAndReselect"
+    />
+
   </div>
 </template>
 
@@ -377,6 +393,7 @@ import { ref, computed } from 'vue'
 import MessageList from './MessageList.vue'
 import CandidateSelector from './CandidateSelector.vue'
 import QuickQuestionPanel from './QuickQuestionPanel.vue'
+import HistoryDrawer from './HistoryDrawer.vue'
 
 import LoginView from './LoginView.vue'
 import TraitReportModal from './TraitReportModal.vue'
@@ -385,7 +402,11 @@ import { useChatLogic } from '../composables/useChatLogic.js'
 const isSidebarOpen = ref(true)
 
 const toggleSidebar = () => {
-    isSidebarOpen.value = !isSidebarOpen.value
+    if (window.innerWidth <= 768) {
+        showMobileHistoryDrawer.value = true
+    } else {
+        isSidebarOpen.value = !isSidebarOpen.value
+    }
 }
 
 const emit = defineEmits(['close'])
@@ -427,6 +448,10 @@ const {
     selectedQuickQuestionCategory,
     quickQuestions,
     historySessions,
+    historyPage,
+    historyHasMore,
+    historyIsLoading,
+    showMobileHistoryDrawer,
 
     // Computed
     currentThemeLabel,
@@ -448,6 +473,8 @@ const {
     sendQuickMessage,
     toggleQuickQuestionCategory,
     loadHistorySession,
+    switchContextToPreview,
+    loadMoreHistory,
     rateMessage
 } = useChatLogic(emit)
 
@@ -672,5 +699,39 @@ const confirmAddCandidates = async () => {
 /* Ensure split-view handles absolute overlay correctly */
 .split-view {
     position: relative;
+}
+
+.header-left.mobile-visible {
+    @media (max-width: 768px) {
+        display: flex !important;
+    }
+}
+
+.preview-footer {
+    padding: 1rem;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    gap: 0.8rem;
+    justify-content: flex-end;
+    background: var(--glass-bg);
+    border-bottom-left-radius: inherit;
+    border-bottom-right-radius: inherit;
+    
+    @media (max-width: 768px) {
+        flex-direction: column;
+        padding: 0.8rem;
+        gap: 0.5rem;
+    }
+    
+    .secondary-btn, .confirm-btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.95rem;
+        
+        @media (max-width: 768px) {
+            width: 100%;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+    }
 }
 </style>

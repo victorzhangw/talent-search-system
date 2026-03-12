@@ -617,6 +617,7 @@ defineExpose({
             
             @media (max-width: 768px) {
                 margin-left: 0;
+                font-size: 0.4em;
             }
         }
         

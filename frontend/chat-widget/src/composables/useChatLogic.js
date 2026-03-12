@@ -87,6 +87,10 @@ export function useChatLogic(emit) {
     }
 
     const historySessions = ref({ today: [], past_30_days: [] })
+    const historyPage = ref(1)
+    const historyHasMore = ref(false)
+    const historyIsLoading = ref(false)
+    const showMobileHistoryDrawer = ref(false)
 
     // --- Computed ---
     const currentThemeLabel = computed(() => {
@@ -262,19 +266,40 @@ export function useChatLogic(emit) {
     }
 
     // History Logic
-    const fetchHistory = async () => {
+    const fetchHistory = async (page = 1, append = false) => {
+        if (historyIsLoading.value) return;
+        historyIsLoading.value = true;
         try {
             const { serverRoot } = getApiConfig()
             const userId = window.TRAITTY_WIDGET_CONFIG?.userEmail || 'anonymous'
 
-            const res = await fetch(`${serverRoot}/chat/history?user_id=${userId}`, {
+            const res = await fetch(`${serverRoot}/chat/history?user_id=${userId}&page=${page}`, {
                 headers: { 'Authorization': `Bearer ${userToken.value}` }
             })
             if (res.ok) {
-                historySessions.value = await res.json()
+                const data = await res.json()
+                if (append) {
+                    historySessions.value.today = [...(historySessions.value.today || []), ...(data.today || [])];
+                    historySessions.value.past_30_days = [...(historySessions.value.past_30_days || []), ...(data.past_30_days || [])];
+                } else {
+                    historySessions.value = {
+                        today: data.today || [],
+                        past_30_days: data.past_30_days || []
+                    }
+                }
+                historyPage.value = page;
+                historyHasMore.value = data.has_more ?? false;
             }
         } catch (e) {
             console.error("[ChatContainer] Failed to load history", e)
+        } finally {
+            historyIsLoading.value = false;
+        }
+    }
+
+    const loadMoreHistory = async () => {
+        if (historyHasMore.value && !historyIsLoading.value) {
+            await fetchHistory(historyPage.value + 1, true);
         }
     }
 
@@ -285,6 +310,7 @@ export function useChatLogic(emit) {
         previewSessionData.value = sessionData
         showPreviewPanel.value = true
         previewMessages.value = [] // clear previous or set loading state
+        showMobileHistoryDrawer.value = false // close drawer when previewing
 
         try {
             const res = await fetch(`${serverRoot}/chat/${sessionData.session_id}`, {
@@ -305,6 +331,29 @@ export function useChatLogic(emit) {
         } catch (e) {
             console.error("[ChatContainer] Failed to load session details for preview", e)
         }
+    }
+
+    const switchContextToPreview = () => {
+        if (!previewSessionData.value) return;
+
+        // Draft preservation is implicitly handled as current session is just left behind
+        // We override the active messages
+        currentSessionId.value = previewSessionData.value.session_id;
+        messages.value = [...previewMessages.value];
+        showPreviewPanel.value = false;
+        
+        // Also update selection lock if possible
+        if (!isSelectionLocked.value && messages.value.length > 0) {
+            isSelectionLocked.value = true;
+        }
+
+        // Add small AI prompt confirming context switch
+        messages.value.push({
+            role: 'ai',
+            content: '已為您切換至歷史對話，您可以繼續提問。'
+        });
+        
+        saveSessionToStorage();
     }
 
     // Init Data Fetching
@@ -902,6 +951,10 @@ export function useChatLogic(emit) {
 
         // History
         historySessions,
+        historyPage,
+        historyHasMore,
+        historyIsLoading,
+        showMobileHistoryDrawer,
 
         // Computed
         currentThemeLabel,
@@ -923,7 +976,9 @@ export function useChatLogic(emit) {
         sendQuickMessage,
         toggleQuickQuestionCategory,
         fetchHistory,
+        loadMoreHistory,
         loadHistorySession,
+        switchContextToPreview,
         rateMessage
     }
 }
