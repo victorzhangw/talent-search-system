@@ -115,12 +115,19 @@ class RAGService:
         cache_key = f"{session_id}::{cand_key}"
         
         # 0. Check Cache
-        cached_context_data = self._get_cached_data(cache_key)
+        # 當前端有傳入 trait_reports 時，強制跳過 Cache 重新合併
+        # 避免舊 Cache 的 assessment 資料缺少 project_name_abbreviation 導致 context_builder 匹配失敗
+        if trait_reports:
+            cached_context_data = None
+            rag_logger.info(f"trait_reports detected → forcing Cache MISS to ensure fresh merge")
+        else:
+            cached_context_data = self._get_cached_data(cache_key)
         
         if cached_context_data:
             rag_logger.info(f"Cache HIT for key: {cache_key}")
             enterprise_data = cached_context_data['enterprise_data']
             final_candidates_data = cached_context_data['final_candidates_data']
+
         else:
             rag_logger.info(f"Cache MISS for key: {cache_key}. Fetching upstream...")
             # 1. Generate Fresh Token for Upstream
@@ -174,40 +181,52 @@ class RAGService:
             # NEW: Check if trait_reports are provided from frontend
             if trait_reports:
                 rag_logger.info(f"✅ Using trait reports from frontend for {len(trait_reports)} candidates")
-                
-                # Merge trait reports with candidate basic info
+
+                # [方案 A] 以 trait_reports 為迴圈主體 (而非 candidates_basic)
+                # 確保每位有報告資料的候選人都會被處理，不受 candidates_basic 的 ID 型別或順序影響
                 final_candidates_data = []
-                for cand in target_candidates_basic:
-                    cand_id = str(cand.get('candidate_id'))
-                    merged = cand.copy()
-                    
-                    # Get trait report from frontend data
-                    if cand_id in trait_reports:
-                        report = trait_reports[cand_id]
-                        rag_logger.info(f"Found trait report for candidate {cand_id}: {len(report.get('traits', []))} traits")
-                        
-                        # Convert frontend report format to expected format
-                        trait_results = {}
-                        for trait in report.get('traits', []):
-                            trait_name = trait.get('name', 'Unknown')
-                            trait_results[trait_name] = {
-                                'score': trait.get('score', 0),
-                                'band': trait.get('band', ''),
-                                'trait_id': trait.get('trait_id'), # Pass the ID along
-                                'chinese_name': trait_name
-                            }
-                        
-                        merged['assessment'] = {
-                            'assessment_id': report.get('assessment_id'),
-                            'trait_results': trait_results,
-                            'project_name_abbreviation': report.get('project_name_abbreviation', 'CIA'),
-                            'completion_time': report.get('assessment_date', 'N/A')
-                        }
+                for cand_id_str, report in trait_reports.items():
+                    # 從 candidates_basic 找對應的基本資訊（姓名、職位等）
+                    cand_basic = next(
+                        (c for c in target_candidates_basic if str(c.get('candidate_id')) == cand_id_str),
+                        None
+                    )
+
+                    if cand_basic:
+                        merged = cand_basic.copy()
                     else:
-                        rag_logger.warning(f"No trait report found for candidate {cand_id}")
-                    
+                        # 找不到基本資訊時，建立最小候選人物件，確保報告仍被處理
+                        rag_logger.warning(f"No basic info for candidate {cand_id_str}, using minimal placeholder")
+                        merged = {'candidate_id': cand_id_str, 'name': f'Candidate-{cand_id_str}', 'position': 'N/A'}
+
+                    # [方案 B] 確保 project_name_abbreviation 直接來自報告，不使用預設值 'CIA'
+                    project_abbrev = report.get('project_name_abbreviation')
+                    if not project_abbrev:
+                        rag_logger.warning(f"candidate {cand_id_str} report missing project_name_abbreviation, skipping")
+                        continue
+
+                    rag_logger.info(f"Processing candidate {cand_id_str} ({project_abbrev}): {len(report.get('traits', []))} traits")
+
+                    # 將前端 traits 列表轉為 trait_results 字典
+                    trait_results = {}
+                    for trait in report.get('traits', []):
+                        trait_name = trait.get('name', 'Unknown')
+                        trait_results[trait_name] = {
+                            'score': trait.get('score', 0),
+                            'band': trait.get('band', ''),
+                            'trait_id': trait.get('trait_id'),
+                            'chinese_name': trait_name
+                        }
+
+                    merged['assessment'] = {
+                        'assessment_id': report.get('assessment_id'),
+                        'trait_results': trait_results,
+                        'project_name_abbreviation': project_abbrev,  # 直接來自報告，不使用預設值
+                        'completion_time': report.get('assessment_date', 'N/A')
+                    }
+
                     final_candidates_data.append(merged)
-                
+
                 rag_logger.info(f"Merged {len(final_candidates_data)} candidates with trait reports")
                 
             else:

@@ -745,12 +745,15 @@ export function useChatLogic(emit) {
         inputQuery.value = ''
         isTyping.value = true
 
-        const aiMsgIndex = messages.value.push({
+        // 使用唯一 ID 標記 AI 訊息，避免陣列索引在非同步過程中失效
+        const aiMsgTempId = `ai_${Date.now()}`
+        messages.value.push({
             role: 'ai',
             content: '',
             intent: '',
-            isTyping: true
-        }) - 1
+            isTyping: true,
+            _tempId: aiMsgTempId
+        })
 
         const { serverRoot } = getApiConfig()
 
@@ -831,6 +834,9 @@ export function useChatLogic(emit) {
                         if (jsonStr === '[DONE]') continue
                         try {
                             const data = JSON.parse(jsonStr)
+                            // 每次動態查詢目標訊息位置，防止陣列被修改導致索引失效
+                            const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
+                            if (aiMsgIndex === -1) continue
                             if (data.type === 'meta') {
                                 messages.value[aiMsgIndex].intent = data.intent
                             } else if (data.type === 'token') {
@@ -849,9 +855,15 @@ export function useChatLogic(emit) {
             }
         } catch (e) {
             console.error(e)
-            messages.value[aiMsgIndex].content += "\n\n(發生錯誤，請重試)"
+            const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
+            if (aiMsgIndex !== -1) {
+                messages.value[aiMsgIndex].content += "\n\n(發生錯誤，請重試)"
+            }
         } finally {
-            messages.value[aiMsgIndex].isTyping = false
+            const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
+            if (aiMsgIndex !== -1) {
+                messages.value[aiMsgIndex].isTyping = false
+            }
             isTyping.value = false
 
             // Save state to Session Storage

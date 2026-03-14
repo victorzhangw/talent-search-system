@@ -77,27 +77,38 @@ class ContextBuilder:
 
             for res in results_list:
                 # 1. Identify Identifiers
-                # 'chinese_name' in rag_engine is actually the display name (English if untranslated)
+                # 注意：API 的 chinese_name 欄位實際存放的是英文名稱（如 'Hope'、'Gratitude'）
+                # API 的 trait_id（如 '99f'）與 DB 的 trait_id（如 'CIA_16'）格式不同，不使用
                 display_name = res.get('chinese_name') or res.get('trait_name')
-                api_tid = res.get('trait_id') or res.get('tid')
                 
-                if not display_name and not api_tid:
+                if not display_name:
                     continue
 
                 # 2. Key Mapping (ID/Name -> DB Trait ID)
-                project_abbrev = asmt.get('project_name_abbreviation', 'CIA')
+                # [方案 B] 不使用硬編碼預設值 'CIA'，缺失時直接跳過此特質
+                project_abbrev = asmt.get('project_name_abbreviation')
+                if not project_abbrev:
+                    # 無法識別報告類型，跳過整個候選人的此特質（不能亂猜）
+                    continue
                 
-                # Best Practice: Try precise ID match first (e.g., CIA_143b)
+                # --- DB 查詢策略 ---
+                # 甲方 API 的 trait_id（如 '99f'、'147b'）與 DB 的 trait_id（如 'CIA_16'）
+                # 格式完全不同，無法直接比對。
+                # 正確做法：用 API 的 chinese_name（實為英文名，如 'Hope'）
+                # 比對 DB 的 name_en，再以 project_abbrev 前綴過濾。
                 trait_def = None
-                if api_tid:
-                    trait_def = db_session.query(TraitDefinition).filter(
-                        TraitDefinition.trait_id == f"{project_abbrev}_{api_tid}"
-                    ).first()
                 
-                # Fallback: Match by English Name with project prefix (helps map 'Empathy' to 'CIA_01')
-                if not trait_def and display_name:
+                if display_name:
+                    # 策略 A：用英文名比對 name_en（主要路徑）
                     trait_def = db_session.query(TraitDefinition).filter(
                         func.trim(func.lower(TraitDefinition.name_en)) == func.trim(func.lower(display_name)),
+                        TraitDefinition.trait_id.like(f"{project_abbrev}_%")
+                    ).first()
+                
+                if not trait_def and display_name:
+                    # 策略 B：Fallback 用中文名比對 name_zh（以防規格書 name_en 為中文的情況）
+                    trait_def = db_session.query(TraitDefinition).filter(
+                        func.trim(func.lower(TraitDefinition.name_zh)) == func.trim(func.lower(display_name)),
                         TraitDefinition.trait_id.like(f"{project_abbrev}_%")
                     ).first()
                 
