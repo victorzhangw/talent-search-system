@@ -55,6 +55,6 @@ class Config:
     DEEPSEEK_API_BASE = 'https://api.deepseek.com/v1'
     
     # External API Settings
-    TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE', 'https://uat.traitty.com') # Configurable UAT/PROD
+    TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE') # Must be provided in .env
     PARTY_A_API_BASE = os.getenv('PARTY_A_API_BASE')
     PARTY_A_PLUGIN_SECRET = os.getenv('PARTY_A_PLUGIN_SECRET')

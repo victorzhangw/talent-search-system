@@ -10,7 +10,7 @@ class RealIntegrationService(IntegrationServiceInterface):
 
     @property
     def base_url(self):
-        return current_app.config.get('TRAITTY_API_BASE', 'https://uat.traitty.com')
+        return current_app.config.get('TRAITTY_API_BASE')
 
     def _get_headers(self, token: str):
         return {

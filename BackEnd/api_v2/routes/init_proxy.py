@@ -22,7 +22,7 @@ def get_init_status():
     # Generate FRESH Upstream Token
     upstream_token = generate_upstream_token(user_email)
     
-    base_url = current_app.config.get('TRAITTY_API_BASE', 'https://uat.traitty.com')
+    base_url = current_app.config.get('TRAITTY_API_BASE')
     url = f"{base_url}/v1/init/"
     
     headers = {

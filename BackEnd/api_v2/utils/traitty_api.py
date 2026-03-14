@@ -16,7 +16,7 @@ def fetch_init_data(email: str):
     獲取目前使用者的 Initiation 資料 (包含配額與可用計畫)
     """
     upstream_token = generate_upstream_token(email)
-    base_url = current_app.config.get('TRAITTY_API_BASE', 'https://uat.traitty.com')
+    base_url = current_app.config.get('TRAITTY_API_BASE')
     url = f"{base_url}/v1/init/"
     
     headers = {
@@ -78,7 +78,7 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str, message_i
 
     # 2. 準備呼叫 API
     upstream_token = generate_upstream_token(email)
-    base_url = current_app.config.get('TRAITTY_API_BASE', 'https://uat.traitty.com')
+    base_url = current_app.config.get('TRAITTY_API_BASE')
     url = f"{base_url}/v1/ai/usage/daily-settlement"
     
     headers = {
