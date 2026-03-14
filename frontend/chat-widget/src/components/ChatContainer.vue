@@ -634,7 +634,7 @@ const confirmAddCandidates = async () => {
 .split-view.chat-mode {
     .left-panel {
         width: 15% !important;    /* ← 原 20%，縮小歷史側欄 */
-        min-width: 160px;          /* ← 原 200px */
+        min-width: 300px;          /* ← 原 200px */
         @media (max-width: 768px) {
             width: 100% !important;
         }

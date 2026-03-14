@@ -193,12 +193,14 @@ class RAGService:
                             trait_results[trait_name] = {
                                 'score': trait.get('score', 0),
                                 'band': trait.get('band', ''),
-                                'chinese_name': trait_name  # Already translated
+                                'trait_id': trait.get('trait_id'), # Pass the ID along
+                                'chinese_name': trait_name
                             }
                         
                         merged['assessment'] = {
                             'assessment_id': report.get('assessment_id'),
                             'trait_results': trait_results,
+                            'project_name_abbreviation': report.get('project_name_abbreviation', 'CIA'),
                             'completion_time': report.get('assessment_date', 'N/A')
                         }
                     else:

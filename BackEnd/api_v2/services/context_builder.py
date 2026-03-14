@@ -76,25 +76,29 @@ class ContextBuilder:
             from sqlalchemy import func
 
             for res in results_list:
-                # 1. Identify Name (PK)
-                trait_name_en = res.get('chinese_name') 
-                if not trait_name_en:
+                # 1. Identify Identifiers
+                # 'chinese_name' in rag_engine is actually the display name (English if untranslated)
+                display_name = res.get('chinese_name') or res.get('trait_name')
+                api_tid = res.get('trait_id') or res.get('tid')
+                
+                if not display_name and not api_tid:
                     continue
 
-                # 2. Key Mapping (Name -> DB Trait ID)
+                # 2. Key Mapping (ID/Name -> DB Trait ID)
                 project_abbrev = asmt.get('project_name_abbreviation', 'CIA')
                 
-                # First try with project-specific prefix to avoid mixing e.g., ANI_02 and CIA_18 (both 'Resilience')
-                # Also trim whitespace because excel imports might contain trailing spaces causing missing traits
-                trait_def = db_session.query(TraitDefinition).filter(
-                    func.trim(func.lower(TraitDefinition.name_en)) == func.trim(func.lower(trait_name_en)),
-                    TraitDefinition.trait_id.like(f"{project_abbrev}_%")
-                ).first()
-                
-                # Fallback: if not found with project prefix, try without it just in case
-                if not trait_def:
+                # Best Practice: Try precise ID match first (e.g., CIA_143b)
+                trait_def = None
+                if api_tid:
                     trait_def = db_session.query(TraitDefinition).filter(
-                        func.trim(func.lower(TraitDefinition.name_en)) == func.trim(func.lower(trait_name_en))
+                        TraitDefinition.trait_id == f"{project_abbrev}_{api_tid}"
+                    ).first()
+                
+                # Fallback: Match by English Name with project prefix (helps map 'Empathy' to 'CIA_01')
+                if not trait_def and display_name:
+                    trait_def = db_session.query(TraitDefinition).filter(
+                        func.trim(func.lower(TraitDefinition.name_en)) == func.trim(func.lower(display_name)),
+                        TraitDefinition.trait_id.like(f"{project_abbrev}_%")
                     ).first()
                 
                 if not trait_def:

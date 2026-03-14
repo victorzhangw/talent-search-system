@@ -198,7 +198,7 @@ export function useChatLogic(emit) {
             const reportsMap = {}
             data.reports.forEach(report => {
                 const candidate = selectedCandidates.find(
-                    c => c.latest_assessment?.assessment_id === report.assessment_id
+                    c => String(c.latest_assessment?.assessment_id) === String(report.assessment_id)
                 )
                 if (candidate) {
                     reportsMap[candidate.candidate_id] = report
@@ -246,7 +246,7 @@ export function useChatLogic(emit) {
 
             data.reports.forEach(report => {
                 const candidate = newCandidates.find(
-                    c => c.latest_assessment?.assessment_id === report.assessment_id
+                    c => String(c.latest_assessment?.assessment_id) === String(report.assessment_id)
                 )
                 if (candidate) {
                     existingReports[candidate.candidate_id] = report

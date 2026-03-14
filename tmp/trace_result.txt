@@ -1,0 +1,22 @@
+
+=== Candidate 36 | Project: ANI ===
+  [ID-MISS] 'ANI_300b' not found
+  [NM-OK]   'Self-Leadership' in ANI -> ANI_05
+  [BAND]    score=79 -> band=A (75-100)
+  [ID-MISS] 'ANI_294b' not found
+  [NM-OK]   'Resilience' in ANI -> ANI_02
+  [BAND]    score=71 -> band=B (50-74)
+  [ID-MISS] 'ANI_143b' not found
+  [NM-OK]   'Empathy' in ANI -> ANI_11
+  [BAND]    score=53 -> band=B (50-74)
+
+=== Candidate 84 | Project: CIA ===
+  [ID-MISS] 'CIA_215f' not found
+  [NM-OK]   'Efficacy' in CIA -> CIA_17
+  [BAND]    score=89 -> band=A (75-100)
+  [ID-MISS] 'CIA_100f' not found
+  [NM-OK]   'Resilience' in CIA -> CIA_18
+  [BAND]    score=83 -> band=A (75-100)
+  [ID-MISS] 'CIA_143b' not found
+  [NM-OK]   'Empathy' in CIA -> CIA_26
+  [BAND]    score=53 -> band=B (50-74)

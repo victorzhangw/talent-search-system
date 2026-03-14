@@ -93,6 +93,7 @@ onMounted(() => {
 /* Global Reset for Widget */
 /* Font Import handled in main.js/global.scss or index.html usually */
 #talent-rag-widget {
+  all: initial ;
   font-family: 'Inter', system-ui, sans-serif;
   
   /* Reset box sizing for our widget subtree */

@@ -193,7 +193,7 @@ const handleScroll = (e) => {
       justify-content: center;
       gap: 0.4rem;
       border-radius: 16px;
-      padding: 0.5rem 0.8rem;
+      padding: 0.5rem 0.7rem;
       background: linear-gradient(90deg, #692ff3 0%, #517BE6 100%);
       border: none;
       color: white;

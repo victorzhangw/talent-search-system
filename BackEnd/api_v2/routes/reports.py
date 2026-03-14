@@ -15,16 +15,7 @@ def get_service():
         return RealIntegrationService()
     return MockIntegrationService()
 
-# Trait Name Translation Map (Shared)
-TRAIT_TRANSLATIONS = {
-    '143b': '同理心', '266f': '洞察力', '82b': '好奇心', '294b': '韌性',
-    '302b': 'AI 素養', '306b': '可靠性', '268f': '自我批判', '299b': '變革敏捷性',
-    '119b': '自我覺察', '311b': '決策力', '300b': '自我領導', '269f': '自我反思',
-    '303b': '積極傾聽', '265f': '尋求反饋', '297b': '社會影響力', '305b': '系統思考',
-    '301b': '創意思考', '309b': '批判性思考', '121b': '終身學習', '308b': '談判技巧',
-    '298b': '分析思考', '145b': '關注細節', '68b': '社會讚許性', '310b': '社交智慧',
-    '293b': '認知彈性', '195b': '成就動機', '267f': '績效冷漠', '307b': '人際溝通'
-}
+# Trait Name Translation Map (No longer used, matching via DB)
 
 @bp.route('/batch', methods=['POST'])
 def get_batch_reports():
@@ -146,9 +137,11 @@ def get_batch_reports():
         formatted_traits = []
         for t in iter_traits:
             tid = t.get('trait_id')
-            name = TRAIT_TRANSLATIONS.get(tid) or t.get('chinese_name') or t.get('trait_name') or 'Unknown'
+            # Use original API name (English) to ensure RAG entry matches name_en in DB
+            name = t.get('chinese_name') or t.get('trait_name') or tid or 'Unknown'
             score = t.get('score', 0)
             formatted_traits.append({
+                'trait_id': tid,
                 'name': name,
                 'score': score,
                 'band': t.get('band', '')
@@ -162,8 +155,14 @@ def get_batch_reports():
         if assessment_date == 'N/A' and 'completion_time' in report_data:
             assessment_date = report_data['completion_time']
         
+        # Get project name abbreviation
+        project_name_abbrev = inner.get('project_name_abbreviation')
+        if not project_name_abbrev:
+            project_name_abbrev = report_data.get('project_name_abbreviation', 'CIA')
+
         formatted_report = {
             'assessment_id': asmt_id,
+            'project_name_abbreviation': project_name_abbrev,
             'traits': formatted_traits,
             'assessment_date': assessment_date
         }

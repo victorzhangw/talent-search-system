@@ -365,7 +365,7 @@
     }
 
     .history-actions {
-        padding: 0 1.2rem 1rem;
+        padding: 0 1rem 0.9rem;
 
         .new-analysis-btn {
             display: flex;
@@ -598,6 +598,7 @@
 }
 
 .welcome-container {
+    all: initial;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1253,6 +1254,7 @@
 
 /* Sidebar for quick questions - positioned absolutely or flex? */
 .quick-sidebar {
+    all: initial;
     width: 260px;
     /* ← 原 320px */
     min-width: 260px;
