@@ -316,9 +316,9 @@
             <QuickQuestionPanel
   :isSelectionLocked="isSelectionLocked"
   :showMobileQuickQuestions="showMobileQuickQuestions"
-  :quickQuestionCategories="quickQuestionCategories"
+  :quickQuestionCategories="filteredQuickQuestionCategories"
   :selectedQuickQuestionCategory="selectedQuickQuestionCategory"
-  :quickQuestions="quickQuestions"
+  :quickQuestions="filteredQuickQuestions"
   :isTyping="isTyping"
   @update:showMobileQuickQuestions="showMobileQuickQuestions = $event"
   @toggleCategory="toggleQuickQuestionCategory"
@@ -447,6 +447,8 @@ const {
     quickQuestionCategories,
     selectedQuickQuestionCategory,
     quickQuestions,
+    filteredQuickQuestions,
+    filteredQuickQuestionCategories,
     historySessions,
     historyPage,
     historyHasMore,

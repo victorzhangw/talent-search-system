@@ -1,5 +1,6 @@
 
 import { ref, computed, onMounted, watch } from 'vue'
+import { getFeatures } from '../config/widgetFeatures.js'
 
 export function useChatLogic(emit) {
     // --- State ---
@@ -85,6 +86,47 @@ export function useChatLogic(emit) {
         const nextIndex = (currentIndex + 1) % keys.length
         selectedQuickQuestionCategory.value = keys[nextIndex]
     }
+
+    /**
+     * 過濾後的快速提問（桌面側欄版）
+     * 根據目前鎖定的候選人數量，以及 widgetFeatures 設定，
+     * 動態移除限定單人的問題。
+     */
+    const filteredQuickQuestions = computed(() => {
+        const features = getFeatures()
+        const questions = quickQuestionCategories.value[selectedQuickQuestionCategory.value] || []
+
+        // 功能關閉或只有 1 人以下時，直接回傳完整清單
+        if (!features.quickQuestions.enforceSingleCandidateLimit) return questions
+        const activeCount = activeConversationCandidateIds.value.length
+        if (activeCount <= 1) return questions
+
+        // 過濾掉「限定單人」的問題
+        const restricted = new Set(features.quickQuestions.singleCandidateQuestions)
+        return questions.filter(q => !restricted.has(q))
+    })
+
+    /**
+     * 過濾後的快速提問分類物件（行動版彈出視窗用）
+     * 結構與 quickQuestionCategories 相同，但依規則移除限定單人的問題；
+     * 若某個分類過濾後為空，整個分類也會一起隱藏。
+     */
+    const filteredQuickQuestionCategories = computed(() => {
+        const features = getFeatures()
+
+        // 功能關閉或只有 1 人以下時，直接回傳原始資料
+        if (!features.quickQuestions.enforceSingleCandidateLimit) return quickQuestionCategories.value
+        const activeCount = activeConversationCandidateIds.value.length
+        if (activeCount <= 1) return quickQuestionCategories.value
+
+        const restricted = new Set(features.quickQuestions.singleCandidateQuestions)
+        const result = {}
+        for (const [cat, questions] of Object.entries(quickQuestionCategories.value)) {
+            const filtered = questions.filter(q => !restricted.has(q))
+            if (filtered.length > 0) result[cat] = filtered
+        }
+        return result
+    })
 
     const historySessions = ref({ today: [], past_30_days: [] })
     const historyPage = ref(1)
@@ -960,6 +1002,9 @@ export function useChatLogic(emit) {
         quickQuestionCategories,
         selectedQuickQuestionCategory,
         quickQuestions,
+        // 過濾版（依候選人數量與 widgetFeatures 設定動態調整）
+        filteredQuickQuestions,
+        filteredQuickQuestionCategories,
 
         // History
         historySessions,
