@@ -20,6 +20,11 @@
     --bubble-ai-bg: rgba(0, 0, 0, 0.04);
     --bubble-ai-border: rgba(0, 0, 0, 0.06);
 
+    /* 快速提問彈出視窗背景（亮色預設） */
+    --quick-popover-bg: rgba(255, 255, 255, 0.98);
+    /* 快速提問彈出視窗標題列背景 */
+    --quick-popover-header-bg: rgba(244, 245, 249, 1);
+
     /* Layout Spacing (shared) */
     --space-xs: 0.25rem;
     --space-sm: 0.5rem;
@@ -49,6 +54,10 @@
     --primary-color: #3b82f6;
     --bubble-ai-bg: rgba(30, 41, 59, 0.4);
     --bubble-ai-border: rgba(51, 65, 85, 0.5);
+
+    /* 快速提問彈出視窗：暗色模式覆寫 */
+    --quick-popover-bg: rgba(30, 30, 40, 0.98);
+    --quick-popover-header-bg: rgba(40, 40, 50, 1);
 }
 
 /* Theme: Sepia (Reading Mode) */
