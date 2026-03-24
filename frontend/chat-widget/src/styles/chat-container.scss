@@ -27,7 +27,8 @@
     /* 方案 B：Messenger 風格緊湊型浮動視窗 */
     width: 400px;
     min-width: 360px;
-    height: 580px;
+    /* 高度加大至 680px 確保底部功能不被遮蓋 */
+    height: 680px;
     max-height: 92vh;
     max-width: calc(100vw - 2rem);
     z-index: 9999;
@@ -69,7 +70,7 @@
     /* 大螢幕也維持緊湊尺寸，不撐滿螢幕 */
     @media (min-width: 1400px) {
         width: 480px;
-        height: 640px;
+        height: 720px;
         max-width: 480px;
     }
 

@@ -83,22 +83,22 @@ const logoSrc = computed(() => {
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Default State (Closed): Messenger 風格固定圓形按鈕 */
+  /* Default State (Closed): Transparent Button with Image */
   &:not(.is-open) {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
     background: transparent;
     box-shadow: none;
     border: none;
     padding: 0;
+    min-width: unset;
+    width: auto;
+    height: auto;
     display: flex;
     align-items: center;
     justify-content: center;
 
     &:hover {
-      transform: scale(1.08);
-      filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3));
+      transform: scale(1.05);
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
     }
   }
 
@@ -107,7 +107,7 @@ const logoSrc = computed(() => {
     width: 3.5rem;
     height: 3.5rem;
     border-radius: 50%;
-    background: #4b5563; /* Gray-600 */
+    background: #4b5563;
     color: white;
     display: flex;
     align-items: center;
@@ -138,15 +138,15 @@ const logoSrc = computed(() => {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    
+
     .logo-img {
-      /* Messenger 風格：60px 固定圓形尺寸 */
-      width: 60px;
-      height: 60px;
+      /* 原始尺寸：隨螢幕自適應，桌機顯示較大 */
+      height: 8.5rem;
+      width: auto;
       object-fit: contain;
       display: block;
       color: rgba(255,255,255,0.1);
-      transform: translate3d(0, 0, 0); 
+      transform: translate3d(0, 0, 0);
       backface-visibility: hidden;
       -webkit-font-smoothing: antialiased;
 
