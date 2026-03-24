@@ -43,19 +43,19 @@ class RAGService:
         else:
             self.integration_service = MockIntegrationService()
             
-        # 3. Setup LLM Client (DeepSeek / MockConfig)
-        api_key = current_app.config.get('DEEPSEEK_API_KEY')
-        api_base = current_app.config.get('DEEPSEEK_API_BASE')
-        self.model_name = current_app.config.get('DEEPSEEK_MODEL', 'deepseek-chat')
+        # 3. Setup LLM Client (LLM / MockConfig)
+        api_key = current_app.config.get('LLM_API_KEY')
+        api_base = current_app.config.get('LLM_API_BASE')
+        self.model_name = current_app.config.get('LLM_MODEL', 'deepseek-chat')
         
         # Fallback: Retry loading .env if key is missing (Hotfix for loading issue)
         if not api_key:
-             rag_logger.warning("DEEPSEEK_API_KEY is None. Attempting to reload .env manually...")
+             rag_logger.warning("LLM_API_KEY is None. Attempting to reload .env manually...")
              try:
                  from dotenv import load_dotenv
                  env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
                  load_dotenv(env_path, override=True)
-                 api_key = os.getenv('DEEPSEEK_API_KEY')
+                 api_key = os.getenv('LLM_API_KEY')
              except Exception as e:
                  rag_logger.error(f".env reload failed: {e}", exc_info=True)
 
@@ -417,7 +417,7 @@ class RAGService:
         ]
 
         try:
-            rag_logger.info(f"Calling DeepSeek API with model '{self.model_name}'...")
+            rag_logger.info(f"Calling LLM API with model '{self.model_name}'...")
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,

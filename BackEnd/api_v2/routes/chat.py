@@ -32,6 +32,21 @@ def background_generate_title(session_id, user_query, candidate_names):
         if len(title) > 15:
             title = title[:15]
             
+        # 1.5 Record Token Usage
+        total_tokens = getattr(response.usage, 'total_tokens', 0) if hasattr(response, 'usage') else 0
+        p_tokens = getattr(response.usage, 'prompt_tokens', 0) if hasattr(response, 'usage') else 0
+        c_tokens = getattr(response.usage, 'completion_tokens', 0) if hasattr(response, 'usage') else 0
+        try:
+            from ..services.session_store import SqlSessionStore
+            store = SqlSessionStore()
+            store.add_message(
+                session_id, 'system', f'[System] 產生標題: {title}', 
+                token_usage=total_tokens, prompt_tokens=p_tokens, completion_tokens=c_tokens, 
+                model_name=rag_service.model_name
+            )
+        except Exception as te:
+            print(f"[Background Title] Token logging error: {te}")
+            
         # 2. Update DB
         db = get_db_session()
         try:
@@ -317,14 +332,15 @@ def chat():
                 prompt_tokens = getattr(total_usage, 'prompt_tokens', 0)
                 completion_tokens = getattr(total_usage, 'completion_tokens', 0)
             
-            # We store total tokens for simple billing schema, or separate?
-            # Model has 'token_usage' int. Let's store total.
+            # Store total and split token usage
             msg_id = session_store.add_message(
                 session_id, 
                 'assistant', 
                 full_assistant_content, 
                 token_usage=(prompt_tokens + completion_tokens),
-                model_name='deepseek-chat'
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                model_name=rag_service.model_name
             )
             
             if msg_id:

@@ -1,0 +1,2 @@
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS prompt_tokens INTEGER DEFAULT 0;
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS completion_tokens INTEGER DEFAULT 0;

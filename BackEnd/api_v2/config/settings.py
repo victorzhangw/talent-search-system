@@ -14,7 +14,7 @@ if os.path.exists(_env_path):
     load_dotenv(_env_path, override=True)
     
     # MANUAL FALLBACK: If dotenv fails, read file directly
-    if not os.getenv('DEEPSEEK_API_KEY'):
+    if not os.getenv('LLM_API_KEY'):
         print("DEBUG: os.getenv failed. Trying manual parse...")
         try:
             # Use utf-8-sig to handle BOM automatically
@@ -22,15 +22,15 @@ if os.path.exists(_env_path):
                 for line in f:
                     # Remove BOM explicitly if present (though utf-8-sig handles it)
                     clean_line = line.strip().lstrip('\ufeff')
-                    if clean_line.startswith('DEEPSEEK_API_KEY='):
+                    if clean_line.startswith('LLM_API_KEY='):
                         val = clean_line.split('=', 1)[1].strip()
-                        os.environ['DEEPSEEK_API_KEY'] = val
-                        print(f"DEBUG: Manual parse set DEEPSEEK_API_KEY to {val[:5]}...")
+                        os.environ['LLM_API_KEY'] = val
+                        print(f"DEBUG: Manual parse set LLM_API_KEY to {val[:5]}...")
                         break
         except Exception as e:
             print(f"DEBUG: Manual parse failed: {e}")
             
-    print(f"DEBUG: Final DEEPSEEK_API_KEY status: {'FOUND' if os.getenv('DEEPSEEK_API_KEY') else 'MISSING'}")
+    print(f"DEBUG: Final LLM_API_KEY status: {'FOUND' if os.getenv('LLM_API_KEY') else 'MISSING'}")
 else:
     print(f"WARNING: .env not found at {_env_path}")
 
@@ -49,10 +49,10 @@ class Config:
     DATABASE_URI = os.getenv('DATABASE_URI', f'sqlite:///{_db_path}')
     
     # LLM Settings
-    DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
-    # Force use of official API, bypassing any dangling environment variables from proxy CMD sessions
-    DEEPSEEK_MODEL = 'deepseek-chat'
-    DEEPSEEK_API_BASE = 'https://api.deepseek.com/v1'
+    LLM_API_KEY = os.getenv('LLM_API_KEY')
+    # Load from .env, with deepseek defaults
+    LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-chat')
+    LLM_API_BASE = os.getenv('LLM_API_BASE', 'https://api.deepseek.com/v1')
     
     # External API Settings
     TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE') # Must be provided in .env

@@ -38,7 +38,7 @@ class SqlSessionStore:
         finally:
             db.close()
 
-    def add_message(self, session_id: str, role: str, content: str, token_usage: int = 0, model_name: str = None):
+    def add_message(self, session_id: str, role: str, content: str, token_usage: int = 0, prompt_tokens: int = 0, completion_tokens: int = 0, model_name: str = None):
         db = get_db_session()
         try:
             msg = ChatMessage(
@@ -46,6 +46,8 @@ class SqlSessionStore:
                 role=role,
                 content=content,
                 token_usage=token_usage,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
                 model_name=model_name,
                 created_at=datetime.utcnow()
             )

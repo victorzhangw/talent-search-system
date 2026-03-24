@@ -1,0 +1,18 @@
+    <!-- 1. 建立掛載點 (建議放在頁面底部) -->
+    <div id="app"></div>
+
+    <!-- 2. 設定參數 -->
+    <script>
+        window.TRAITTY_WIDGET_CONFIG = {
+            // 使用者識別 (必要,請填入登入的信箱)
+            userEmail: "[EMAIL_ADDRESS]",
+            apiBaseUrl: "https://traittyservice.aurocore.com/api/v2",
+
+            // 自動啟動 (必要)
+            autoInit: true
+        };
+    </script>
+    
+
+    <!-- 3. 載入 Widget 主程式 -->
+    <script src="https://traittychat.aurocore.com/loader.iife.js"></script>
