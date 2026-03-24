@@ -76,30 +76,29 @@ const logoSrc = computed(() => {
 
 .chat-launcher {
   position: fixed;
-  bottom: 2rem;
-  right: 2rem;
+  /* 對齊 chat-container 的 bottom: 1.5rem */
+  bottom: 1.5rem;
+  right: 1.5rem;
   z-index: 10000;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Default State (Closed): Transparent Button with Image */
+  /* Default State (Closed): Messenger 風格固定圓形按鈕 */
   &:not(.is-open) {
-    background: transparent; /* No background */
-    box-shadow: none; /* No shadow */
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: none;
     border: none;
-    
     padding: 0;
-    min-width: unset; 
-    width: auto;
-    height: auto;
-    
     display: flex;
     align-items: center;
     justify-content: center;
 
     &:hover {
-      transform: scale(1.05); /* Slight grow effect instead of lift */
-      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); /* Shadow on the image itself */
+      transform: scale(1.08);
+      filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3));
     }
   }
 
@@ -138,15 +137,15 @@ const logoSrc = computed(() => {
     justify-content: center;
     width: 100%;
     height: 100%;
-    overflow: hidden; /* Clip potential edge artifacts */
+    overflow: hidden;
     
     .logo-img {
-      height: 8.5rem; /* Standalone floating image size */
-      width: auto;
+      /* Messenger 風格：60px 固定圓形尺寸 */
+      width: 60px;
+      height: 60px;
       object-fit: contain;
-      display: block; /* Remove inline spacing */
+      display: block;
       color: rgba(255,255,255,0.1);
-      /* Fixes for rendering artifacts/flickering */
       transform: translate3d(0, 0, 0); 
       backface-visibility: hidden;
       -webkit-font-smoothing: antialiased;

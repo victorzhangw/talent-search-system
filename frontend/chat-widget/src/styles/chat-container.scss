@@ -24,11 +24,12 @@
     position: fixed;
     bottom: 1.5rem;
     right: 1.5rem;
-    width: 70vw;
-    min-width: 900px;
-    height: 800px;
+    /* 方案 B：Messenger 風格緊湊型浮動視窗 */
+    width: 400px;
+    min-width: 360px;
+    height: 580px;
     max-height: 92vh;
-    max-width: 95vw;
+    max-width: calc(100vw - 2rem);
     z-index: 9999;
 
     @media (max-width: 768px) {
@@ -47,12 +48,12 @@
     }
 
     /* Default Widget Border Radius */
-    border-radius: 32px;
+    border-radius: 20px;
 
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.45);
 
     @include glass-effect(true);
 
@@ -65,11 +66,11 @@
     max-width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
     right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 
-    /* Responsive for New Tab / Fullscreen */
+    /* 大螢幕也維持緊湊尺寸，不撐滿螢幕 */
     @media (min-width: 1400px) {
-        width: 90vw;
-        height: 90vh;
-        max-width: 1600px;
+        width: 480px;
+        height: 640px;
+        max-width: 480px;
     }
 
     /* FULLPAGE MODE OVERRIDE */
@@ -327,13 +328,11 @@
         display: none !important;
     }
 
-    /* Responsive Width for Fullscreen / Large Widget */
-    /* Applied when container is large enough, or explicitly in full-page mode */
+    /* 縮小版模式：1400px+ 大螢幕仍維持相對尺寸，不強制 min-width */
     @media (min-width: 1400px) {
-        width: 15%;
-        /* Less aggressive than before */
-        min-width: 300px;
-        max-width: 500px;
+        width: 40%;
+        min-width: unset;
+        max-width: 200px;
     }
 
     @media (max-width: 768px) {
