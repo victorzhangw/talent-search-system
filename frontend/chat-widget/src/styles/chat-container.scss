@@ -137,7 +137,8 @@
         padding: 0.35rem;
 
         [data-theme="midnight"] & {
-            background: rgba(255, 255, 255, 0.1);
+            /* Figma: 降低 header 元件白色覆蓋透明度至 0.08 */
+            background: rgba(255, 255, 255, 0.08);
         }
     }
 
@@ -151,7 +152,8 @@
         /* Matches Figma size */
 
         [data-theme="midnight"] & {
-            background: rgba(255, 255, 255, 0.1);
+            /* Figma: 降低 action-pill 白色覆蓋透明度至 0.08 */
+            background: rgba(255, 255, 255, 0.08);
         }
 
         @media (max-width: 768px) {
@@ -194,7 +196,8 @@
         justify-content: center;
 
         [data-theme="midnight"] & {
-            background: rgba(255, 255, 255, 0.1);
+            /* Figma: 降低 styled-circle 白色覆蓋透明度至 0.08 */
+            background: rgba(255, 255, 255, 0.08);
         }
 
         @media (max-width: 768px) {
@@ -257,7 +260,8 @@
             border-radius: 4px;
 
             [data-theme="midnight"] & {
-                background: rgba(255, 255, 255, 0.15);
+                /* Figma: icon-btn hover 深紫背景 */
+                background: rgba(255, 255, 255, 0.1);
             }
         }
 
@@ -361,7 +365,8 @@
     }
 
     [data-theme="midnight"] & {
-        background: rgba(255, 255, 255, 0.02);
+        /* Figma Aside: #262033（深紫側欄）*/
+        background: var(--sidebar-bg, #262033);
     }
 
     .history-actions {
@@ -421,7 +426,8 @@
                 /* slightly purple */
 
                 [data-theme="midnight"] & {
-                    background: rgba(255, 255, 255, 0.1);
+                    /* Figma Button hover: #3F3356（深紫）*/
+                    background: var(--btn-hover-bg, #3F3356);
                 }
             }
 
@@ -431,8 +437,9 @@
                 font-weight: 600;
 
                 [data-theme="midnight"] & {
-                    background: rgba(255, 255, 255, 0.15);
-                    color: #b07fff;
+                    /* Figma Candidate Card Selected: rgba(106,37,244,0.15) */
+                    background: rgba(106, 37, 244, 0.15);
+                    color: #a78bfa;
                 }
             }
         }
@@ -707,7 +714,8 @@
         flex-direction: column;
 
         [data-theme="midnight"] & {
-            background: #1f2937;
+            /* Figma Navigation Controls bg: #1E1430（深紫）*/
+            background: var(--nav-bg, #1E1430);
         }
 
         textarea {
@@ -789,18 +797,19 @@
                 }
 
                 [data-theme="midnight"] & {
-                    background: rgba(255, 255, 255, 0.1);
-                    border-color: rgba(255, 255, 255, 0.2);
+                    background: rgba(255, 255, 255, 0.08);
+                    border-color: rgba(255, 255, 255, 0.15);
                     color: var(--glass-text-primary);
 
                     &:hover {
-                        background: rgba(255, 255, 255, 0.2);
-                        border-color: rgba(255, 255, 255, 0.3);
+                        background: rgba(255, 255, 255, 0.15);
+                        border-color: rgba(255, 255, 255, 0.25);
                     }
 
                     &.active {
-                        background: #8b5cf6;
-                        border-color: #8b5cf6;
+                        /* 對齊 Figma 品牌紫 #6A25F4 */
+                        background: #6A25F4;
+                        border-color: #6A25F4;
                     }
                 }
 

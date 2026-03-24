@@ -43,21 +43,34 @@
     --bubble-ai-border: rgba(0, 0, 0, 0.06);
 }
 
-/* Theme: Midnight (OLED/High Contrast) */
+/* Theme: Midnight - 符合 Figma Traitty AI UI 深紫色系 */
 [data-theme='midnight'] {
-    --glass-bg: rgba(5, 5, 10, 0.98);
-    /* Almost black */
-    --glass-border: rgba(255, 255, 255, 0.15);
+    /* 主背景：Figma Main Workspace #150731（深紫黑） */
+    --glass-bg: #150731;
+    /* 邊框：接近 Figma Overlay stroke 9% 白 */
+    --glass-border: rgba(255, 255, 255, 0.09);
     --glass-text-primary: #ffffff;
-    --glass-text-secondary: #94a3b8;
+    /* 次要文字：對齊 Figma #9CA3AF */
+    --glass-text-secondary: #9CA3AF;
 
-    --primary-color: #3b82f6;
-    --bubble-ai-bg: rgba(30, 41, 59, 0.4);
-    --bubble-ai-border: rgba(51, 65, 85, 0.5);
+    /* 主色：還原為 Figma 品牌紫 #6A25F4 */
+    --primary-color: #6A25F4;
+    --primary-hover: #5B1CE0;
 
-    /* 快速提問彈出視窗：暗色模式覆寫 */
-    --quick-popover-bg: rgba(30, 30, 40, 0.98);
-    --quick-popover-header-bg: rgba(40, 40, 50, 1);
+    /* AI 氣泡：紫色調取代原本藍灰 */
+    --bubble-ai-bg: rgba(46, 33, 77, 0.5);
+    --bubble-ai-border: rgba(63, 51, 86, 0.6);
+
+    /* 快速提問彈出視窗：接近 Figma 深紫底色 */
+    --quick-popover-bg: rgba(21, 7, 49, 0.98);
+    --quick-popover-header-bg: rgba(30, 20, 48, 1);
+
+    /* 🆕 側欄背景：Figma Aside #262033 */
+    --sidebar-bg: #262033;
+    /* 🆕 導航列背景：Figma Navigation Controls #1E1430 */
+    --nav-bg: #1E1430;
+    /* 🆕 按鈕 hover/active 背景：Figma Button hover #3F3356 */
+    --btn-hover-bg: #3F3356;
 }
 
 /* Theme: Sepia (Reading Mode) */
