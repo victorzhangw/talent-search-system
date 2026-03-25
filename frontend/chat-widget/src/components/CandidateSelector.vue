@@ -393,6 +393,7 @@ defineExpose({
     justify-content: space-between;
     align-items: center;
     padding: 0 0.2rem;
+    position: relative;
     
     @media (max-width: 768px) {
         flex-direction: column;
@@ -439,7 +440,7 @@ defineExpose({
 }
 
 .centered-selected-text {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
     color: var(--glass-text-primary);
     /* 將此元素推到父容器中間 - 使用 absolute 或 flex auto-margin 技巧 */
