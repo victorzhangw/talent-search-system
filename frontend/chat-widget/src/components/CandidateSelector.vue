@@ -393,7 +393,7 @@ defineExpose({
     justify-content: space-between;
     align-items: center;
     padding: 0 0.2rem;
-    position: relative;
+    gap: 0.2rem;
     
     @media (max-width: 768px) {
         flex-direction: column;
@@ -406,8 +406,8 @@ defineExpose({
 .batch-actions {
     display: flex;
     align-items: center;
-    gap: 0.8rem;
-    font-size: 0.85rem;
+    gap: 0.4rem;
+    font-size: 0.75rem;
     
     @media (max-width: 768px) {
         display: none !important; /* Hide select all / clear on mobile */
@@ -428,11 +428,11 @@ defineExpose({
 }
 
 .list-stats {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--glass-text-secondary);
     display: flex;
     align-items: center;
-    gap: 1.5rem; /* 給予間距 */
+    gap: 0.5rem; /* 給予間距 */
     
     @media (max-width: 768px) {
         display: none !important;
@@ -440,13 +440,12 @@ defineExpose({
 }
 
 .centered-selected-text {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--glass-text-primary);
-    /* 將此元素推到父容器中間 - 使用 absolute 或 flex auto-margin 技巧 */
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
     
     @media (max-width: 768px) {
         position: static;
@@ -476,7 +475,7 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.6rem 0.8rem; 
+  padding: 0.8rem 0.8rem; 
   
   @media (max-width: 768px) {
       padding: 0.2rem 0.3rem;
