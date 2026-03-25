@@ -152,6 +152,18 @@
         gap: 0.6rem;
     }
 
+    /* Global Material Icon overrides for header */
+    .material-icon {
+        width: 18px; /* Compact mode default */
+        height: 18px;
+        object-fit: contain;
+
+        .expanded-mode & {
+            width: 24px;
+            height: 24px;
+        }
+    }
+
     .border-box {
         border-radius: 8px;
         background: rgba(127, 127, 127, 0.1);
@@ -236,11 +248,12 @@
 
     .title {
         font-weight: 700;
-        font-size: 1rem; /* Compact mode default */
+        font-size: 1rem;
+        /* Compact mode default */
         color: var(--glass-text-primary);
         gap: 0.4rem;
         white-space: nowrap;
-        margin-left: 10px;
+        margin-right: 15px;
 
         .expanded-mode & {
             font-size: 1.1rem;
@@ -253,7 +266,8 @@
         }
 
         .title-img-icon {
-            width: 18px; /* Compact mode default */
+            width: 18px;
+            /* Compact mode default */
             height: 18px;
             object-fit: contain;
 
@@ -897,7 +911,11 @@
     justify-content: center;
     align-items: flex-end;
     backdrop-filter: blur(2px);
-    padding: 2rem;
+    padding: 0.9rem;
+
+    .expanded-mode & {
+        padding: 2rem;
+    }
 
     [data-theme="midnight"] & {
         background: rgba(0, 0, 0, 0.7);
@@ -928,14 +946,16 @@
 
         /* Custom Scrollbar for better visibility */
         scrollbar-width: thin;
-        scrollbar-color: rgba(0,0,0,0.2) transparent;
+        scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 
         &::-webkit-scrollbar {
             width: 6px;
         }
+
         &::-webkit-scrollbar-track {
             background: transparent;
         }
+
         &::-webkit-scrollbar-thumb {
             background-color: rgba(0, 0, 0, 0.2);
             border-radius: 4px;
@@ -943,7 +963,8 @@
     }
 
     /* 2 Columns when expanded or full page */
-    .expanded-mode &, .full-page-mode & {
+    .expanded-mode &,
+    .full-page-mode & {
         :deep(.list-container) {
             display: grid !important;
             grid-template-columns: repeat(2, 1fr) !important;
@@ -958,7 +979,8 @@
     /* Scrollbar in Midnight Theme */
     [data-theme="midnight"] & {
         :deep(.list-container) {
-            scrollbar-color: rgba(255,255,255,0.3) transparent;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+
             &::-webkit-scrollbar-thumb {
                 background-color: rgba(255, 255, 255, 0.3);
             }

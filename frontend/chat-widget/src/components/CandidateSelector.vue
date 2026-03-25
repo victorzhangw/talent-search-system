@@ -475,7 +475,7 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.8rem 0.8rem; 
+  padding: 0.4rem 0.8rem; 
   
   @media (max-width: 768px) {
       padding: 0.2rem 0.3rem;
