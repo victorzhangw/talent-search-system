@@ -618,6 +618,7 @@ const confirmAddCandidates = async () => {
 
 .chat-container.expanded-mode {
     width: 98vw;
+    height: 90vh;
     max-width: none;
     right: 1vw;
     /* Optional: Ensure header doesn't stretch weirdly if needed, but flex handles it */

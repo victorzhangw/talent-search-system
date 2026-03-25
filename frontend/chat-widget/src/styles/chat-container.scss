@@ -74,6 +74,18 @@
         max-width: 400px;
     }
 
+    /* EXPANDED MODE OVERRIDE (全寬模式) */
+    &.expanded-mode {
+        width: 90vw;
+        height: 90vh;
+        max-width: 1600px;
+        /* 在大螢幕下也可確保全寬模式有足夠空間 */
+        @media (min-width: 1400px) {
+            width: 90vw;
+            max-width: 1600px;
+        }
+    }
+
     /* FULLPAGE MODE OVERRIDE */
     &.full-page-mode {
         position: fixed;
