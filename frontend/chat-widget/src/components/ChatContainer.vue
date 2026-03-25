@@ -22,7 +22,7 @@
       <div class="header-right">
         <div class="action-pill">
             <!-- Expand -->
-            <button v-if="!isFullPage" class="icon-btn desktop-only" @click="toggleExpand" :title="isExpanded ? '恢復預設寬度' : '切換全寬模式'">
+            <button v-if="!isFullPage" class="icon-btn desktop-only" @click="toggleExpand" :title="isExpanded ? '恢復緊湊視窗' : '展開完整視窗'">
                 <img v-if="!isExpanded" src="../assets/images/展開箭頭.svg" class="material-icon" alt="展開" />
                 <img v-else src="../assets/images/收起箭頭.svg" class="material-icon" alt="收起" />
             </button>
