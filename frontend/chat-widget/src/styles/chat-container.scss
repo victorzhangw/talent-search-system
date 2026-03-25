@@ -24,11 +24,12 @@
     position: fixed;
     bottom: 1.5rem;
     right: 1.5rem;
-    width: 70vw;
-    min-width: 900px;
-    height: 800px;
+    /* 方案 2：長條浮動手機版樣式 */
+    width: 400px;
+    min-width: 360px;
+    height: 65vh;
     max-height: 92vh;
-    max-width: 95vw;
+    max-width: calc(100vw - 2rem);
     z-index: 9999;
 
     @media (max-width: 768px) {
@@ -65,11 +66,12 @@
     max-width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
     right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 
-    /* Responsive for New Tab / Fullscreen */
+    /* 大螢幕（桌機）也套用手機版尺寸，取消強制撐滿 */
     @media (min-width: 1400px) {
-        width: 90vw;
-        height: 90vh;
-        max-width: 1600px;
+        /* 維持原本 400px 寬度即可，不需要改變尺寸 */
+        width: 400px;
+        height: 65vh;
+        max-width: 400px;
     }
 
     /* FULLPAGE MODE OVERRIDE */
@@ -93,7 +95,7 @@
 }
 
 .header {
-    padding: 0.8rem 1.2rem;
+    padding: 0.4rem 1.2rem;
     border-bottom: 1px solid var(--glass-border);
     display: flex;
     justify-content: space-between;
