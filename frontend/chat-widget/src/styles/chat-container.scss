@@ -79,6 +79,7 @@
         width: 90vw;
         height: 90vh;
         max-width: 1600px;
+
         /* 在大螢幕下也可確保全寬模式有足夠空間 */
         @media (min-width: 1400px) {
             width: 90vw;
@@ -114,6 +115,12 @@
     align-items: center;
     background: rgba(127, 127, 127, 0.05);
     flex-shrink: 0;
+
+    [data-theme="midnight"] & {
+        /* Figma: 降低 header 元件白色覆蓋透明度至 0.08 */
+        background: rgba(45, 30, 73, 1);
+
+    }
 
     .header-left,
     .header-right {
@@ -898,16 +905,50 @@
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
     border: 1px solid var(--glass-border);
 
-    /* Force Two Columns inside Modal */
+    /* Container layout inside Modal */
     :deep(.list-container) {
-        display: grid !important;
-        grid-template-columns: repeat(2, 1fr);
+        /* Default for Compact Mode (1 Column) */
+        display: flex !important;
+        flex-direction: column !important;
         gap: 0.8rem;
-        align-content: start;
         padding-right: 0.5rem;
 
-        @media (max-width: 768px) {
-            grid-template-columns: 1fr;
+        /* Custom Scrollbar for better visibility */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0,0,0,0.2) transparent;
+
+        &::-webkit-scrollbar {
+            width: 6px;
+        }
+        &::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        &::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+    }
+
+    /* 2 Columns when expanded or full page */
+    .expanded-mode &, .full-page-mode & {
+        :deep(.list-container) {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            align-content: start;
+
+            @media (max-width: 768px) {
+                grid-template-columns: 1fr !important;
+            }
+        }
+    }
+
+    /* Scrollbar in Midnight Theme */
+    [data-theme="midnight"] & {
+        :deep(.list-container) {
+            scrollbar-color: rgba(255,255,255,0.3) transparent;
+            &::-webkit-scrollbar-thumb {
+                background-color: rgba(255, 255, 255, 0.3);
+            }
         }
     }
 
