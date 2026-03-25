@@ -21,6 +21,9 @@
 }
 
 .chat-container {
+    margin: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
     position: fixed;
     bottom: 1.5rem;
     right: 1.5rem;
@@ -154,7 +157,8 @@
 
     /* Global Material Icon overrides for header */
     .material-icon {
-        width: 18px; /* Compact mode default */
+        width: 18px;
+        /* Compact mode default */
         height: 18px;
         object-fit: contain;
 
@@ -1081,7 +1085,7 @@
 
         .confirm-btn {
             border-radius: 20px;
-            padding: 0.6rem 3rem;
+            padding: 0.6rem 1rem;
             min-width: 200px;
             display: flex;
             align-items: center;
@@ -1792,7 +1796,12 @@
 }
 
 .chat-input-container {
-    margin: 1rem 1.2rem;
+    margin: 1rem 0rem;
+
+    .expanded-mode & {
+        margin: 1rem 1.2rem;
+    }
+
     border: 2px dashed #a5b4fc;
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.4);
