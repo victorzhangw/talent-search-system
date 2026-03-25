@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="candidate-selector">
     
 
@@ -254,27 +254,27 @@ defineExpose({
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0.4rem;
+  padding: 0.4em;
   color: var(--glass-text-primary);
   overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
 .header-section {
   flex-shrink: 0;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.5em;
   
   h3 { 
       margin: 0; 
-      font-size: 1.1rem; 
+      font-size: 1.1em; 
       color: var(--glass-text-primary);
       display: flex;
       align-items: baseline;
-      gap: 0.5rem;
+      gap: 0.5em;
       flex-wrap: wrap; 
   }
   
   .subtitle { 
-      font-size: 0.85rem; 
+      font-size: 0.85em; 
       color: var(--glass-text-secondary); 
       font-weight: normal;
   }
@@ -285,14 +285,14 @@ defineExpose({
     @media (max-width: 768px) {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-        padding: 0 0.5rem 0.5rem;
+        gap: 0.5em;
+        padding: 0 0.5em 0.5em;
         border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.5em;
     }
     
     .tags-header {
-        font-size: 0.85rem;
+        font-size: 0.85em;
         color: var(--glass-text-secondary);
         font-weight: 500;
     }
@@ -300,19 +300,19 @@ defineExpose({
     .tags-list {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem;
+        gap: 0.5em;
     }
     
     .selected-tag {
         display: inline-flex;
         align-items: center;
-        gap: 0.1rem;
+        gap: 0.1em;
         background: rgba(106, 37, 244, 0.1);
         border: 1px solid rgba(106, 37, 244, 0.2);
         color: var(--primary-color);
-        padding: 0.2rem 0.2rem;
+        padding: 0.2em 0.2em;
         border-radius: 16px;
-        font-size: 0.5rem;
+        font-size: 0.5em;
         cursor: pointer;
         
         .tag-close-icon {
@@ -326,10 +326,10 @@ defineExpose({
 
 .search-toolbar {
     flex-shrink: 0;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.5em;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.5em;
 }
 
 .search-box {
@@ -339,14 +339,14 @@ defineExpose({
     background: rgba(127, 127, 127, 0.1);
     border: 1px solid var(--glass-border);
     border-radius: 32px;
-    padding: 0 0.8rem;
+    padding: 0 0.8em;
     height: 40px;
     
     @media (max-width: 768px) {
         height: 30px;
     }
     
-    .icon { opacity: 0.6; margin-right: 0.5rem; width: 18px; height: 18px; }
+    .icon { opacity: 0.6; margin-right: 0.5em; width: 18px; height: 18px; }
     
     input {
         border: none;
@@ -356,10 +356,10 @@ defineExpose({
         height: 100%;
         outline: none;
         font-family: inherit;
-        font-size: 0.95rem;
+        font-size: 0.95em;
 
         @media (max-width: 768px) {
-            font-size: 0.65rem;
+            font-size: 0.65em;
         }
         
         &::placeholder { color: var(--glass-text-secondary); opacity: 0.7; }
@@ -370,7 +370,7 @@ defineExpose({
         border: 1px solid rgba(127, 127, 127, 0.2);
         color: var(--glass-text-secondary);
         cursor: pointer;
-        padding: 0.2rem;
+        padding: 0.2em;
         border-radius: 50%; /* 改為圓形 */
         display: flex;
         align-items: center;
@@ -392,12 +392,12 @@ defineExpose({
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 0.2rem;
-    gap: 0.2rem;
+    padding: 0 0.2em;
+    gap: 0.2em;
     
     @media (max-width: 768px) {
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 0.5em;
         align-items: flex-start;
         position: relative;
     }
@@ -406,8 +406,8 @@ defineExpose({
 .batch-actions {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
+    gap: 0.4em;
+    font-size: 0.75em;
     
     @media (max-width: 768px) {
         display: none !important; /* Hide select all / clear on mobile */
@@ -428,11 +428,11 @@ defineExpose({
 }
 
 .list-stats {
-    font-size: 0.75rem;
+    font-size: 0.75em;
     color: var(--glass-text-secondary);
     display: flex;
     align-items: center;
-    gap: 0.5rem; /* 給予間距 */
+    gap: 0.5em; /* 給予間距 */
     
     @media (max-width: 768px) {
         display: none !important;
@@ -440,7 +440,7 @@ defineExpose({
 }
 
 .centered-selected-text {
-    font-size: 0.8rem;
+    font-size: 0.8em;
     font-weight: 600;
     color: var(--glass-text-primary);
     flex: 1;
@@ -452,9 +452,9 @@ defineExpose({
         transform: none;
         width: 100%;
         text-align: center;
-        margin-top: 0.5rem;
-        font-size: 1rem;
-        padding-bottom: 0.5rem;
+        margin-top: 0.5em;
+        font-size: 1em;
+        padding-bottom: 0.5em;
         border-bottom: 1px solid rgba(0,0,0,0.05);
     }
 }
@@ -467,18 +467,18 @@ defineExpose({
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding-right: 0.5rem; 
+  gap: 0.6em;
+  padding-right: 0.5em; 
 }
 
 .candidate-item {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0.8rem; 
+  gap: 0.3em;
+  padding: 0.4em 0.8em; 
   
   @media (max-width: 768px) {
-      padding: 0.2rem 0.3rem;
+      padding: 0.2em 0.3em;
   }
   
   background: white; 
@@ -562,7 +562,7 @@ defineExpose({
     align-items: center;
     justify-content: center;
     color: white;
-    font-size: 0.8rem;
+    font-size: 0.8em;
     flex-shrink: 0;
     transition: all 0.2s;
     
@@ -570,8 +570,8 @@ defineExpose({
         width: 18px;
         height: 18px;
         order: -1;          /* Force to the left side */
-        margin-left: 0;     /* Remove desktop push-right */
-        margin-right: 0.5rem;
+        margin-left: 0;     /* emove desktop push-right */
+        margin-right: 0.5em;
     }
     
     .check-icon { width: 14px; height: 14px; }
@@ -580,29 +580,29 @@ defineExpose({
   .info {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.95rem;
+    gap: 0.5em;
+    font-size: 0.95em;
     min-width: 0;
     flex: 1;
     
     @media (max-width: 768px) {
-        font-size: 0.85rem;
+        font-size: 0.85em;
         flex-direction: column;
         align-items: flex-start;
-        gap: 0.1rem;
+        gap: 0.1em;
     }
     
     .name { 
         font-weight: 500; 
-        font-size: 0.95rem;
+        font-size: 0.95em;
         color: var(--glass-text-primary); 
         
         @media (max-width: 768px) {
-            font-size: 0.5rem;
+            font-size: 0.5em;
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            gap: 0.1rem;
+            gap: 0.1em;
         }
         overflow: hidden;
         text-overflow: ellipsis;
@@ -610,10 +610,10 @@ defineExpose({
         flex: 1; 
 
         .position {
-            font-size: 0.8rem;
+            font-size: 0.8em;
             color: var(--glass-text-secondary);
             font-weight: normal;
-            margin-left: 0.3rem;
+            margin-left: 0.3em;
             
             @media (max-width: 768px) {
                 margin-left: 0;
@@ -622,9 +622,9 @@ defineExpose({
         }
         
         .email {
-            font-size: 0.5rem;
+            font-size: 0.5em;
             color: var(--glass-text-secondary);
-            margin-left: 0.5rem;
+            margin-left: 0.5em;
             display: none; 
             
             @media (max-width: 768px) {
@@ -638,20 +638,20 @@ defineExpose({
 
 .empty-state {
     text-align: center;
-    padding: 2rem;
+    padding: 2em;
     color: var(--glass-text-secondary);
     font-style: italic;
 }
 
 .loading-more {
-    padding: 1rem;
+    padding: 1em;
     text-align: center;
     color: var(--glass-text-secondary);
-    font-size: 0.85rem;
+    font-size: 0.85em;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.5em;
 
     .spinner-small {
         width: 16px; 
@@ -664,14 +664,14 @@ defineExpose({
 }
 
 .scroll-hint {
-    padding: 0.8rem;
+    padding: 0.8em;
     text-align: center;
     color: var(--glass-text-secondary);
-    font-size: 0.8rem;
+    font-size: 0.8em;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.3em;
     opacity: 0.7;
     transition: opacity 0.2s;
     
