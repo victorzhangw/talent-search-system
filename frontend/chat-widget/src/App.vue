@@ -12,22 +12,24 @@
     
     <!-- Backdrop Overlay to block parent page clicks -->
     <Teleport to="body">
-      <transition name="fade">
-        <div 
-          v-if="isOpen && !isFullPageMode" 
-          class="widget-modal-backdrop"
-          @click="isOpen = true" 
-        ></div>
-      </transition>
-      
-      <transition name="fade">
-        <ChatContainer 
-          v-if="isOpen" 
-          :is-full-page="isFullPageMode" 
-          @close="handleClose" 
-          @minimize="handleMinimize"
-        />
-      </transition>
+      <div class="talent-widget-portal-reset">
+        <transition name="fade">
+          <div 
+            v-if="isOpen && !isFullPageMode" 
+            class="widget-modal-backdrop"
+            @click="isOpen = true" 
+          ></div>
+        </transition>
+        
+        <transition name="fade">
+          <ChatContainer 
+            v-if="isOpen" 
+            :is-full-page="isFullPageMode" 
+            @close="handleClose" 
+            @minimize="handleMinimize"
+          />
+        </transition>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -112,6 +114,21 @@ onMounted(() => {
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   z-index: 9998; /* Just below the chat container's 9999 */
+}
+
+/* Teleport to body -> the subtree won't be affected by #talent-rag-widget's reset.
+   Provide a local reset wrapper to resist host page inherited/default styles. */
+.talent-widget-portal-reset {
+  all: initial;
+  display: contents;
+  font-family: 'Inter', system-ui, sans-serif;
+
+  line-height: 1.6;
+
+  /* Reset box sizing inside the teleported subtree */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
 }
 
 /* Base fade transition for both the launcher, overlay, and container if needed */

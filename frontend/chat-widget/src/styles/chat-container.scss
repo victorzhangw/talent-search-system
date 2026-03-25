@@ -30,7 +30,7 @@
     /* 方案 2：長條浮動手機版樣式 */
     width: 400px;
     min-width: 360px;
-    height: 65vh;
+    height: 88vh;
     max-height: 92vh;
     max-width: calc(100vw - 2rem);
     z-index: 9999;
@@ -73,7 +73,7 @@
     @media (min-width: 1400px) {
         /* 維持原本 400px 寬度即可，不需要改變尺寸 */
         width: 400px;
-        height: 65vh;
+        height: 88vh;
         max-width: 400px;
     }
 
@@ -795,7 +795,7 @@
             .select-candidate-btn {
                 background: transparent;
                 border: 1px solid var(--glass-border);
-                padding: 0.5rem 1rem;
+                padding: 0.5rem 0.6rem;
                 border-radius: 20px;
                 color: var(--glass-text-secondary);
                 font-size: 0.85rem;
