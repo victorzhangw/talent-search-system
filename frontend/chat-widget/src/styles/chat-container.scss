@@ -236,18 +236,31 @@
 
     .title {
         font-weight: 700;
-        font-size: 1.1rem;
+        font-size: 1rem; /* Compact mode default */
         color: var(--glass-text-primary);
         gap: 0.4rem;
         white-space: nowrap;
+        margin-left: 10px;
+
+        .expanded-mode & {
+            font-size: 1.1rem;
+            margin-left: 0;
+        }
 
         @media (max-width: 768px) {
             font-size: 0.9rem;
+            margin-left: 0;
         }
 
         .title-img-icon {
-            width: 24px;
-            height: 24px;
+            width: 18px; /* Compact mode default */
+            height: 18px;
+            object-fit: contain;
+
+            .expanded-mode & {
+                width: 24px;
+                height: 24px;
+            }
 
             @media (max-width: 768px) {
                 width: 18px;
