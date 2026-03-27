@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="candidate-selector">
     
 
@@ -312,7 +312,7 @@ defineExpose({
         color: var(--primary-color);
         padding: 0.2em 0.2em;
         border-radius: 16px;
-        font-size: 0.5em;
+        font-size: 0.6em;
         cursor: pointer;
         
         .tag-close-icon {
@@ -356,7 +356,7 @@ defineExpose({
         height: 100%;
         outline: none;
         font-family: inherit;
-        font-size: 0.95em;
+        font-size: 0.9em;
 
         @media (max-width: 768px) {
             font-size: 0.65em;
@@ -500,6 +500,10 @@ defineExpose({
   &.active {
     background: rgba(106, 37, 244, 0.03); 
     border-color: rgba(106, 37, 244, 0.15);
+
+    [data-theme="midnight"] & {
+      background: rgba(63, 42, 107, 1);
+    }
   }
 
   &.locked {
@@ -581,7 +585,7 @@ defineExpose({
     display: flex;
     align-items: center;
     gap: 0.5em;
-    font-size: 0.95em;
+    font-size: 0.9em;
     min-width: 0;
     flex: 1;
     
@@ -594,11 +598,11 @@ defineExpose({
     
     .name { 
         font-weight: 500; 
-        font-size: 0.95em;
+        font-size: 0.9em;
         color: var(--glass-text-primary); 
         
         @media (max-width: 768px) {
-            font-size: 0.5em;
+            font-size: 0.8em;
             display: flex;
             flex-direction: column;
             align-items: flex-start;
@@ -622,7 +626,7 @@ defineExpose({
         }
         
         .email {
-            font-size: 0.5em;
+            font-size: 0.6em;
             color: var(--glass-text-secondary);
             margin-left: 0.5em;
             display: none; 

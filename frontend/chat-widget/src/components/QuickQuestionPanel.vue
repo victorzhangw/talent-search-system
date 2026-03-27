@@ -4,7 +4,7 @@
     <div class="mobile-popover-header" v-if="showMobileQuickQuestions">
       <div class="header-left-content">
         <svg class="material-icon" viewBox="0 0 24 24"><path d="M3.06822 9.4092L1.85005 10.6075M1.72276 6.21345H0M1.85005 1.82022L3.06822 3.01848M6.31708 0V1.6946M10.7833 1.82022L9.5651 3.01848M12.9786 12.7458L17.365 11.2396C18.1872 10.9573 18.219 9.8248 17.4136 9.5104L7.3781 6.07269C6.62375 5.7782 5.86518 6.50613 6.1456 7.2554L9.4317 17.4017C9.7309 18.2013 10.8816 18.1988 11.1896 17.3979L12.9786 12.7458Z" stroke="#101010" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>點擊取得 Traitty 專業解析</span>
+        <span>點擊取得專業解析</span>
       </div>
       <button class="close-popover-btn" @click="closeMobile">✕</button>
     </div>

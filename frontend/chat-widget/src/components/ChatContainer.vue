@@ -15,7 +15,7 @@
       <!-- Center: Title -->
       <div class="header-center title">
         <img src="../assets/images/TraittyAIIcon-S.svg" class="title-img-icon" alt="Traitty AI" />
-        Traitty AI
+        問問 Traitty
       </div>
 
       <!-- Right: Actions -->
@@ -193,7 +193,7 @@
                                    
                                     <button class="primary-btn confirm-btn" @click="confirmSelection">
                                         <img src="../assets/images/AI star.svg" class="material-icon small" alt="AI Star" />
-                                        <span class="desktop-only">開始分析</span><span class="mobile-only">確認</span> {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
+                                        <span class="desktop-only">開始分析</span><span class="mobile-only">開始分析</span> {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
                                     </button>
                                      <button class="secondary-btn cancel-btn" @click="showCandidateDropdown = false">
                                         關閉視窗
@@ -207,14 +207,16 @@
                     <div class="big-input-box">
                         <textarea 
                             v-model="inputQuery" 
-                            :placeholder="selectedCandidateIds.length > 0 ? '向 Traitty 詢問任何人才相關問題...' : '進入對話後，需開啟新人才解析方能選擇其他人選。'"
+                            :placeholder="selectedCandidateIds.length > 0 ? '問問Traitty' : '進入對話後，需開啟新人才解析方能選擇其他人選。'"
                             :disabled="selectedCandidateIds.length === 0"
                         ></textarea>
                         <div class="input-actions-row">
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
                                 <button class="select-candidate-btn" @click="showCandidateDropdown = true">
                                     選取人才 {{ selectedCandidateIds.length > 0 ? `(${selectedCandidateIds.length})` : '' }}
-                                    <img src="../assets/images/human-search.svg" class="material-icon small" alt="搜尋" />
+                                    <svg class="material-icon small" viewBox="0 0 18 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M6.66667 6.66667C5.75 6.66667 4.96528 6.34028 4.3125 5.6875C3.65972 5.03472 3.33333 4.25 3.33333 3.33333C3.33333 2.41667 3.65972 1.63194 4.3125 0.979167C4.96528 0.326389 5.75 0 6.66667 0C7.58333 0 8.36806 0.326389 9.02083 0.979167C9.67361 1.63194 10 2.41667 10 3.33333C10 4.25 9.67361 5.03472 9.02083 5.6875C8.36806 6.34028 7.58333 6.66667 6.66667 6.66667ZM6.66667 5C7.125 5 7.51736 4.83681 7.84375 4.51042C8.17014 4.18403 8.33333 3.79167 8.33333 3.33333C8.33333 2.875 8.17014 2.48264 7.84375 2.15625C7.51736 1.82986 7.125 1.66667 6.66667 1.66667C6.20833 1.66667 5.81597 1.82986 5.48958 2.15625C5.16319 2.48264 5 2.875 5 3.33333C5 3.79167 5.16319 4.18403 5.48958 4.51042C5.81597 4.83681 6.20833 5 6.66667 5ZM15.9167 16.25L13.25 13.5833C12.9583 13.75 12.6458 13.8889 12.3125 14C11.9792 14.1111 11.625 14.1667 11.25 14.1667C10.2083 14.1667 9.32292 13.8021 8.59375 13.0729C7.86458 12.3438 7.5 11.4583 7.5 10.4167C7.5 9.375 7.86458 8.48958 8.59375 7.76042C9.32292 7.03125 10.2083 6.66667 11.25 6.66667C12.2917 6.66667 13.1771 7.03125 13.9062 7.76042C14.6354 8.48958 15 9.375 15 10.4167C15 10.7917 14.9444 11.1458 14.8333 11.4792C14.7222 11.8125 14.5833 12.125 14.4167 12.4167L17.0833 15.0833L15.9167 16.25ZM11.25 12.5C11.8333 12.5 12.3264 12.2986 12.7292 11.8958C13.1319 11.4931 13.3333 11 13.3333 10.4167C13.3333 9.83333 13.1319 9.34028 12.7292 8.9375C12.3264 8.53472 11.8333 8.33333 11.25 8.33333C10.6667 8.33333 10.1736 8.53472 9.77083 8.9375C9.36806 9.34028 9.16667 9.83333 9.16667 10.4167C9.16667 11 9.36806 11.4931 9.77083 11.8958C10.1736 12.2986 10.6667 12.5 11.25 12.5ZM0 13.3333V11.0208C0 10.5486 0.118056 10.1111 0.354167 9.70833C0.590278 9.30556 0.916667 9 1.33333 8.79167C2.04167 8.43056 2.84028 8.125 3.72917 7.875C4.61806 7.625 5.60417 7.5 6.6875 7.5C6.52083 7.75 6.37847 8.01736 6.26042 8.30208C6.14236 8.58681 6.04861 8.88194 5.97917 9.1875C5.14583 9.25694 4.40278 9.39931 3.75 9.61458C3.09722 9.82986 2.54861 10.0556 2.10417 10.2917C1.96528 10.3611 1.85764 10.4618 1.78125 10.5938C1.70486 10.7257 1.66667 10.8681 1.66667 11.0208V11.6667H5.97917C6.04861 11.9722 6.14236 12.2639 6.26042 12.5417C6.37847 12.8194 6.52083 13.0833 6.6875 13.3333H0Z" fill="currentColor"/>
+                                    </svg>
                                 </button>
                                 <button class="welcome-quick-btn" 
                                     @click="toggleMobileQuickQuestions" 
@@ -227,7 +229,7 @@
                             </div>
                             <button class="send-btn" @click="handleInitialSend" :disabled="!canSendInitial">
                                 <svg class="material-icon" viewBox="0 0 15 15">
-                                  <path d="M6.0625 14.75V5.04167L1.85417 9.25L0 7.375L7.375 0L14.75 7.375L12.8958 9.25L8.6875 5.04167V14.75H6.0625Z" fill="white"/>
+                                  <path d="M6.0625 14.75V5.04167L1.85417 9.25L0 7.375L7.375 0L14.75 7.375L12.8958 9.25L8.6875 5.04167V14.75H6.0625Z"/>
                                 </svg>
                             </button>
                         </div>
@@ -252,8 +254,8 @@
                             <div class="left-actions">
                                 <div class="locked-status-wrapper">
                                     <button class="locked-status-btn" @click="toggleLockedCandidates" :class="{ 'active': showLockedCandidates }">
-                                        <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-                                        鎖定 {{ activeConversationCandidatesObjects.length }} 位人選
+                                        
+                                        選定 {{ activeConversationCandidatesObjects.length }} 位人選
                                         <svg class="material-icon small dropdown-icon" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
                                     </button>
                                     
@@ -261,8 +263,8 @@
                                         <div v-if="showLockedCandidates" class="locked-candidates-dropdown">
                                             <div class="dropdown-info-header">
                                                 <div class="info-content">
-                                                    <svg class="material-icon small" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-                                                    <span>開啟新人才解析，方能『選擇其他人選』</span>
+                                                   
+                                                    <span>增刪人選或開啟新解析</span>
                                                 </div>
                                                 <button class="close-dropdown-btn" @click.stop="showLockedCandidates = false">✕</button>
                                             </div>
