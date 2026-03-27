@@ -1,6 +1,7 @@
 from flask import Blueprint, request, Response, jsonify, stream_with_context, current_app
 import json
 import threading
+import os
 from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
 from ..services.session_store import SqlSessionStore
@@ -19,7 +20,18 @@ def background_generate_title(session_id, user_query, candidate_names):
             return
             
         # 1. Ask LLM for title
-        prompt = f"請根據以下使用者的提問與選擇的候選人，產生一個 15 字以內的對話標題，不要任何引號或解釋。\n候選人：{', '.join(candidate_names) if candidate_names else '無'}\n提問：{user_query}"
+        c_names = ', '.join(candidate_names) if candidate_names else '無'
+        
+        # Load prompt from external file
+        prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', 'conversation_title_prompt.txt')
+        try:
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                prompt_tpl = f.read()
+            prompt = prompt_tpl.format(c_names=c_names, user_query=user_query)
+        except Exception as pe:
+            print(f"[Background Title] Prompt load error: {pe}")
+            # Fallback simple prompt
+            prompt = f"分析候選人 {c_names} 的對話，摘要為 19 字以內的標題。提問：{user_query}"
         
         messages = [{"role": "user", "content": prompt}]
         response = rag_service.client.chat.completions.create(
@@ -29,8 +41,8 @@ def background_generate_title(session_id, user_query, candidate_names):
             temperature=0.3
         )
         title = response.choices[0].message.content.strip().strip('"\'')
-        if len(title) > 15:
-            title = title[:15]
+        if len(title) > 20:
+            title = title[:20]
             
         # 1.5 Record Token Usage
         total_tokens = getattr(response.usage, 'total_tokens', 0) if hasattr(response, 'usage') else 0
