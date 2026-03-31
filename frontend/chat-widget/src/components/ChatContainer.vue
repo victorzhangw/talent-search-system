@@ -668,6 +668,12 @@ const confirmAddCandidates = async () => {
         min-width: 200px;          /* ← 原 240px */
         border-left: 1px solid var(--glass-border);
         background: rgba(0, 0, 0, 0.02);
+        @media (max-width: 768px) {
+           
+            min-width: 250px !important;
+            
+           
+        }
     }
 }
 
