@@ -141,16 +141,17 @@ const logoSrc = computed(() => {
     overflow: hidden; /* Clip potential edge artifacts */
     
     .logo-img {
-      height: 8.5rem; /* Standalone floating image size */
+      height: 8rem; /* Standalone floating image size */
       width: auto;
       object-fit: contain;
       display: block; /* Remove inline spacing */
-      color: rgba(255,255,255,0.1);
       /* Fixes for rendering artifacts/flickering */
       transform: translate3d(0, 0, 0); 
       backface-visibility: hidden;
       -webkit-font-smoothing: antialiased;
-
+    @media (max-width: 768px) {
+        height: 6rem;
+        }
       /* Heartbeat/Breathing Animation when active */
       &.in-use-pulse {
         animation: heartbeat 2s infinite ease-in-out;

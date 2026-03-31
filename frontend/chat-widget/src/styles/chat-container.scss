@@ -674,9 +674,9 @@
 
     /* === 歡迎畫面區塊佈局設定 === 
        可在此統一定義三個主要區塊的位置與間距，方便後續自定義 */
-    --spacing-top: 10vh;
+    --spacing-top: 11vh;
     /* 1. 整個歡迎畫面頂部的淨空留白 */
-    --spacing-header: 4vh;
+    --spacing-header: 1vh;
     /* 2. Welcome-Header 與 Instructions 的間距 */
     --spacing-push-bottom: auto;
     /* 3. 將 Input Box 推向容器最底部的彈性空間 (auto) */
@@ -687,8 +687,8 @@
 
     @media (max-width: 768px) {
         /* 手機模式的佈局獨立微調 */
-        --spacing-top: 4vh;
-        --spacing-header: 3vh;
+        --spacing-top: 5vh;
+        --spacing-header: 1vh;
         --spacing-push-bottom: auto;
         --spacing-bottom: 2vh;
         padding: var(--spacing-top) 0.5em var(--spacing-bottom) 0.5em;
@@ -715,7 +715,7 @@
             }
 
             @media (max-width: 768px) {
-                display: none;
+                /*display: none;
                 /* Hide on small screens to save space */
             }
 
@@ -1859,7 +1859,7 @@
 }
 
 .chat-input-container {
-    margin: 1em 0em;
+    margin: 1em 0.8em;
 
     .expanded-mode & {
         margin: 1em 1.2em;

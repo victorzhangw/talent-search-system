@@ -15,7 +15,7 @@
       <!-- Center: Title -->
       <div class="header-center title">
         <img src="../assets/images/TraittyAIIcon-S.svg" class="title-img-icon" alt="Traitty AI" />
-        問問 Traitty
+        Traitty AI
       </div>
 
       <!-- Right: Actions -->
@@ -207,7 +207,7 @@
                     <div class="big-input-box">
                         <textarea 
                             v-model="inputQuery" 
-                            :placeholder="selectedCandidateIds.length > 0 ? '問問Traitty' : '進入對話後，需開啟新人才解析方能選擇其他人選。'"
+                            :placeholder="selectedCandidateIds.length > 0 ? '問問Traitty' : '問問Traitty AI'"
                             :disabled="selectedCandidateIds.length === 0"
                         ></textarea>
                         <div class="input-actions-row">
@@ -646,10 +646,17 @@ const confirmAddCandidates = async () => {
     }
 
     .right-panel {
-        width: 93% !important;     /* ← 原 90%，增加聊天區寬度 */
+        /* 緊湊模式下預設寬度 100% */
+        width: 100% !important;
         flex: unset !important;
         display: flex;
         flex-direction: column;
+
+        /* 只有在展開模式下才縮小寬度以適應側邊欄佈局 */
+        .chat-container.expanded-mode & {
+            width: 94% !important;
+        }
+
         @media (max-width: 768px) {
             width: 100% !important;
             flex: 1 !important;

@@ -602,7 +602,7 @@ defineExpose({
         color: var(--glass-text-primary); 
         
         @media (max-width: 768px) {
-            font-size: 0.8em;
+            font-size: 0.95em;
             display: flex;
             flex-direction: column;
             align-items: flex-start;

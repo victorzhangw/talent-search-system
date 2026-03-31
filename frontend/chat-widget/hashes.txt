@@ -1,0 +1,6 @@
+﻿SHA384 �� dist\loader.iife.js ����:
+721eaaa248b00da9f3c90fdfb94cc31be2852f73fc70a72adaf77e1162ad1237b89fcd8aa1e4bf68207b4aaeeae20cf4
+CertUtil: -hashfile �R�O���\�����C
+SHA384 �� dist\loader.css ����:
+2951539d8059607afce14175ef4718ecb1e3de39b6fff128582adc7adb4058e220213a85cf0f9144d11871c61faadc00
+CertUtil: -hashfile �R�O���\�����C

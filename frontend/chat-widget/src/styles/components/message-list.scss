@@ -46,7 +46,7 @@
         line-height: 1.5;
 
         @media (max-width: 768px) {
-            font-size: 0.6em;
+            font-size: 0.9em;
         }
     }
 
@@ -78,7 +78,7 @@
             line-height: 1.6;
 
             @media (max-width: 768px) {
-                font-size: 0.7em;
+                font-size: 0.95em;
                 line-height: 1.5;
             }
 
@@ -119,6 +119,7 @@
             }
 
             [data-theme="midnight"] & {
+
                 :deep(strong),
                 :deep(a),
                 :deep(h3) {
