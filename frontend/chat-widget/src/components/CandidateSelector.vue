@@ -67,11 +67,13 @@
         </div>
         
         <div class="info">
-          <span class="name">
-            {{ cand.name }}
-            <span v-if="cand.position" class="position"> {{ cand.position }}</span>
-            <span v-if="cand.email" class="email">({{ cand.email }})</span>
-          </span>
+          <div class="name">
+            <span class="name-text">{{ cand.name }}</span>
+            <div class="sub-info" v-if="cand.position || cand.email">
+              <span v-if="cand.position" class="position">{{ cand.position }}</span>
+              <span v-if="cand.email" class="email">({{ cand.email }})</span>
+            </div>
+          </div>
         </div>
 
         <div class="checkbox">
@@ -598,42 +600,52 @@ defineExpose({
     
     .name { 
         font-weight: 500; 
-        font-size: 0.9em;
+        font-size: 1em;
         color: var(--glass-text-primary); 
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.1em;
+        flex: 1; 
+        overflow: hidden;
         
         @media (max-width: 768px) {
-            font-size: 0.95em;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.1em;
+            font-size: 1.05em;
         }
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        flex: 1; 
 
-        .position {
-            font-size: 0.8em;
-            color: var(--glass-text-secondary);
-            font-weight: normal;
-            margin-left: 0.3em;
-            
-            @media (max-width: 768px) {
-                margin-left: 0;
-                font-size: 0.4em;
-            }
+        .name-text {
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        
-        .email {
-            font-size: 0.6em;
-            color: var(--glass-text-secondary);
-            margin-left: 0.5em;
-            display: none; 
+
+        .sub-info {
+            display: flex;
+            align-items: baseline;
+            gap: 0.4em;
+            width: 100%;
+            overflow: hidden;
+
+            .position {
+                font-size: 0.85em;
+                padding-left: 0.5em;
+                color: var(--glass-text-secondary);
+                font-weight: normal;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex-shrink: 0;
+                max-width: 45%;
+            }
             
-            @media (max-width: 768px) {
-                display: block;
-                margin-left: 0;
+            .email {
+                font-size: 0.8em;
+                color: var(--glass-text-secondary);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex: 1;
             }
         }
     }

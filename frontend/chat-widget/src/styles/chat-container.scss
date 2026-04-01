@@ -185,8 +185,9 @@
         align-items: center;
         background: rgba(127, 127, 127, 0.1);
         border-radius: 20px;
-        padding: 0.2em 0.4em;
+        padding: 2px 4px;
         height: 28px;
+        box-sizing: border-box;
         /* Matches Figma size */
 
         [data-theme="midnight"] & {
@@ -196,11 +197,26 @@
 
         @media (max-width: 768px) {
             height: 24px;
-            padding: 0.1em 0.2em;
+            padding: 2px;
         }
 
         .icon-btn {
             background: transparent;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            &:hover {
+                border-radius: 50%;
+            }
+
+            @media (max-width: 768px) {
+                width: 20px;
+                height: 20px;
+            }
 
             .material-icon {
                 @media (max-width: 768px) {
@@ -233,6 +249,10 @@
         display: flex;
         align-items: center;
         justify-content: center;
+
+        &.icon-btn:hover {
+            border-radius: 50%;
+        }
 
         [data-theme="midnight"] & {
             /* Figma: 降低 styled-circle 白色覆蓋透明度至 0.08 */
@@ -704,10 +724,11 @@
             align-items: center;
             width: 80px;
             height: 80px;
+            box-shadow: 0px 10px 40px -10px rgba(0, 0, 0, 0.08);
             border-radius: 50%;
-            border: 2px solid #e2e8f0;
+            border: none;
             /* 淡灰色外框 */
-            background-color: #f8fafc;
+            background-color: #fff;
 
             [data-theme="midnight"] & {
                 border: 1px solid rgba(255, 255, 255, 0.09);
@@ -1279,7 +1300,6 @@
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
     /* 使用 CSS 變數，由主題系統（global.scss）統一管理，避免 media query 覆寫失效 */
     background: var(--quick-popover-bg);
-    backdrop-filter: blur(10px);
     z-index: 100;
     border: 1px solid var(--glass-border);
     padding: 0;

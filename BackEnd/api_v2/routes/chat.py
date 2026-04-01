@@ -134,8 +134,8 @@ def get_user_history():
         
         session_data = {
             'session_id': s.session_id,
-            'started_at': s.started_at.isoformat() if s.started_at else None,
-            'last_active_at': s.last_active_at.isoformat() if s.last_active_at else None,
+            'started_at': s.started_at.isoformat() if hasattr(s.started_at, 'isoformat') else s.started_at,
+            'last_active_at': s.last_active_at.isoformat() if hasattr(s.last_active_at, 'isoformat') else s.last_active_at,
             'status': s.status,
             'title': title
         }
