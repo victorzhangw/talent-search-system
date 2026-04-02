@@ -1300,7 +1300,12 @@
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
     /* 使用 CSS 變數，由主題系統（global.scss）統一管理，避免 media query 覆寫失效 */
     background: var(--quick-popover-bg);
-    z-index: 100;
+    
+    /* 修正 Option B 帶來的層級穿透 Bug */
+    z-index: 9999; 
+    -webkit-backdrop-filter: blur(0px); /* 騙 Safari 開啟獨立硬體渲染層避免被底層資料覆蓋，但保持實心效果 */
+    backdrop-filter: blur(0px);
+    
     border: 1px solid var(--glass-border);
     padding: 0;
     gap: 2px;
