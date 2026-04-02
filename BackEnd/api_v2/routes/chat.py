@@ -162,17 +162,21 @@ def get_session_details(session_id):
         
     messages = session_store.get_messages(session_id)
     
+    # 過濾掉 system role（如背景任務產生的系統訊息），並將 assistant → ai 以符合前端渲染規則
+    ROLE_MAP = {'assistant': 'ai', 'user': 'user'}
+    visible_messages = [m for m in messages if m.role in ('user', 'assistant')]
+    
     return jsonify({
         'session_id': session.session_id,
         'status': session.status,
         'metadata': session.metadata_,
         'messages': [{
             'id': m.id,
-            'role': m.role,
+            'role': ROLE_MAP.get(m.role, m.role),
             'content': m.content,
             'rating': getattr(m, 'rating', 0),
             'created_at': m.created_at.isoformat() if m.created_at else None
-        } for m in messages]
+        } for m in visible_messages]
     })
 
 @bp.route('/message/<int:message_id>/rating', methods=['PUT', 'OPTIONS'])

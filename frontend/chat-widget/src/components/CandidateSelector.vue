@@ -625,6 +625,7 @@ defineExpose({
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                text-align: left;
             }
 
             .position {
@@ -653,6 +654,7 @@ defineExpose({
                 overflow: hidden;
                 text-overflow: ellipsis;
                 flex: 1;
+                text-align: left;
             }
         }
     }

@@ -636,6 +636,19 @@
 
     :deep(.candidate-item) {
         height: auto;
+
+        .info .name .name-row {
+            justify-content: center;
+        }
+
+        .info .name .name-row .name-text {
+            flex: 0 1 auto;
+            text-align: center !important;
+        }
+
+        .info .name .sub-info .email {
+            text-align: center !important;
+        }
     }
 }
 
@@ -651,6 +664,19 @@
 
 .full-page-mode :deep(.candidate-item) {
     height: auto;
+
+    .info .name .name-row {
+        justify-content: center;
+    }
+
+    .info .name .name-row .name-text {
+        flex: 0 1 auto;
+        text-align: center !important;
+    }
+
+    .info .name .sub-info .email {
+        text-align: center !important;
+    }
 }
 
 
@@ -697,25 +723,36 @@
     --spacing-top: 11vh;
     /* 1. 整個歡迎畫面頂部的淨空留白 */
     --spacing-header: 1vh;
-    /* 2. Welcome-Header 與 Instructions 的間距 */
-    --spacing-push-bottom: auto;
     /* 3. 將 Input Box 推向容器最底部的彈性空間 (auto) */
-    --spacing-bottom: 4vh;
+    --spacing-push-bottom: auto;
     /* 4. 底部 Input Box 距離容器邊界的淨空留白 */
+    --spacing-bottom: 0vh;
 
-    padding: var(--spacing-top) 1em var(--spacing-bottom) 1em;
+    padding: var(--spacing-top) 0em var(--spacing-bottom) 0em;
+
+    .expanded-mode &,
+    .full-page-mode & {
+        --spacing-bottom: 4vh;
+        padding: var(--spacing-top) 1em var(--spacing-bottom) 1em;
+    }
 
     @media (max-width: 768px) {
-        /* 手機模式的佈局獨立微調 */
-        --spacing-top: 5vh;
-        --spacing-header: 1vh;
-        --spacing-push-bottom: auto;
-        --spacing-bottom: 2vh;
-        padding: var(--spacing-top) 0.5em var(--spacing-bottom) 0.5em;
+
+        /* 手機模式的佈局獨立微調 (覆寫所有模式) */
+        &,
+        .expanded-mode &,
+        .full-page-mode & {
+            --spacing-top: 5vh;
+            --spacing-header: 1vh;
+            --spacing-push-bottom: auto;
+            --spacing-bottom: 0vh !important;
+            padding: var(--spacing-top) 0em 0vh 0em !important;
+        }
     }
 
     .welcome-header {
         margin-bottom: var(--spacing-header);
+        padding: 0 1em;
 
         .magic-icon-wrapper {
             margin-bottom: 1em;
@@ -792,6 +829,7 @@
         text-align: left;
         color: var(--glass-text-secondary);
         margin-bottom: var(--spacing-push-bottom);
+        padding: 0 1em;
 
         @media (max-width: 768px) {
             font-size: 0.8em;
@@ -812,9 +850,9 @@
         max-width: 600px;
         background: var(--glass-bg);
         border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        box-shadow: 0px -2px 40px 0px rgba(0, 0, 0, 0.14);
         border: 1px solid var(--glass-border);
-        padding: 1em;
+        padding: 0.7em;
         display: flex;
         flex-direction: column;
 
@@ -838,6 +876,8 @@
 
             @media (max-width: 768px) {
                 font-size: 0.9em;
+                height: 50px;
+                /* 行動版獨立高度 */
             }
 
             &::placeholder {
@@ -1900,10 +1940,10 @@
 }
 
 .chat-input-container {
-    margin: 1em 0.8em;
+    margin: 0em;
 
     .expanded-mode & {
-        margin: 1em 1.2em;
+        margin: 1em 1em;
     }
 
     border: 1px solid rgba(223, 223, 223, 1);
@@ -1918,12 +1958,19 @@
 
 
     @media (max-width: 768px) {
-        margin: 0.6em 0.4em 1em 0.4em;
+
+        &,
+        .expanded-mode &,
+        .full-page-mode & {
+            margin: 0em !important;
+        }
+
         padding: 0.8em 0.6em;
     }
 
     [data-theme="midnight"] & {
         background: rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--glass-border);
         /* 虛線微調：0.4 → 0.55，在深色背景下更清晰 */
         border-color: rgba(165, 180, 252, 0.55);
         box-shadow: 0px -3px 5.2px 0px rgba(255, 255, 255, 0.36);
@@ -1955,7 +2002,7 @@
 
         @media (max-width: 768px) {
             min-height: 60px;
-            font-size: 0.65em;
+            font-size: 0.85em;
         }
 
         &::placeholder {
@@ -2014,7 +2061,7 @@
                 .dropdown-info-header {
                     background: #f8fafc;
                     padding: 0.5em 0.8em;
-                    font-size: 0.8em;
+                    font-size: 1em;
                     color: #64748b;
                     display: flex;
                     justify-content: space-between;
@@ -2022,7 +2069,7 @@
                     border-bottom: 1px solid var(--glass-border);
 
                     @media (max-width: 768px) {
-                        font-size: 0.6em;
+                        font-size: 1em;
                     }
 
                     .info-content {
@@ -2034,7 +2081,7 @@
                     .close-dropdown-btn {
                         background: none;
                         border: none;
-                        font-size: 1.1em;
+                        font-size: 1.2em;
                         font-weight: 900;
                         line-height: 1;
                         cursor: pointer;
@@ -2049,7 +2096,7 @@
                         }
 
                         @media (max-width: 768px) {
-                            font-size: 0.9em;
+                            font-size: 1.4em;
                         }
                     }
 
@@ -2254,7 +2301,7 @@
             border: 1px solid #cbd5e1;
             border-radius: 20px;
             padding: 0.4em 0.8em;
-            font-size: 0.8em;
+            font-size: 0.9em;
             color: var(--glass-text-primary);
             font-weight: 500;
             cursor: pointer;
@@ -2270,7 +2317,7 @@
 
             @media (max-width: 768px) {
                 padding: 0.3em 0.6em;
-                font-size: 0.75em;
+                font-size: 0.9em;
                 gap: 0.25em;
             }
 

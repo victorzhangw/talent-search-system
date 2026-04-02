@@ -655,12 +655,13 @@ const confirmAddCandidates = async () => {
         /* 只有在展開模式下才縮小寬度以適應側邊欄佈局 */
         .chat-container.expanded-mode & {
             width: 94% !important;
-        }
-
-        @media (max-width: 768px) {
+            @media (max-width: 768px) {
             width: 100% !important;
             flex: 1 !important;
         }
+        }
+
+        
     }
 
     .quick-sidebar {
