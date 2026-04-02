@@ -1,4 +1,12 @@
 <template>
+  <transition name="fade">
+    <div 
+      class="quick-question-overlay" 
+      v-if="showMobileQuickQuestions" 
+      @click="closeMobile"
+    ></div>
+  </transition>
+
   <div class="quick-sidebar" :class="{ 'show-mobile-popover': showMobileQuickQuestions }">
     <!-- Mobile only Header -->
     <div class="mobile-popover-header" v-if="showMobileQuickQuestions">

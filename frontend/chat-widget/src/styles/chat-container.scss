@@ -208,7 +208,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            
+
             &:hover {
                 border-radius: 50%;
             }
@@ -1285,10 +1285,26 @@
     }
 }
 
+.quick-question-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 9998;
+    /* Just below the popover's 9999 */
+
+    [data-theme="midnight"] & {
+        background: rgba(0, 0, 0, 0.7);
+    }
+}
+
 @mixin quick-sidebar-popover-style {
     display: flex !important;
     position: absolute;
-    bottom: 120px;
+    bottom: 80px;
     /* Float above the input container */
     left: 50% !important;
     right: auto !important;
@@ -1300,12 +1316,10 @@
     box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
     /* 使用 CSS 變數，由主題系統（global.scss）統一管理，避免 media query 覆寫失效 */
     background: var(--quick-popover-bg);
-    
+
     /* 修正 Option B 帶來的層級穿透 Bug */
-    z-index: 9999; 
-    -webkit-backdrop-filter: blur(0px); /* 騙 Safari 開啟獨立硬體渲染層避免被底層資料覆蓋，但保持實心效果 */
-    backdrop-filter: blur(0px);
-    
+    z-index: 9999;
+
     border: 1px solid var(--glass-border);
     padding: 0;
     gap: 2px;
@@ -1384,7 +1398,7 @@
         flex-direction: column;
         padding: 0.1em 0.8em;
         overflow-y: auto;
-        max-height: 45vh;
+        max-height: 65vh;
         gap: 1em;
         margin-bottom: 10px;
     }
@@ -1892,7 +1906,7 @@
         margin: 1em 1.2em;
     }
 
-    border: 2px solid #a5b4fc;
+    border: 1px solid rgba(223, 223, 223, 1);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.4);
     display: flex;
@@ -1900,8 +1914,8 @@
     padding: 0.8em 1em;
     position: relative;
     flex-shrink: 0;
-    box-shadow: 0 0 8px rgba(165, 180, 252, 0.6),
-    0 0 16px rgba(165, 180, 252, 0.4);
+    box-shadow: 0px -2px 40px 0px rgba(0, 0, 0, 0.14);
+
 
     @media (max-width: 768px) {
         margin: 0.6em 0.4em 1em 0.4em;
@@ -1912,6 +1926,7 @@
         background: rgba(0, 0, 0, 0.2);
         /* 虛線微調：0.4 → 0.55，在深色背景下更清晰 */
         border-color: rgba(165, 180, 252, 0.55);
+        box-shadow: 0px -3px 5.2px 0px rgba(255, 255, 255, 0.36);
     }
 
     &:focus-within {

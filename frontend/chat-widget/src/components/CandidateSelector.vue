@@ -68,10 +68,12 @@
         
         <div class="info">
           <div class="name">
-            <span class="name-text">{{ cand.name }}</span>
-            <div class="sub-info" v-if="cand.position || cand.email">
+            <div class="name-row">
+              <span class="name-text">{{ cand.name }}</span>
               <span v-if="cand.position" class="position">{{ cand.position }}</span>
-              <span v-if="cand.email" class="email">({{ cand.email }})</span>
+            </div>
+            <div class="sub-info" v-if="cand.email">
+              <span class="email">{{ cand.email }}</span>
             </div>
           </div>
         </div>
@@ -593,9 +595,6 @@ defineExpose({
     
     @media (max-width: 768px) {
         font-size: 0.85em;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.1em;
     }
     
     .name { 
@@ -604,6 +603,7 @@ defineExpose({
         color: var(--glass-text-primary); 
         display: flex;
         flex-direction: column;
+        justify-content: center;
         align-items: flex-start;
         gap: 0.1em;
         flex: 1; 
@@ -613,32 +613,39 @@ defineExpose({
             font-size: 1.05em;
         }
 
-        .name-text {
-            width: 100%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .sub-info {
+        .name-row {
             display: flex;
-            align-items: baseline;
-            gap: 0.4em;
+            align-items: center;
             width: 100%;
-            overflow: hidden;
+            gap: 0.5em;
+
+            .name-text {
+                flex: 1;
+                min-width: 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
 
             .position {
-                font-size: 0.85em;
-                padding-left: 0.5em;
+                font-size: 0.75em;
                 color: var(--glass-text-secondary);
                 font-weight: normal;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 flex-shrink: 0;
-                max-width: 45%;
+                max-width: 50%;
+                text-align: right;
             }
-            
+        }
+
+        .sub-info {
+            display: flex;
+            align-items: baseline;
+            width: 100%;
+            overflow: hidden;
+
             .email {
                 font-size: 0.8em;
                 color: var(--glass-text-secondary);

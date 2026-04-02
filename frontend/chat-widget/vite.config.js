@@ -11,7 +11,7 @@ export default defineConfig({
       targets: [
         {
           src: 'src/assets/images/*',
-          dest: 'assets/images'
+          dest: 'images'
         }
       ]
     })
@@ -47,8 +47,10 @@ export default defineConfig({
         // For a single file widget, inline CSS or a single css file is good.
         // Vite by default emits style.css. 
         assetFileNames: (assetInfo) => {
-          if (assetInfo.name === 'style.css') return 'loader.css';
-          return assetInfo.name;
+          if (assetInfo.name && assetInfo.name.endsWith('.css')) {
+            return 'loader.css';
+          }
+          return `images/[name][extname]`;
         },
       }
     },
