@@ -39,15 +39,23 @@ import { ref, onMounted, computed } from 'vue'
 import ChatLauncher from './components/ChatLauncher.vue'
 import ChatContainer from './components/ChatContainer.vue'
 
+// sessionStorage 旗標 key：跨頁面跳轉保留「是否有活躍對話」
+const ACTIVE_SESSION_KEY = 'traitty_widget_has_active_session'
+
 const isOpen = ref(false)
 const isFullPageMode = ref(false)
 const hasActiveSession = ref(false)
 
 const toggleChat = () => {
   if (!isOpen.value) {
-      // Opening the widget
-      if (!hasActiveSession.value) {
-          // Fresh start: Clear session state
+      // 同時檢查記憶體狀態 與 sessionStorage 持久化旗標
+      // 頁面跳轉後記憶體清空，但 sessionStorage 仍保留，
+      // 因此必須以兩者 OR 做判斷，避免誤判為全新開始而清除對話狀態
+      const persistedActive = !!sessionStorage.getItem(ACTIVE_SESSION_KEY)
+      const actuallyHasSession = hasActiveSession.value || persistedActive
+
+      if (!actuallyHasSession) {
+          // 確認是全新開始才清除 sessionStorage
           try {
               sessionStorage.removeItem('traitty_selected_candidates')
               sessionStorage.removeItem('traitty_batch_reports')
@@ -58,22 +66,36 @@ const toggleChat = () => {
               console.error('Error clearing storage:', e)
           }
       }
-      // If hasActiveSession is true, we simply open (restore) without clearing
+
+      // 同步記憶體狀態（確保後續邏輯一致）
+      hasActiveSession.value = actuallyHasSession
   }
   isOpen.value = !isOpen.value
 }
 
 const handleClose = () => {
     isOpen.value = false
-    hasActiveSession.value = false // Reset active state
+    hasActiveSession.value = false
+    // 用戶主動關閉：清除持久化旗標，下次開啟視為全新開始
+    try { sessionStorage.removeItem(ACTIVE_SESSION_KEY) } catch (e) {}
 }
 
 const handleMinimize = () => {
     isOpen.value = false
-    hasActiveSession.value = true // Keep active state
+    hasActiveSession.value = true
+    // 最小化：寫入持久化旗標，頁面跳轉後仍能正確還原對話
+    try { sessionStorage.setItem(ACTIVE_SESSION_KEY, '1') } catch (e) {}
 }
 
 onMounted(() => {
+    // 從 sessionStorage 恢復 hasActiveSession 狀態
+    // 解決：最小化 → 點擊頁面連結（頁面跳轉）→ 重開 widget 回到初始狀態的問題
+    try {
+        if (sessionStorage.getItem(ACTIVE_SESSION_KEY)) {
+            hasActiveSession.value = true
+        }
+    } catch (e) {}
+
     // Check URL params for mode
     const urlParams = new URLSearchParams(window.location.search)
     if (urlParams.get('mode') === 'fullpage') {

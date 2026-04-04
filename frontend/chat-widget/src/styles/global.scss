@@ -84,13 +84,20 @@
     --primary-color: #b58900;
     /* Yellow/Gold */
     --bubble-ai-bg: rgba(0, 0, 0, 0.03);
-    --bubble-ai-border: rgba(165, 122, 0, 0.1);
+    --bubble-ai-border: #a57a001a;
 }
 
 body {
     margin: 0;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    /* 中文優先使用 Noto Sans TC，英文優先使用 Inter */
+    font-family: 'Inter', 'Noto Sans TC', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.6;
+
+    /* 核心渲染優化（僅優化邊緣與清晰度，不調整視覺權重感） */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
 }
 
 /* Global Animations & Components */

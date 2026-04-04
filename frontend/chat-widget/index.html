@@ -6,9 +6,134 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Traitty Demo Widget</title>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; margin: 0; background: #f5f5f7; }
+    .test-nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #1d1d1f;
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      z-index: 999;
+      font-size: 14px;
+    }
+    .test-nav .brand { font-weight: 700; color: #f5f5f7; letter-spacing: -0.3px; }
+    .test-nav .badge {
+      background: #ff375f;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .test-nav a {
+      color: #a1a1a6;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .test-nav a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .test-nav a.active { background: rgba(255,255,255,0.15); color: #fff; }
+    .test-content {
+      margin-top: 60px;
+      padding: 48px 40px;
+      max-width: 800px;
+    }
+    .test-content h1 { font-size: 28px; font-weight: 700; color: #1d1d1f; margin-bottom: 8px; }
+    .test-content p { color: #6e6e73; line-height: 1.7; margin-bottom: 16px; }
+    .steps {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-top: 24px;
+    }
+    .steps h2 { font-size: 18px; font-weight: 600; color: #1d1d1f; margin-bottom: 20px; }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 18px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .step-num {
+      width: 28px; height: 28px;
+      background: #6a25f4;
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-text { color: #3d3d3f; line-height: 1.6; font-size: 15px; }
+    .step-text strong { color: #1d1d1f; }
+    .jump-btn {
+      display: inline-block;
+      margin-top: 28px;
+      background: #6a25f4;
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+      transition: opacity 0.2s;
+    }
+    .jump-btn:hover { opacity: 0.85; }
+  </style>
 </head>
 
 <body>
+  <!-- 測試導航欄 -->
+  <nav class="test-nav">
+    <span class="brand">Traitty Widget</span>
+    <span class="badge">測試環境</span>
+    <a href="/" class="active">📄 首頁</a>
+    <a href="/page2.html">🔗 第二頁（跳轉測試）</a>
+  </nav>
+
+  <!-- 測試說明 -->
+  <div class="test-content">
+    <h1>🧪 最小化狀態還原測試</h1>
+    <p>此頁面用於驗證 Chat Widget 在「最小化 → 頁面跳轉 → 重新開啟」流程中能否正確還原對話狀態。</p>
+
+    <div class="steps">
+      <h2>📋 測試步驟</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">點擊右下角 <strong>Widget 圖示</strong>，開啟聊天視窗</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">選擇候選人，點「開始分析」，確認進入<strong>對話模式</strong></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">點擊 Widget 標題列的<strong>「最小化」按鈕</strong>（向下箭頭），收起視窗</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">點擊下方的<strong>「跳轉至第二頁」按鈕</strong>，模擬點擊頁面超連結的場景</div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text">在第二頁點擊<strong>「返回首頁」</strong>，再點 Widget 圖示重新開啟</div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-text">✅ 預期結果：應直接還原至<strong>對話狀態</strong>，而非回到「選擇候選人」初始畫面</div>
+      </div>
+    </div>
+
+    <a href="/page2.html" class="jump-btn">🔗 跳轉至第二頁（模擬頁面連結點擊）</a>
+  </div>
+
   <!-- Widget Configuration for Local Dev -->
   <script>
     window.TRAITTY_WIDGET_CONFIG = {

@@ -8,6 +8,9 @@ from ..services.session_store import SqlSessionStore
 from ..database.connection import get_db_session
 from ..database.models import ChatSession
 from ..database import db_session
+from ..utils.logger import get_conversation_logger
+
+conv_logger = get_conversation_logger()
 
 bp = Blueprint('chat', __name__, url_prefix='/chat')
 
@@ -58,6 +61,9 @@ def background_generate_title(session_id, user_query, candidate_names):
             )
         except Exception as te:
             print(f"[Background Title] Token logging error: {te}")
+            
+        # 1.6 File Logging
+        conv_logger.info(f"[SYSTEM] SessionID: {session_id} | Title: {title} | Tokens: {total_tokens} (P:{p_tokens}, C:{c_tokens})")
             
         # 2. Update DB
         db = get_db_session()
@@ -280,6 +286,7 @@ def chat():
 
             # Log User Message
             session_store.add_message(session_id, 'user', query)
+            conv_logger.info(f"[USER] SessionID: {session_id} | UserID: {user_id} | Content: {query}")
 
             try:
                 response_stream, use_case_id = rag_service.generate_response(
@@ -361,6 +368,9 @@ def chat():
             
             if msg_id:
                 yield f"data: {json.dumps({'type': 'message_id', 'id': msg_id})}\n\n"
+                
+            # Log Assistant Message to File
+            conv_logger.info(f"[AI] SessionID: {session_id} | Content: {full_assistant_content} | Tokens: {prompt_tokens + completion_tokens} (P:{prompt_tokens}, C:{completion_tokens}) | Model: {rag_service.model_name}")
             
             # --- 扣除額度並即時同步回傳給前端 ---
             if not has_llm_error:

@@ -66,3 +66,9 @@ def get_daily_logger(name: str, filename: str, level=logging.INFO, formatter_str
         logger.propagate = False
         
     return logger
+
+def get_conversation_logger():
+    """
+    獲取專門紀錄對話歷程的 Logger
+    """
+    return get_daily_logger("Conversation_Logger", "conversations.log", level=logging.INFO)
