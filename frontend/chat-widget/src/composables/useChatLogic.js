@@ -3,6 +3,14 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { getFeatures } from '../config/widgetFeatures.js'
 
 export function useChatLogic(emit) {
+    // --- 型別安全的 candidate_id 比對輔助函式 ---
+    // 上游 API 回傳的 candidate_id 可能是 number 或 string，
+    // 經 sessionStorage JSON 序列化/反序列化後型別可能不一致，
+    // Array.includes() 使用嚴格相等（===）會導致匹配失敗。
+    // 統一轉為字串比對以避免此問題。
+    const idIncludes = (arr, id) => arr.map(String).includes(String(id))
+    const idEquals = (a, b) => String(a) === String(b)
+
     // --- State ---
     const currentTab = ref('login') // 'login' or 'main' (split view)
     const isSelectionLocked = ref(false) // Controls the split view state
@@ -144,7 +152,7 @@ export function useChatLogic(emit) {
     })
 
     const activeConversationCandidatesObjects = computed(() => {
-        return candidates.value.filter(c => activeConversationCandidateIds.value.includes(c.candidate_id))
+        return candidates.value.filter(c => idIncludes(activeConversationCandidateIds.value, c.candidate_id))
     })
 
     // --- API & Config Helpers ---
@@ -180,7 +188,7 @@ export function useChatLogic(emit) {
         const state = {
             token: userToken.value,
             activeIds: activeConversationCandidateIds.value,
-            selectedCandidates: candidates.value.filter(c => activeConversationCandidateIds.value.includes(c.candidate_id)),
+            selectedCandidates: candidates.value.filter(c => idIncludes(activeConversationCandidateIds.value, c.candidate_id)),
             messages: messages.value,
             sessionId: currentSessionId.value,
             theme: themeIndex.value
@@ -627,7 +635,7 @@ export function useChatLogic(emit) {
         activeConversationCandidateIds.value = [...ids]
 
         // Identify objects for report fetching
-        const selectedCandidates = candidates.value.filter(c => ids.includes(c.candidate_id))
+        const selectedCandidates = candidates.value.filter(c => idIncludes(ids, c.candidate_id))
 
         // Save to Session Storage for New Tab Restoration
         try {
@@ -681,15 +689,31 @@ export function useChatLogic(emit) {
     }
 
     const removeCandidate = (candidateIdToRemove) => {
-        activeConversationCandidateIds.value = activeConversationCandidateIds.value.filter(id => id !== candidateIdToRemove)
+        activeConversationCandidateIds.value = activeConversationCandidateIds.value.filter(id => !idEquals(id, candidateIdToRemove))
 
         if (activeConversationCandidateIds.value.length === 0) {
             resetAndReselect()
         } else {
             try {
                 sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(activeConversationCandidateIds.value))
-                const activeCands = candidates.value.filter(c => activeConversationCandidateIds.value.includes(c.candidate_id))
+                const activeCands = candidates.value.filter(c => idIncludes(activeConversationCandidateIds.value, c.candidate_id))
                 sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(activeCands))
+
+                // 同步清除被移除候選人的報告資料，避免 sendMessage 時
+                // trait_reports 中仍存在已移除候選人的報告，導致後端
+                // rag_engine 找不到對應的 candidates_info 而使用 fallback 名稱
+                try {
+                    const cachedReports = sessionStorage.getItem('traitty_batch_reports')
+                    if (cachedReports) {
+                        const reports = JSON.parse(cachedReports)
+                        // 清除可能的 number/string 兩種 key 格式
+                        delete reports[candidateIdToRemove]
+                        delete reports[String(candidateIdToRemove)]
+                        sessionStorage.setItem('traitty_batch_reports', JSON.stringify(reports))
+                    }
+                } catch (reportErr) {
+                    console.error('[ChatLogic] Failed to clean up batch reports on remove:', reportErr)
+                }
 
                 // Push Helper Message upon update
                 messages.value.push({
@@ -707,11 +731,11 @@ export function useChatLogic(emit) {
         if (!newIds || newIds.length === 0) return
 
         // 過濾掉已在對話中的人
-        const realNewIds = newIds.filter(id => !activeConversationCandidateIds.value.includes(id))
+        const realNewIds = newIds.filter(id => !idIncludes(activeConversationCandidateIds.value, id))
         if (realNewIds.length === 0) return
 
         // 找出新增候選人的完整物件
-        const newCandidateObjects = candidates.value.filter(c => realNewIds.includes(c.candidate_id))
+        const newCandidateObjects = candidates.value.filter(c => idIncludes(realNewIds, c.candidate_id))
 
         // 將新 IDs 合併到現有對話
         const mergedIds = [...activeConversationCandidateIds.value, ...realNewIds]
@@ -725,7 +749,7 @@ export function useChatLogic(emit) {
         // 更新 sessionStorage
         try {
             sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(mergedIds))
-            const allActiveCands = candidates.value.filter(c => mergedIds.includes(c.candidate_id))
+            const allActiveCands = candidates.value.filter(c => idIncludes(mergedIds, c.candidate_id))
             sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(allActiveCands))
         } catch (e) {
             console.error('[ChatLogic] Failed to update session storage on add:', e)
@@ -812,7 +836,7 @@ export function useChatLogic(emit) {
             // Using activeConversationCandidateIds here!
             const activeIds = activeConversationCandidateIds.value
             // Define activeCandidates for usage in body
-            const activeCandidates = candidates.value.filter(c => activeIds.includes(c.candidate_id))
+            const activeCandidates = candidates.value.filter(c => idIncludes(activeIds, c.candidate_id))
 
             // Determine mode
             // 1. Quick Questions -> Force 'expert'
