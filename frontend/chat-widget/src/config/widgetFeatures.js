@@ -28,21 +28,11 @@ export const defaultFeatures = {
         /**
          * 是否啟用「候選人數量限制」過濾規則
          *
-         * 設為 true：  singleCandidateQuestions 列表中的問題，
-         *              在選取 2 位或以上候選人時會自動隱藏
+         * 設為 true：  根據後端模組的 candidate_mode（single_only / multi_only / both），
+         *              在候選人數量不符時自動隱藏不適用的提問。
          * 設為 false： 所有問題無論候選人數量皆顯示（停用此功能）
          */
-        enforceSingleCandidateLimit: true,
-
-        /**
-         * 限定「只能在單一候選人」時顯示的問題清單
-         * 使用完全比對（問題文字必須完全一致）
-         *
-         * 若要新增更多限定單人的問題，直接在此陣列加入問題文字即可。
-         */
-        singleCandidateQuestions: [
-            '快速面試提問指南'
-        ]
+        enforceSingleCandidateLimit: true
     }
 }
 

@@ -1,1 +1,1 @@
-from . import chat, auth, candidates
+from . import chat, auth, candidates, modules

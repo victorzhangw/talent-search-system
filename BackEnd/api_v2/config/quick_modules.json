@@ -1,0 +1,156 @@
+{
+  "recruit_interview": {
+    "category": "招募",
+    "display_name": "快速面試提問指南",
+    "single_prompt_file": "modules/recruit_interview_single.txt",
+    "multi_prompt_file": null,
+    "candidate_mode": "single_only"
+  },
+  "recruit_strengths": {
+    "category": "招募",
+    "display_name": "工作中的主要優勢與潛力",
+    "single_prompt_file": "modules/recruit_strengths_single.txt",
+    "multi_prompt_file": "modules/recruit_strengths_multi.txt",
+    "candidate_mode": "both"
+  },
+  "recruit_team_role": {
+    "category": "招募",
+    "display_name": "在團隊合作中適合的角色",
+    "single_prompt_file": "modules/recruit_team_role_single.txt",
+    "multi_prompt_file": "modules/recruit_team_role_multi.txt",
+    "candidate_mode": "both"
+  },
+  "recruit_risk": {
+    "category": "招募",
+    "display_name": "需注意的管理問題或潛在風險",
+    "single_prompt_file": "modules/recruit_risk_single.txt",
+    "multi_prompt_file": "modules/recruit_risk_multi.txt",
+    "candidate_mode": "both"
+  },
+  "mgmt_pressure": {
+    "category": "管理",
+    "display_name": "如何面對困難、壓力、挑戰",
+    "single_prompt_file": "modules/mgmt_pressure_single.txt",
+    "multi_prompt_file": "modules/mgmt_pressure_multi.txt",
+    "candidate_mode": "both"
+  },
+  "mgmt_style": {
+    "category": "管理",
+    "display_name": "合適的管理方式與風格",
+    "single_prompt_file": "modules/mgmt_style_single.txt",
+    "multi_prompt_file": "modules/mgmt_style_multi.txt",
+    "candidate_mode": "both"
+  },
+  "mgmt_leadership": {
+    "category": "管理",
+    "display_name": "展現何種領導風格",
+    "single_prompt_file": "modules/mgmt_leadership_single.txt",
+    "multi_prompt_file": "modules/mgmt_leadership_multi.txt",
+    "candidate_mode": "both"
+  },
+  "mgmt_onboarding": {
+    "category": "管理",
+    "display_name": "入職前 90 天的帶領重點",
+    "single_prompt_file": "modules/mgmt_onboarding_single.txt",
+    "multi_prompt_file": "modules/mgmt_onboarding_multi.txt",
+    "candidate_mode": "both"
+  },
+  "mgmt_manual_mgr": {
+    "category": "管理",
+    "display_name": "個人使用說明書(主管)",
+    "single_prompt_file": "modules/mgmt_manual_mgr_single.txt",
+    "multi_prompt_file": null,
+    "candidate_mode": "single_only"
+  },
+  "mgmt_manual_self": {
+    "category": "管理",
+    "display_name": "個人使用說明書(個人)",
+    "single_prompt_file": "modules/mgmt_manual_self_single.txt",
+    "multi_prompt_file": null,
+    "candidate_mode": "single_only"
+  },
+  "mgmt_change": {
+    "category": "管理",
+    "display_name": "變動(AI/轉型)情境的角色與風險",
+    "single_prompt_file": "modules/mgmt_change_single.txt",
+    "multi_prompt_file": "modules/mgmt_change_multi.txt",
+    "candidate_mode": "both"
+  },
+  "mgmt_hipo": {
+    "category": "管理",
+    "display_name": "高潛人才識別要點",
+    "single_prompt_file": "modules/mgmt_hipo_single.txt",
+    "multi_prompt_file": "modules/mgmt_hipo_multi.txt",
+    "candidate_mode": "both"
+  },
+  "team_comm": {
+    "category": "團隊合作",
+    "display_name": "有效的溝通方法／模式",
+    "single_prompt_file": "modules/team_comm_single.txt",
+    "multi_prompt_file": "modules/team_comm_multi.txt",
+    "candidate_mode": "both"
+  },
+  "team_complement": {
+    "category": "團隊合作",
+    "display_name": "團隊合作的互補與摩擦",
+    "single_prompt_file": "modules/team_complement_single.txt",
+    "multi_prompt_file": "modules/team_complement_multi.txt",
+    "candidate_mode": "both"
+  },
+  "team_meeting": {
+    "category": "團隊合作",
+    "display_name": "打造高效會議團隊",
+    "single_prompt_file": null,
+    "multi_prompt_file": "modules/team_meeting_multi.txt",
+    "candidate_mode": "multi_only"
+  },
+  "retain_turnover": {
+    "category": "留才",
+    "display_name": "離職風險因素分析",
+    "single_prompt_file": "modules/retain_turnover_single.txt",
+    "multi_prompt_file": "modules/retain_turnover_multi.txt",
+    "candidate_mode": "both"
+  },
+  "retain_engagement": {
+    "category": "留才",
+    "display_name": "穩定性和投入度的驅動動機",
+    "single_prompt_file": "modules/retain_engagement_single.txt",
+    "multi_prompt_file": "modules/retain_engagement_multi.txt",
+    "candidate_mode": "both"
+  },
+  "dev_direction": {
+    "category": "培育發展",
+    "display_name": "培育重點與發展方向",
+    "single_prompt_file": "modules/dev_direction_single.txt",
+    "multi_prompt_file": "modules/dev_direction_multi.txt",
+    "candidate_mode": "both"
+  },
+  "dev_training": {
+    "category": "培育發展",
+    "display_name": "適合的培訓方式與學習節奏",
+    "single_prompt_file": "modules/dev_training_single.txt",
+    "multi_prompt_file": "modules/dev_training_multi.txt",
+    "candidate_mode": "both"
+  },
+  "dev_assignment": {
+    "category": "培育發展",
+    "display_name": "適合承擔的任務與專案",
+    "single_prompt_file": "modules/dev_assignment_single.txt",
+    "multi_prompt_file": "modules/dev_assignment_multi.txt",
+    "candidate_mode": "both"
+  },
+  "deep_leadership": {
+    "category": "深度分析",
+    "display_name": "領導風格與潛能分析",
+    "single_prompt_file": "modules/deep_leadership_single.txt",
+    "multi_prompt_file": "modules/deep_leadership_multi.txt",
+    "candidate_mode": "both"
+  },
+  "deep_communication": {
+    "category": "深度分析",
+    "display_name": "高效溝通模式解析",
+    "single_prompt_file": "modules/deep_communication_single.txt",
+    "multi_prompt_file": "modules/deep_communication_multi.txt",
+    "candidate_mode": "both"
+  }
+}

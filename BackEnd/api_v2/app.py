@@ -20,7 +20,7 @@ def create_app(config_class=Config):
         return traceback.format_exc(), 500
 
     # Register Blueprints
-    from .routes import chat, auth, candidates, reports, init_proxy
+    from .routes import chat, auth, candidates, reports, init_proxy, modules
     from .admin import router as admin_router
     
     app.register_blueprint(chat.bp) # Default /chat
@@ -29,6 +29,7 @@ def create_app(config_class=Config):
     app.register_blueprint(reports.bp, url_prefix='/api/v2/reports') # NEW: Batch reports endpoint
     app.register_blueprint(init_proxy.bp, url_prefix='/api/v2/init') # Proxy to upstream /v1/init
     app.register_blueprint(admin_router.bp) # /api/admin as defined in blueprint url_prefix
+    app.register_blueprint(modules.bp, url_prefix='/api/v2/modules') # 快速提問模組清單 API
 
 
     @app.route('/health')

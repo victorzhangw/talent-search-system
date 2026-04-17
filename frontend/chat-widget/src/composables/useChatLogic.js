@@ -65,24 +65,12 @@ export function useChatLogic(emit) {
     const showReportModal = ref(false)
     const currentReportCandidate = ref({})
 
-    const quickQuestionCategories = ref({
-        "管理": [
+    // 快速提問模組：從後端 API 動態拉取（單一資料源）
+    const quickQuestionCategories = ref({})
+    // 當前快速提問模組 ID（僅在 sendQuickMessage 時設定，發送後重置）
+    const currentModuleId = ref(null)
 
-            "如何面對困難、壓力、挑戰",
-            "合適的管理方式與風格",
-            "有效的溝通方法/模式",
-            "展現何種領導風格"
-        ],
-        "招募": [
-            "快速面試提問指南",
-            "工作中的主要優勢與潛力",
-            "在團隊合作中適合的角色",
-            "需注意的管理問題或潛在風險"
-
-        ]
-    })
-
-    const selectedQuickQuestionCategory = ref('管理')
+    const selectedQuickQuestionCategory = ref('')
 
     const quickQuestions = computed(() => {
         return quickQuestionCategories.value[selectedQuickQuestionCategory.value] || []
@@ -90,47 +78,75 @@ export function useChatLogic(emit) {
 
     const toggleQuickQuestionCategory = () => {
         const keys = Object.keys(quickQuestionCategories.value)
+        if (keys.length === 0) return
         const currentIndex = keys.indexOf(selectedQuickQuestionCategory.value)
         const nextIndex = (currentIndex + 1) % keys.length
         selectedQuickQuestionCategory.value = keys[nextIndex]
     }
 
     /**
+     * 從後端 API 拉取快速提問模組清單
+     * 回應格式：{ categories: { "招募": [{id, label, mode}, ...], ... } }
+     */
+    const fetchQuickModules = async () => {
+        const { apiBaseUrl } = getApiConfig()
+        try {
+            const res = await fetch(`${apiBaseUrl}/modules/`, {
+                headers: { 'Authorization': `Bearer ${userToken.value}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                quickQuestionCategories.value = data.categories || {}
+                // 設定預設分類為第一個
+                const keys = Object.keys(quickQuestionCategories.value)
+                if (keys.length > 0 && !keys.includes(selectedQuickQuestionCategory.value)) {
+                    selectedQuickQuestionCategory.value = keys[0]
+                }
+                console.log(`[ChatLogic] ✅ Loaded ${keys.length} quick question categories from API`)
+            }
+        } catch (e) {
+            console.error('[ChatLogic] Failed to fetch quick modules:', e)
+        }
+    }
+
+    /**
      * 過濾後的快速提問（桌面側欄版）
-     * 根據目前鎖定的候選人數量，以及 widgetFeatures 設定，
-     * 動態移除限定單人的問題。
+     * 根據目前鎖定的候選人數量，依據每個提問項目的 mode 屬性動態過濾。
      */
     const filteredQuickQuestions = computed(() => {
         const features = getFeatures()
         const questions = quickQuestionCategories.value[selectedQuickQuestionCategory.value] || []
 
-        // 功能關閉或只有 1 人以下時，直接回傳完整清單
         if (!features.quickQuestions.enforceSingleCandidateLimit) return questions
         const activeCount = activeConversationCandidateIds.value.length
-        if (activeCount <= 1) return questions
 
-        // 過濾掉「限定單人」的問題
-        const restricted = new Set(features.quickQuestions.singleCandidateQuestions)
-        return questions.filter(q => !restricted.has(q))
+        return questions.filter(q => {
+            // 純字串格式（fallback，相容舊資料）
+            if (typeof q === 'string') return true
+            // 物件格式：依 mode 過濾
+            if (activeCount <= 1 && q.mode === 'multi_only') return false
+            if (activeCount > 1 && q.mode === 'single_only') return false
+            return true
+        })
     })
 
     /**
      * 過濾後的快速提問分類物件（行動版彈出視窗用）
-     * 結構與 quickQuestionCategories 相同，但依規則移除限定單人的問題；
-     * 若某個分類過濾後為空，整個分類也會一起隱藏。
+     * 依據每個提問項目的 mode 屬性動態過濾。
      */
     const filteredQuickQuestionCategories = computed(() => {
         const features = getFeatures()
-
-        // 功能關閉或只有 1 人以下時，直接回傳原始資料
         if (!features.quickQuestions.enforceSingleCandidateLimit) return quickQuestionCategories.value
         const activeCount = activeConversationCandidateIds.value.length
-        if (activeCount <= 1) return quickQuestionCategories.value
 
-        const restricted = new Set(features.quickQuestions.singleCandidateQuestions)
         const result = {}
         for (const [cat, questions] of Object.entries(quickQuestionCategories.value)) {
-            const filtered = questions.filter(q => !restricted.has(q))
+            const filtered = questions.filter(q => {
+                if (typeof q === 'string') return true
+                if (activeCount <= 1 && q.mode === 'multi_only') return false
+                if (activeCount > 1 && q.mode === 'single_only') return false
+                return true
+            })
             if (filtered.length > 0) result[cat] = filtered
         }
         return result
@@ -467,6 +483,8 @@ export function useChatLogic(emit) {
         await fetchInitData()
         // Fetch candidates after login
         await fetchCandidates()
+        // Fetch quick question modules from API
+        await fetchQuickModules()
         // Fetch history
         await fetchHistory()
         currentTab.value = 'main' // Switch to split view
@@ -842,6 +860,8 @@ export function useChatLogic(emit) {
             // 1. Quick Questions -> Force 'expert'
             // 2. Typed Input -> 'auto' (Let backend router decide)
             const mode = isQuick ? 'expert' : 'auto';
+            // 快速提問時攜帶 module_id
+            const moduleId = currentModuleId.value || null;
 
             const response = await fetch(`${serverRoot}/chat/`, {
                 method: 'POST',
@@ -850,6 +870,7 @@ export function useChatLogic(emit) {
                 },
                 body: JSON.stringify({
                     query: query,
+                    module_id: moduleId,  // 快速提問模組 ID
                     candidate_ids: activeIds,
                     candidates_info: activeCandidates.map(c => ({
                         candidate_id: c.candidate_id,
@@ -931,6 +952,8 @@ export function useChatLogic(emit) {
                 messages.value[aiMsgIndex].isTyping = false
             }
             isTyping.value = false
+            // 重置 module_id（確保下次自由提問不會攜帶舊值）
+            currentModuleId.value = null
 
             // Save state to Session Storage
             try {
@@ -967,8 +990,15 @@ export function useChatLogic(emit) {
         }
     }
 
-    const sendQuickMessage = (text) => {
-        inputQuery.value = text
+    const sendQuickMessage = (questionItem) => {
+        // questionItem 可能是物件 {id, label, mode} 或純字串（相容舊版）
+        if (typeof questionItem === 'string') {
+            inputQuery.value = questionItem
+            currentModuleId.value = null
+        } else {
+            inputQuery.value = questionItem.label
+            currentModuleId.value = questionItem.id || null
+        }
         sendMessage(null, true) // Pass true for isQuick
     }
 

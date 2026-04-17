@@ -22,7 +22,7 @@ rag_logger = get_rag_logger()
 
 class RAGService:
     def __init__(self):
-        # 1. Load Use Cases Config
+        # 1. Load Use Cases Config（自由提問用）
         self.config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'use_cases.json')
         with open(self.config_path, 'r', encoding='utf-8') as f:
             self.use_cases = json.load(f)
@@ -35,6 +35,16 @@ class RAGService:
         else:
              rag_logger.warning("mode_rules.json not found.")
              self.mode_rules = {}
+
+        # 1.6 Load Quick Modules Config（快速提問用）
+        modules_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'quick_modules.json')
+        if os.path.exists(modules_path):
+            with open(modules_path, 'r', encoding='utf-8') as f:
+                self.quick_modules = json.load(f)
+            rag_logger.info(f"Loaded {len(self.quick_modules)} quick modules.")
+        else:
+            rag_logger.warning("quick_modules.json not found. Quick question module routing disabled.")
+            self.quick_modules = {}
 
         # 2. Setup Integration Service
         mode = current_app.config.get('INTEGRATION_MODE', 'MOCK')
@@ -76,6 +86,9 @@ class RAGService:
         self._context_cache = {}
         self.CACHE_TTL = 300 # 5 minutes
 
+        # 5. Prompts 基礎路徑
+        self._prompts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts')
+
     def _get_use_case(self, query: str) -> Dict[str, Any]:
         """ Hybrid Intent Router """
         for uc_id, uc_data in self.use_cases.items():
@@ -83,6 +96,47 @@ class RAGService:
                 if keyword in query:
                     return uc_id, uc_data
         return "UC-GENERAL", self.use_cases["UC-GENERAL"]
+
+    def _load_prompt_file(self, relative_path: str) -> str:
+        """從 prompts/ 目錄載入 Prompt 模板檔案"""
+        full_path = os.path.join(self._prompts_dir, relative_path)
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            rag_logger.error(f"Failed to load prompt file: {relative_path} - {e}", exc_info=True)
+            return None
+
+    def _route_by_module(self, module_id: str, candidate_count: int):
+        """
+        模組路由：依 module_id + 候選人數量，載入對應的 Prompt 模板。
+        回傳 (prompt_content, module_config) 或 (None, None)。
+        """
+        module = self.quick_modules.get(module_id)
+        if not module:
+            rag_logger.warning(f"Unknown module_id: {module_id}, falling back to use_case routing.")
+            return None, None
+        
+        # 依據候選人數量自動選擇 Prompt
+        if candidate_count > 1 and module.get('multi_prompt_file'):
+            prompt_file = module['multi_prompt_file']
+        elif candidate_count <= 1 and module.get('single_prompt_file'):
+            prompt_file = module['single_prompt_file']
+        else:
+            # 組合不支援（如 single_only 模組傳了 3 人，或 multi_only 模組傳了 1 人）
+            # Fallback: 嘗試使用另一版本
+            fallback = module.get('single_prompt_file') or module.get('multi_prompt_file')
+            if fallback:
+                rag_logger.warning(f"Module {module_id} candidate_mode={module['candidate_mode']} but got {candidate_count} candidates. Using fallback: {fallback}")
+                prompt_file = fallback
+            else:
+                rag_logger.error(f"Module {module_id} has no valid prompt file for {candidate_count} candidates.")
+                return None, None
+        
+        content = self._load_prompt_file(prompt_file)
+        if content:
+            rag_logger.info(f"Module route: {module_id} -> {prompt_file} ({len(content)} chars)")
+        return content, module
 
     def _get_cached_data(self, key):
         import time
@@ -102,7 +156,8 @@ class RAGService:
         }
 
     def generate_response(self, query: str, candidate_ids: List[str], session_id: str, 
-                         candidates_info: List[Dict] = None, trait_reports: Dict = None, mode: str = 'explanation'):
+                         candidates_info: List[Dict] = None, trait_reports: Dict = None, mode: str = 'explanation',
+                         module_id: str = None):
         """
         Orchestrates the Full RAG Flow:
         Token -> Data Fetch (Cache/API) -> Context -> LLM
@@ -291,14 +346,53 @@ class RAGService:
                 'final_candidates_data': final_candidates_data
             })
  
-        # 3. Intent Routing & Mode Handling (NEW LOGIC)
-        # We now use a unified prompt and delegate intention detection to the LLM itself
+        # 3. Intent Routing & Mode Handling
         determined_mode = 'expert' # Fetch high-resolution data from ContextBuilder for LLM
-        rag_logger.info(f"Input Mode: {mode}, Using Unified Intent Prompt")
+        candidate_count = len(final_candidates_data)
+        
+        # === 路由分支：模組路由（快速提問） vs 自由提問 ===
+        if module_id and module_id in self.quick_modules:
+            # --- 模組路由：快速提問，使用專屬 Prompt ---
+            rag_logger.info(f"Module route: module_id={module_id}, candidates={candidate_count}")
+            
+            module_prompt, module_config = self._route_by_module(module_id, candidate_count)
+            
+            if module_prompt:
+                # 建立 minimal uc_config 供 ContextBuilder 使用
+                uc_config = {
+                    'description': module_config.get('display_name', module_id),
+                    'answer_guidence': '',
+                    'prompt_config': {
+                        'style_ref': 'MODULE-DRIVEN',
+                        'risk_notes': []
+                    }
+                }
+                uc_id = f"MOD-{module_id}"
+                
+                # Build Context
+                builder = ContextBuilder(uc_config)
+                rag_context = builder.build(enterprise_data, final_candidates_data, mode=determined_mode)
+                
+                # 組裝 System Prompt：直接使用模組 Prompt 模板 + 資料注入
+                try:
+                    sys_prompt = module_prompt.format(
+                        base_analysis=rag_context.get('base_analysis', ''),
+                        interactions=rag_context.get('interactions') if rag_context.get('interactions') else '(無顯著交互作用)',
+                        constraints=rag_context.get('constraints', '')
+                    )
+                except KeyError as e:
+                    # 部分模組 Prompt 可能不含所有佔位符，直接拼接
+                    rag_logger.warning(f"Module prompt format partial match: {e}. Appending data as suffix.")
+                    sys_prompt = module_prompt + f"\n\n【基礎特質分析資料】\n{rag_context.get('base_analysis', '')}\n\n【特質交互作用加強分析】\n{rag_context.get('interactions', '(無顯著交互作用)')}\n\n【約束條件】\n{rag_context.get('constraints', '')}"
+                
+                return self._call_llm(sys_prompt, query, uc_id, session_id)
+        
+        # --- 自由提問路由：沿用既有 use_case + unified_rag_prompt ---
+        rag_logger.info(f"Free-form route: mode={mode}, Using Unified Intent Prompt")
 
         # Inject Special Prompt Content based on Unified AI Mode
         prompt_content_file = 'unified_rag_prompt.txt'
-        prompt_content_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', prompt_content_file)
+        prompt_content_path = os.path.join(self._prompts_dir, prompt_content_file)
         
         custom_role_prompt = "(Role Definition Missing)"
         if os.path.exists(prompt_content_path):
@@ -333,7 +427,6 @@ class RAGService:
         rag_context = builder.build(enterprise_data, final_candidates_data, mode=determined_mode)
  
         # 5. Assemble System Prompt
-        candidate_count = len(final_candidates_data)
         sys_prompt = self._assemble_prompt(uc_config, rag_context, candidate_count)
         
         # 6. Call LLM

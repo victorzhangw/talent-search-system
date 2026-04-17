@@ -222,8 +222,9 @@ def chat():
     user_id = data.get('user_id') # Copied from frontend config email
     
     mode = data.get('mode', 'explanation') # Default to explanation if not provided
+    module_id = data.get('module_id')  # 快速提問模組 ID（如 recruit_interview），自由提問時為 None
     
-    print(f"[Chat] Received trait_reports for {len(trait_reports)} candidates", flush=True)
+    print(f"[Chat] Received trait_reports for {len(trait_reports)} candidates, module_id={module_id}", flush=True)
     
     if not query:
         return jsonify({'error': 'Query is required'}), 400
@@ -293,7 +294,8 @@ def chat():
                     query, candidate_ids, session_id, 
                     candidates_info=candidates_info,
                     trait_reports=trait_reports,
-                    mode=mode
+                    mode=mode,
+                    module_id=module_id
                 )
             except OperationalError as db_err:
                 # Catch specific DB connection errors

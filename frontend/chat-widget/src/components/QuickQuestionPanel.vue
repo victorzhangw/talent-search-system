@@ -35,7 +35,7 @@
         @click="sendQuick(q)"
         :disabled="isTyping"
       >
-        {{ q }}
+        {{ q.label || q }}
       </button>
     </div>
 
@@ -57,7 +57,7 @@
           @click="sendQuick(q); closeMobile()"
           :disabled="isTyping"
         >
-          {{ q }}
+          {{ q.label || q }}
         </button>
       </div>
     </div>
