@@ -1,0 +1,10 @@
+Release Version: 20260421_153538
+Generated At: 2026/4/21 15:35:38
+------------------------------------------
+
+File: loader.css
+SRI: sha384-4oNfB8si83W57w3bV1+cbpS+3M3vDerU40Lu1kMCYOxBNjPiYSV1OyGjc8n5k5Ll
+
+File: loader.iife.js
+SRI: sha384-++TcJYLtCpqIKpcEO+xA4tkoVLYZb8pdXi55x24M8eouWvzwiLn4G4+r57adU8cg
+
