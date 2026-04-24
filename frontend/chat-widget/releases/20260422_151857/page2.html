@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>第二頁 - Traitty Widget 跳轉測試</title>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; margin: 0; background: #f0f0f5; }
+    .test-nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #1d1d1f;
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      z-index: 999;
+      font-size: 14px;
+    }
+    .test-nav .brand { font-weight: 700; color: #f5f5f7; letter-spacing: -0.3px; }
+    .test-nav .badge {
+      background: #ff9f0a;
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .test-nav a {
+      color: #a1a1a6;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .test-nav a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .test-nav a.active { background: rgba(255,255,255,0.15); color: #fff; }
+
+    .page-content {
+      margin-top: 60px;
+      padding: 48px 40px;
+      max-width: 800px;
+    }
+    .page-content h1 { font-size: 28px; font-weight: 700; color: #1d1d1f; margin-bottom: 8px; }
+    .page-content p { color: #6e6e73; line-height: 1.7; }
+
+    .result-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      margin-top: 24px;
+    }
+    .result-card h2 { font-size: 18px; font-weight: 600; color: #1d1d1f; margin-bottom: 12px; }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f2;
+      font-size: 15px;
+      color: #3d3d3f;
+    }
+    .check-item:last-child { border-bottom: none; }
+    .check-icon { font-size: 20px; flex-shrink: 0; }
+
+    .hint-box {
+      margin-top: 24px;
+      background: #f0f7ff;
+      border: 1px solid #c7e0ff;
+      border-radius: 10px;
+      padding: 16px 20px;
+      color: #1a6cc4;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .back-btn {
+      display: inline-block;
+      margin-top: 28px;
+      background: #1d1d1f;
+      color: #fff;
+      padding: 12px 28px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+      transition: opacity 0.2s;
+    }
+    .back-btn:hover { opacity: 0.8; }
+  </style>
+</head>
+
+<body>
+  <!-- 測試導航欄 -->
+  <nav class="test-nav">
+    <span class="brand">Traitty Widget</span>
+    <span class="badge">第二頁</span>
+    <a href="/">📄 首頁</a>
+    <a href="/page2.html" class="active">🔗 第二頁（跳轉測試）</a>
+  </nav>
+
+  <div class="page-content">
+    <h1>🔗 第二頁 — 頁面已跳轉</h1>
+    <p>您已成功跳轉至第二頁。現在請點擊右下角的 Widget 圖示，驗證對話狀態是否正確還原。</p>
+
+    <div class="result-card">
+      <h2>✅ 驗證清單</h2>
+      <div class="check-item">
+        <span class="check-icon">🔵</span>
+        <span>頁面已跳轉，JS 記憶體已重置（<code>hasActiveSession</code> 歸零）</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">💾</span>
+        <span>sessionStorage 中的 <code>traitty_widget_has_active_session</code> 旗標應仍存在</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">🎯</span>
+        <span>點擊 Widget 圖示後，<strong>應直接進入對話模式</strong>，而非候選人選擇畫面</span>
+      </div>
+      <div class="check-item">
+        <span class="check-icon">📜</span>
+        <span>對話訊息、候選人鎖定狀態應完整還原</span>
+      </div>
+    </div>
+
+    <div class="hint-box">
+      💡 <strong>提示：</strong>可開啟瀏覽器開發者工具 → Application → Session Storage，查看
+      <code>traitty_widget_has_active_session</code> 的值是否為 <code>1</code>，以及
+      <code>traitty_session_active_ids</code> 是否保留了之前鎖定的候選人 ID。
+    </div>
+
+    <a href="/" class="back-btn">← 返回首頁再點開 Widget 驗證</a>
+  </div>
+
+  <!-- Widget 也嵌入第二頁（可選，讓用戶直接在這頁開啟 Widget 測試） -->
+  <script>
+    window.TRAITTY_WIDGET_CONFIG = {
+      userEmail: "eva.wepredict@gmail.com"
+    };
+  </script>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

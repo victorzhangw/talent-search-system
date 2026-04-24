@@ -84,6 +84,13 @@ export function useChatLogic(emit) {
         selectedQuickQuestionCategory.value = keys[nextIndex]
     }
 
+    const selectQuickQuestionCategory = (catName) => {
+        const keys = Object.keys(quickQuestionCategories.value)
+        if (keys.includes(catName)) {
+            selectedQuickQuestionCategory.value = catName
+        }
+    }
+
     /**
      * 從後端 API 拉取快速提問模組清單
      * 回應格式：{ categories: { "招募": [{id, label, mode}, ...], ... } }
@@ -308,7 +315,7 @@ export function useChatLogic(emit) {
             try {
                 const cached = sessionStorage.getItem('traitty_batch_reports')
                 if (cached) existingReports = JSON.parse(cached)
-            } catch (e) {}
+            } catch (e) { }
 
             data.reports.forEach(report => {
                 const candidate = newCandidates.find(
@@ -407,7 +414,7 @@ export function useChatLogic(emit) {
         currentSessionId.value = previewSessionData.value.session_id;
         messages.value = [...previewMessages.value];
         showPreviewPanel.value = false;
-        
+
         // Also update selection lock if possible
         if (!isSelectionLocked.value && messages.value.length > 0) {
             isSelectionLocked.value = true;
@@ -418,7 +425,7 @@ export function useChatLogic(emit) {
             role: 'ai',
             content: '已為您切換至歷史對話，您可以繼續提問。'
         });
-        
+
         saveSessionToStorage();
     }
 
@@ -849,7 +856,7 @@ export function useChatLogic(emit) {
 
         try {
             const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 90000)
+            const timeoutId = setTimeout(() => controller.abort(), 180000)
 
             // Using activeConversationCandidateIds here!
             const activeIds = activeConversationCandidateIds.value
@@ -1086,6 +1093,7 @@ export function useChatLogic(emit) {
         sendMessage,
         sendQuickMessage,
         toggleQuickQuestionCategory,
+        selectQuickQuestionCategory,
         fetchHistory,
         loadMoreHistory,
         loadHistorySession,

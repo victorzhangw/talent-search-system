@@ -323,7 +323,7 @@
   :quickQuestions="filteredQuickQuestions"
   :isTyping="isTyping"
   @update:showMobileQuickQuestions="showMobileQuickQuestions = $event"
-  @toggleCategory="toggleQuickQuestionCategory"
+  @selectCategory="selectQuickQuestionCategory"
   @sendQuick="handleSendQuick"
 />
 
@@ -476,6 +476,7 @@ const {
     sendMessage,
     sendQuickMessage,
     toggleQuickQuestionCategory,
+    selectQuickQuestionCategory,
     loadHistorySession,
     switchContextToPreview,
     loadMoreHistory,
