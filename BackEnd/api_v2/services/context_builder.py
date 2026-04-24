@@ -133,36 +133,28 @@ class ContextBuilder:
             
             # A. Base Traits Semantics
             for trait_id, score, band_row in processed_traits:
-                # Fetch Name
+                # Fetch Name (kept for internal constraint/interaction lookup only)
                 trait_def = db_session.query(TraitDefinition).filter_by(trait_id=trait_id).first()
                 t_name_zh = trait_def.name_zh if trait_def else trait_id
                 
-                # WORDING SELECTION BASED ON MODE
+                # --- 安全輸出：不向 LLM 暴露 trait_id / name_zh / score / band ---
+                # 統一使用 semantic_label + description，讓 LLM 無法引用原始特質名稱
+                semantic = band_row.semantic_label or '行為傾向'
                 if mode == 'explanation':
-                    # Use Friendly Wording if available, else fallback to standard
                     wording = band_row.report_wording_friendly or band_row.description or '無描述'
-                    # Explanation Mode: Hide specific scores and bands in the output string if possible, 
-                    # but context needs to provide the semantic meaning.
-                    # User constraint: "cannot mention trait names/scores".
-                    # We provide the semantic analysis to LLM but instruct LLM not to output raw names.
-                    components["base_analysis"] += f"  * [特質洞察]: {wording}\n"
-                    # Using generic label to help LLM avoid leaking names? 
-                    # But LLM needs to connect interactions. 
-                    # Let's provide the name for internal logic but trust the system prompt to hide it.
-                    # Or better: "  * [{t_name_zh}]: {wording}" 
-                    # The prompt instruction says "Don't mention trait names".
-                else: 
-                    # Expert Mode
+                else:
                     wording = band_row.description or '無描述'
-                    components["base_analysis"] += f"  * [{trait_id}] {t_name_zh} (Score {score} -> Band {band_row.band}):\n"
-                    components["base_analysis"] += f"    - 語意: {band_row.semantic_label}\n"
-                    components["base_analysis"] += f"    - 描述: {wording}\n"
+                
+                components["base_analysis"] += f"  * 行為面向 — {semantic}:\n"
+                components["base_analysis"] += f"    - {wording}\n"
+                if band_row.management_focus:
+                    components["base_analysis"] += f"    - 管理重點: {band_row.management_focus}\n"
                 
                 # B. Constraints (Do/Dont)
                 if band_row.ai_guidance:
                     guidance = self._parse_json(band_row.ai_guidance)
                     if guidance.get('do') or guidance.get('dont'):
-                        components["constraints"] += f"  [{cand_name} - {t_name_zh} ({band_row.band})]:\n"
+                        components["constraints"] += f"  [{cand_name} - {band_row.semantic_label or '行為傾向'}]:\n"
                         if guidance.get('do'):
                             components["constraints"] += f"    - MUST DO: {guidance['do']}\n"
                         if guidance.get('dont'):
@@ -181,13 +173,8 @@ class ContextBuilder:
                     # Check if the TRIGGER trait exists and matches the required band
                     trigger_band = candidate_bands_map.get(comm.trigger_trait_id)
                     if trigger_band and trigger_band == comm.trigger_band:
-                        # Get names for clarity
-                        t1_def = db_session.query(TraitDefinition).filter_by(trait_id=trait_id).first()
-                        t2_def = db_session.query(TraitDefinition).filter_by(trait_id=comm.trigger_trait_id).first()
-                        t1_name = t1_def.name_zh if t1_def else trait_id
-                        t2_name = t2_def.name_zh if t2_def else comm.trigger_trait_id
-                        
-                        components["interactions"] += f"  > [{cand_name}] [主: {t1_name}] + [引: {t2_name}]:\n"
+                        # 安全輸出：不向 LLM 暴露特質名稱，僅提供行為交互敘述
+                        components["interactions"] += f"  > [{cand_name}] 行為交互作用:\n"
                         components["interactions"] += f"    {comm.narrative}\n"
 
         return components

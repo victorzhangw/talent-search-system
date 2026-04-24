@@ -54,9 +54,9 @@ def init_db(app):
     # Create Tables (Idempotent)
     try:
         Base.metadata.create_all(bind=engine)
-        print("✅ Database tables created/verified in PostgreSQL.")
+        print("[SUCCESS] Database tables created/verified in PostgreSQL.")
     except Exception as e:
-        print(f"❌ Failed to connect/create tables in PostgreSQL: {e}")
+        print(f"[ERROR] Failed to connect/create tables in PostgreSQL: {e}")
         print("   Please check your .env DB_USER / DB_PASSWORD / DB_NAME")
     
     @app.teardown_appcontext
