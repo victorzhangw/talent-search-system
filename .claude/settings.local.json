@@ -5,7 +5,11 @@
       "Bash(Select-Object FullName)",
       "PowerShell(head *)",
       "Bash(Get-ChildItem -Path \"D:\\\\python\\\\AI-Character-Chatbot\\\\BackEnd\\\\api_v2\" -Exclude \".venv\" -Recurse -Filter \"*.py\")",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Recurse -Path \"D:\\\\python\\\\AI-Character-Chatbot\\\\FrontEnd\\\\chat-widget\\\\src\" -Include *.js, *.ts, *.jsx, *.tsx)",
+      "Bash(Select-String -Path \"D:\\\\python\\\\AI-Character-Chatbot\\\\api-docs-uat.html\" -Pattern '\"status\": \"success\"|\\\\[DONE\\\\]|\"status\": true,|\"data\": \\\\[')",
+      "Bash(Select-Object LineNumber, Line)",
+      "Bash(Format-Table -AutoSize)"
     ]
   }
 }

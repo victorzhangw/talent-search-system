@@ -1,5 +1,6 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, current_app
 from ..utils.token_generator import generate_upstream_token
+from ..utils.response_helpers import ok, err
 import jwt
 import httpx
 
@@ -32,22 +33,24 @@ def get_init_status():
 
     try:
         print(f"[Init Proxy] Forwarding request to {url}...", flush=True)
-        # Verify=False might be needed if there are local SSL issues, but usually okay
         response = httpx.get(url, headers=headers, timeout=15.0)
-        
-        # Check if response is valid JSON
+
         try:
             data = response.json()
         except Exception:
             print(f"[Init Proxy] Upstream did not return valid JSON. Status: {response.status_code}")
-            return jsonify({'error': 'Invalid JSON from upstream', 'status': False}), 502
-            
-        print(f"[Init Proxy] Response Status: {response.status_code}, data: {data}")    
-        return jsonify(data), response.status_code
-        
+            return err('UPSTREAM_INVALID_RESPONSE', 'Upstream returned invalid JSON', 502)
+
+        print(f"[Init Proxy] Response Status: {response.status_code}, data: {data}")
+
+        if response.status_code >= 400:
+            return err('UPSTREAM_ERROR', 'Upstream service returned an error', response.status_code, details=data)
+
+        return ok(data)
+
     except httpx.RequestError as e:
         print(f"[Init Proxy] Network Error: {e}")
-        return jsonify({'error': 'Upstream network error', 'details': str(e), 'status': False}), 503
+        return err('UPSTREAM_NETWORK_ERROR', 'Upstream network error', 503, details=str(e))
     except Exception as e:
         print(f"[Init Proxy] Unexpected Error: {e}")
-        return jsonify({'error': 'Internal proxy error', 'details': str(e), 'status': False}), 500
+        return err('PROXY_ERROR', 'Internal proxy error', 500, details=str(e))

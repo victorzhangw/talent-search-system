@@ -17,7 +17,9 @@ def create_app(config_class=Config):
     @app.errorhandler(500)
     def internal_error(error):
         import traceback
-        return traceback.format_exc(), 500
+        traceback.print_exc()
+        from .utils.response_helpers import err
+        return err('INTERNAL_SERVER_ERROR', '伺服器發生未預期錯誤，請聯絡管理員', 500)
 
     # Register Blueprints
     from .routes import chat, auth, candidates, reports, init_proxy, modules

@@ -99,9 +99,10 @@ onMounted(async () => {
             headers: { 'Authorization': `Bearer ${props.token}` }
         })
         if (!res.ok) throw new Error('Fetch failed')
-        const data = await res.json()
-        traits.value = data.traits
-        assessmentDate.value = data.assessment_date
+        const resp = await res.json()
+        if (!resp.success) throw new Error(resp.error?.message || 'Fetch failed')
+        traits.value = resp.data.traits
+        assessmentDate.value = resp.data.assessment_date
     } catch (e) {
         error.value = "無法載入報告數據"
     } finally {

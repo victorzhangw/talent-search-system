@@ -1,9 +1,10 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, current_app
 from ..services.integration_mock import MockIntegrationService
 from ..services.rag_engine import RAGService
 from ..database import db_session, TraitDefinition
 from ..services.integration_real import RealIntegrationService
 from ..utils.token_generator import generate_upstream_token
+from ..utils.response_helpers import ok, err
 import jwt
 
 # No url_prefix, handled in app.py
@@ -64,16 +65,12 @@ def list_candidates():
             page_info = result.get('page', {})
     except Exception as e:
         print(f"ERROR: Failed to fetch candidates: {e}")
-        return jsonify({'error': 'Upstream service unavailable', 'details': str(e)}), 503
-    
+        return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503, details=str(e))
+
     if candidates and len(candidates) > 0:
         print(f"DEBUG: Successfully fetched {len(candidates)} candidates.", flush=True)
 
-    # Return structure matching Upstream
-    return jsonify({
-        'data': candidates,
-        'page': page_info
-    })
+    return ok(candidates, meta={'page': page_info})
 
 @bp.route('/<candidate_id>/report', methods=['GET'])
 def get_candidate_report(candidate_id):
@@ -102,7 +99,7 @@ def get_candidate_report(candidate_id):
             candidates = resp.get('data', [])
     except Exception as e:
         print(f"ERROR: Failed to fetch candidate list for report: {e}")
-        return jsonify({'error': 'Upstream service unavailable', 'details': str(e)}), 503
+        return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503, details=str(e))
 
     # Debug ID types
     print(f"DEBUG: Looking for candidate_id: {candidate_id} (Type: {type(candidate_id)})", flush=True)
@@ -121,7 +118,7 @@ def get_candidate_report(candidate_id):
     
     if not target_cand:
         print(f"DEBUG: Candidate {candidate_id} not found in list.", flush=True)
-        return jsonify({'error': 'Candidate not found in list'}), 404
+        return err('NOT_FOUND', 'Candidate not found in list', 404)
         
     # Check assessment ID location
     asmt_id = None
@@ -132,9 +129,8 @@ def get_candidate_report(candidate_id):
         asmt_id = target_cand.get('assessment_id')
         
     if not asmt_id:
-         print(f"DEBUG: No assessment_id found for candidate {candidate_id}. Data: {target_cand}", flush=True)
-         # Graceful UI handling: Return basic info but no traits
-         return jsonify({
+        print(f"DEBUG: No assessment_id found for candidate {candidate_id}. Data: {target_cand}", flush=True)
+        return ok({
             'candidate_name': target_cand.get('name'),
             'assessment_date': 'N/A',
             'traits': []
@@ -169,7 +165,7 @@ def get_candidate_report(candidate_id):
 
     if not report_data:
         print(f"DEBUG: Report data is empty after fetch.", flush=True)
-        return jsonify({'error': 'Report fetch failed', 'details': f'Assessment {asmt_id} not retrieved'}), 500
+        return err('REPORT_FETCH_FAILED', 'Report fetch failed', 500, details=f'Assessment {asmt_id} not retrieved')
 
     # 4. Simplify/Format for UI (Business Style)
     # Extract trait list
@@ -202,7 +198,7 @@ def get_candidate_report(candidate_id):
     # Sort by score desc
     formatted_traits.sort(key=lambda x: x['score'], reverse=True)
 
-    return jsonify({
+    return ok({
         'candidate_name': target_cand.get('name'),
         'assessment_date': target_cand.get('latest_assessment', {}).get('completion_time', 'N/A'),
         'traits': formatted_traits

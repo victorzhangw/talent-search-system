@@ -1,5 +1,5 @@
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from sqlalchemy import func
 from datetime import datetime, timedelta
 import datetime as dt
@@ -7,6 +7,7 @@ import datetime as dt
 from ..database.connection import get_db_session
 from ..database.models import ChatSession, ChatMessage, AdminUser
 from .auth import create_access_token, verify_password, get_password_hash, token_required
+from ..utils.response_helpers import ok, err
 
 bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -14,46 +15,42 @@ bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 def login():
     data = request.get_json()
     if not data or not data.get('username') or not data.get('password'):
-         return jsonify({'detail': 'Username and password required'}), 400
-         
+        return err('MISSING_FIELD', 'Username and password required', 400)
+
     db = get_db_session()
     try:
         user = db.query(AdminUser).filter(AdminUser.username == data['username']).first()
-        if not user:
-            return jsonify({'detail': 'Incorrect username or password'}), 401
-            
-        if not verify_password(data['password'], user.password_hash):
-            return jsonify({'detail': 'Incorrect username or password'}), 401
-        
+        if not user or not verify_password(data['password'], user.password_hash):
+            return err('INVALID_CREDENTIALS', 'Incorrect username or password', 401)
+
         access_token = create_access_token(data={"sub": user.username})
-        return jsonify({"access_token": access_token, "token_type": "bearer"})
+        return ok({"access_token": access_token, "token_type": "bearer"})
     finally:
         db.close()
 
 @bp.route('/me', methods=['GET'])
 @token_required
 def read_users_me(current_user):
-    return jsonify({"username": current_user})
+    return ok({"username": current_user})
 
 @bp.route('/users', methods=['POST'])
 @token_required
 def create_user(current_user):
     data = request.get_json()
     if not data or not data.get('username') or not data.get('password'):
-        return jsonify({'detail': 'Username and password required'}), 400
-        
+        return err('MISSING_FIELD', 'Username and password required', 400)
+
     db = get_db_session()
     try:
-        # Check if username exists
         if db.query(AdminUser).filter(AdminUser.username == data['username']).first():
-            return jsonify({'detail': 'Username already exists.'}), 400
-             
+            return err('CONFLICT', 'Username already exists', 400)
+
         hashed_password = get_password_hash(data['password'])
         new_user = AdminUser(username=data['username'], password_hash=hashed_password)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        return jsonify({"username": new_user.username, "id": new_user.id}), 201
+        return ok({"username": new_user.username, "id": new_user.id}, status=201)
     finally:
         db.close()
 
@@ -62,18 +59,17 @@ def create_user(current_user):
 def update_user_password(current_user, user_id):
     data = request.get_json()
     if not data or not data.get('password'):
-        return jsonify({'detail': 'New password required'}), 400
-        
+        return err('MISSING_FIELD', 'New password required', 400, field='password')
+
     db = get_db_session()
     try:
         user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
         if not user:
-            return jsonify({'detail': 'User not found'}), 404
-            
-        hashed_password = get_password_hash(data['password'])
-        user.password_hash = hashed_password
+            return err('NOT_FOUND', 'User not found', 404)
+
+        user.password_hash = get_password_hash(data['password'])
         db.commit()
-        return jsonify({"detail": "Password updated successfully"})
+        return ok({"message": "Password updated successfully"})
     finally:
         db.close()
 
@@ -83,7 +79,7 @@ def list_users(current_user):
     db = get_db_session()
     try:
         users = db.query(AdminUser).all()
-        return jsonify([{"id": u.id, "username": u.username, "created_at": u.created_at.isoformat()} for u in users])
+        return ok([{"id": u.id, "username": u.username, "created_at": u.created_at.isoformat()} for u in users])
     finally:
         db.close()
 
@@ -118,14 +114,13 @@ def list_sessions(current_user):
             end_date_utc = end_date_local - timedelta(hours=8)
             query = query.filter(ChatSession.started_at < end_date_utc)
             
+        total = query.count()
         sessions = query.order_by(ChatSession.last_active_at.desc()).offset(skip).limit(limit).all()
-        
+
         results = []
         for s in sessions:
             msg_count = len(s.messages)
             total_tokens = sum([m.token_usage for m in s.messages if m.token_usage])
-            
-            # Serialize
             results.append({
                 "session_id": s.session_id,
                 "user_id": s.user_id,
@@ -135,10 +130,10 @@ def list_sessions(current_user):
                 "message_count": msg_count,
                 "total_tokens": total_tokens
             })
-        return jsonify(results)
+        return ok(results, meta={"skip": skip, "limit": limit, "total": total})
     except Exception as e:
         print(f"[Admin] Error listing sessions: {e}")
-        return jsonify({'detail': str(e)}), 500
+        return err('QUERY_FAILED', str(e), 500)
     finally:
         db.close()
 
@@ -149,11 +144,11 @@ def get_session_details(current_user, session_id):
     try:
         session = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
         if not session:
-            return jsonify({'detail': 'Session not found'}), 404
-            
+            return err('NOT_FOUND', 'Session not found', 404)
+
         messages = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at).all()
-        
-        return jsonify({
+
+        return ok({
             "session": {
                 "session_id": session.session_id,
                 "user_id": session.user_id,
@@ -161,15 +156,13 @@ def get_session_details(current_user, session_id):
                 "started_at": session.started_at.isoformat() if session.started_at else None,
                 "metadata": session.metadata_
             },
-            "messages": [
-                {
-                    "id": m.id,
-                    "role": m.role,
-                    "content": m.content,
-                    "token_usage": m.token_usage,
-                    "created_at": m.created_at.isoformat() if m.created_at else None
-                } for m in messages
-            ]
+            "messages": [{
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "token_usage": m.token_usage,
+                "created_at": m.created_at.isoformat() if m.created_at else None
+            } for m in messages]
         })
     finally:
         db.close()
@@ -232,11 +225,11 @@ def get_dashboard_stats(current_user):
             d_str = r[0].strftime('%m-%d')
             token_trend.append({"date": d_str, "tokens": r[1] or 0})
             
-        return jsonify({
-            "total_sessions": total_sessions, # This Month
-            "total_tokens": total_tokens,     # This Month
-            "total_messages": total_messages, # This Month
-            "active_users_yesterday": active_users_yesterday, # Yesterday TW
+        return ok({
+            "total_sessions": total_sessions,
+            "total_tokens": total_tokens,
+            "total_messages": total_messages,
+            "active_users_yesterday": active_users_yesterday,
             "token_trend": token_trend
         })
     finally:
@@ -285,10 +278,10 @@ def users_usage_report(current_user):
                 "last_active_at": r.last_active_at.isoformat() if r.last_active_at else None
             })
             
-        return jsonify(data)
+        return ok(data)
     except Exception as e:
         print(f"[Admin] Report Error: {e}")
-        return jsonify({'detail': str(e)}), 500
+        return err('QUERY_FAILED', str(e), 500)
     finally:
         db.close()
 
@@ -331,10 +324,10 @@ def daily_usage_report(current_user):
                 "sessions": r.sessions
             })
             
-        return jsonify(data)
+        return ok(data)
     except Exception as e:
         print(f"[Admin] Daily Report Error: {e}")
-        return jsonify({'detail': str(e)}), 500
+        return err('QUERY_FAILED', str(e), 500)
     finally:
         db.close()
 

@@ -1,4 +1,5 @@
-from flask import Blueprint, request, Response, jsonify, stream_with_context, current_app
+from flask import Blueprint, request, Response, stream_with_context, current_app
+from ..utils.response_helpers import ok, err
 import json
 import threading
 import os
@@ -101,7 +102,7 @@ def get_user_history():
         
     user_id = request.args.get('user_id')
     if not user_id:
-        return jsonify({'error': 'user_id parameter is required'}), 400
+        return err('MISSING_FIELD', 'user_id parameter is required', 400, field='user_id')
         
     session_store = SqlSessionStore()
     sessions = session_store.get_user_sessions(user_id=user_id, days=30)
@@ -151,9 +152,10 @@ def get_user_history():
         else:
             past_sessions.append(session_data)
             
-    return jsonify({
+    return ok({
         'today': today_sessions,
-        'past_30_days': past_sessions
+        'past_30_days': past_sessions,
+        'has_more': False
     })
 
 @bp.route('/<session_id>', methods=['GET', 'OPTIONS'])
@@ -164,7 +166,7 @@ def get_session_details(session_id):
     session_store = SqlSessionStore()
     session = session_store.get_session(session_id)
     if not session:
-        return jsonify({'error': 'Not found'}), 404
+        return err('NOT_FOUND', 'Session not found', 404)
         
     messages = session_store.get_messages(session_id)
     
@@ -172,7 +174,7 @@ def get_session_details(session_id):
     ROLE_MAP = {'assistant': 'ai', 'user': 'user'}
     visible_messages = [m for m in messages if m.role in ('user', 'assistant')]
     
-    return jsonify({
+    return ok({
         'session_id': session.session_id,
         'status': session.status,
         'metadata': session.metadata_,
@@ -192,17 +194,17 @@ def update_message_rating(message_id):
         
     data = request.get_json()
     if not data or 'rating' not in data:
-        return jsonify({'error': 'rating is required'}), 400
-        
+        return err('MISSING_FIELD', 'rating is required', 400, field='rating')
+
     rating = int(data['rating'])
-    
+
     session_store = SqlSessionStore()
     success = session_store.update_message_rating(message_id, rating)
-    
+
     if success:
-        return jsonify({'status': 'success', 'message_id': message_id, 'rating': rating})
+        return ok({'message_id': message_id, 'rating': rating})
     else:
-        return jsonify({'error': 'Message not found or update failed'}), 404
+        return err('NOT_FOUND', 'Message not found or update failed', 404)
 
 @bp.route('/', methods=['POST'])
 def chat():
@@ -212,7 +214,7 @@ def chat():
         print(f">>> [DEBUG] Payload received. Keys: {list(data.keys())}", flush=True)
     except Exception as e:
         print(f">>> [DEBUG] Failed to parse JSON: {e}", flush=True)
-        return jsonify({'error': 'Invalid JSON'}), 400
+        return err('INVALID_JSON', 'Invalid JSON in request body', 400)
 
     query = data.get('query')
     candidate_ids = data.get('candidate_ids', [])
@@ -227,7 +229,7 @@ def chat():
     print(f"[Chat] Received trait_reports for {len(trait_reports)} candidates, module_id={module_id}", flush=True)
     
     if not query:
-        return jsonify({'error': 'Query is required'}), 400
+        return err('MISSING_FIELD', 'Query is required', 400, field='query')
 
     print(f">>> [DEBUG] Candidate IDs: {candidate_ids}", flush=True)
     print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}, Mode: {mode}", flush=True)
@@ -298,25 +300,16 @@ def chat():
                     module_id=module_id
                 )
             except OperationalError as db_err:
-                # Catch specific DB connection errors
                 print(f"[RAG DB Error] {db_err}", flush=True)
-                err_json = json.dumps({'type': 'token', 'content': "⚠️ 系統提示：目前資料庫暫時無法連線，無法讀取候選人資料。請通知管理員檢查後端服務。\n"})
-                yield f"data: {err_json}\n\n"
-                yield "data: [DONE]\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'code': 'DB_UNAVAILABLE', 'message': '資料庫暫時無法連線，請通知管理員檢查後端服務。'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 return
             except Exception as e:
                 print(f"[RAG Generation Error] {e}", flush=True)
                 import traceback
-                tb = traceback.format_exc()
-                
-                # Friendly error message for general failures
-                err_json = json.dumps({'type': 'token', 'content': "⚠️ 抱歉，系統運算時發生未預期的錯誤，請稍後再試。"})
-                yield f"data: {err_json}\n\n"
-                
-                # Log full traceback to console/file instead of sending to user
-                print(f"SYSTEM ERROR TRACEBACK:\n{tb}", flush=True)
-                
-                yield "data: [DONE]\n\n"
+                print(f"SYSTEM ERROR TRACEBACK:\n{traceback.format_exc()}", flush=True)
+                yield f"data: {json.dumps({'type': 'error', 'code': 'SYSTEM_ERROR', 'message': '系統運算時發生未預期的錯誤，請稍後再試。'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
                 return
             
             # Send thinking/intent meta
@@ -328,10 +321,8 @@ def chat():
             
             try:
                 for chunk in response_stream:
-                    # Check for usage in the chunk (OpenAI standard)
                     if hasattr(chunk, 'usage') and chunk.usage:
                         total_usage = chunk.usage
-                        # print(f"[Chat] Token Usage: {total_usage}")
                         continue
 
                     if chunk.choices and len(chunk.choices) > 0:
@@ -343,12 +334,11 @@ def chat():
                                 has_llm_error = True
                             yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
             except Exception as e:
-                print(f"[Streaming Error] {e}", flush=True)  # ADDED FLUSH
+                print(f"[Streaming Error] {e}", flush=True)
                 import traceback
                 traceback.print_exc()
-                err_msg = "\n\n(連線中斷: 請稍後再試)"
                 has_llm_error = True
-                yield f"data: {json.dumps({'type': 'token', 'content': err_msg})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'code': 'STREAM_INTERRUPTED', 'message': '連線中斷，請稍後再試。'})}\n\n"
             
             # Log Assistant Message & Usage
             prompt_tokens = 0
@@ -407,13 +397,14 @@ def chat():
             else:
                 print(f"[Daily Settlement] Skipped quota deduction due to LLM error flag for session: {session_id}", flush=True)
 
-            yield "data: [DONE]\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except Exception as outer_e:
             print(f"[Generator outer error] {outer_e}", flush=True)
             import traceback
             with open("traceback.log", "w", encoding="utf-8") as f:
                 f.write(traceback.format_exc())
-            yield f"data: {json.dumps({'type': 'token', 'content': '系統錯誤'})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'code': 'SYSTEM_ERROR', 'message': '系統錯誤，請稍後再試。'})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     # Create response with proper headers to prevent buffering
     response = Response(stream_with_context(generate()), mimetype='text/event-stream')

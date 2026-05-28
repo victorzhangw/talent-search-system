@@ -1,9 +1,10 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, current_app
 from ..services.integration_mock import MockIntegrationService
 from ..services.session_store import SqlSessionStore
 from ..database import db_session, ChatSession, ChatMessage
 from ..services.integration_real import RealIntegrationService
 from ..utils.token_generator import generate_upstream_token
+from ..utils.response_helpers import ok, err
 import jwt
 
 # No url_prefix, handled in app.py
@@ -69,7 +70,7 @@ def get_batch_reports():
     if not assessment_ids:
         print("❌ ERROR: No assessment_ids provided", file=sys.stderr, flush=True)
         print("[Batch Reports] ERROR: No assessment_ids provided", flush=True)
-        return jsonify({'error': 'assessment_ids is required'}), 400
+        return err('MISSING_FIELD', 'assessment_ids is required', 400, field='assessment_ids')
     
     print(f"[Batch Reports] Fetching {len(assessment_ids)} reports for IDs: {assessment_ids}", flush=True)
     
@@ -89,15 +90,16 @@ def get_batch_reports():
         print(f"[Batch Reports] ERROR fetching from service: {e}", flush=True)
         import traceback
         traceback.print_exc()
-        return jsonify({'error': f'Failed to fetch assessments: {str(e)}'}), 500
-    
+        return err('FETCH_FAILED', 'Failed to fetch assessments', 500, details=str(e))
+
     if not results:
         print(f"[Batch Reports] WARNING: No results returned from service", flush=True)
-        return jsonify({'reports': []}), 200
+        return ok({'reports': []})
     
     # 4. Format each report
     formatted_reports = []
-    
+    skipped_ids = []
+
     for idx, report_data in enumerate(results):
         print(f"[Batch Reports] Processing report {idx + 1}/{len(results)}", flush=True)
         
@@ -116,6 +118,7 @@ def get_batch_reports():
         
         if not asmt_id:
             print(f"[Batch Reports] WARNING: Skipping report without assessment_id", flush=True)
+            skipped_ids.append(report_data.get('assessment_id') or report_data.get('candidate_id'))
             continue
         
         # Extract trait results
@@ -173,7 +176,9 @@ def get_batch_reports():
     print(f"[Batch Reports] ✅ Returning {len(formatted_reports)} formatted reports", flush=True)
     print("[Batch Reports] ========== End Processing ==========", flush=True)
     print("=" * 60, flush=True)
-    
-    return jsonify({
-        'reports': formatted_reports
-    })
+
+    meta = {'skipped_count': len(skipped_ids)}
+    if skipped_ids:
+        meta['skipped_ids'] = skipped_ids
+
+    return ok({'reports': formatted_reports}, meta=meta)

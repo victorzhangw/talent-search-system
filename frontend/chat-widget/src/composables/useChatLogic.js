@@ -102,9 +102,8 @@ export function useChatLogic(emit) {
                 headers: { 'Authorization': `Bearer ${userToken.value}` }
             })
             if (res.ok) {
-                const data = await res.json()
-                quickQuestionCategories.value = data.categories || {}
-                // 設定預設分類為第一個
+                const resp = await res.json()
+                quickQuestionCategories.value = (resp.success ? resp.data?.categories : null) || {}
                 const keys = Object.keys(quickQuestionCategories.value)
                 if (keys.length > 0 && !keys.includes(selectedQuickQuestionCategory.value)) {
                     selectedQuickQuestionCategory.value = keys[0]
@@ -265,11 +264,11 @@ export function useChatLogic(emit) {
                 throw new Error(`Batch reports fetch failed: ${res.status}`)
             }
 
-            const data = await res.json()
+            const resp = await res.json()
+            const reports = resp.success ? (resp.data?.reports ?? []) : []
 
-            // Store reports in Session Storage, keyed by candidate_id
             const reportsMap = {}
-            data.reports.forEach(report => {
+            reports.forEach(report => {
                 const candidate = selectedCandidates.find(
                     c => String(c.latest_assessment?.assessment_id) === String(report.assessment_id)
                 )
@@ -308,16 +307,16 @@ export function useChatLogic(emit) {
 
             if (!res.ok) throw new Error(`Incremental batch reports failed: ${res.status}`)
 
-            const data = await res.json()
+            const resp = await res.json()
+            const reports = resp.success ? (resp.data?.reports ?? []) : []
 
-            // 讀取現有報告，合併新的
             let existingReports = {}
             try {
                 const cached = sessionStorage.getItem('traitty_batch_reports')
                 if (cached) existingReports = JSON.parse(cached)
             } catch (e) { }
 
-            data.reports.forEach(report => {
+            reports.forEach(report => {
                 const candidate = newCandidates.find(
                     c => String(c.latest_assessment?.assessment_id) === String(report.assessment_id)
                 )
@@ -350,18 +349,19 @@ export function useChatLogic(emit) {
                 headers: { 'Authorization': `Bearer ${userToken.value}` }
             })
             if (res.ok) {
-                const data = await res.json()
+                const resp = await res.json()
+                const d = resp.success ? (resp.data || {}) : {}
                 if (append) {
-                    historySessions.value.today = [...(historySessions.value.today || []), ...(data.today || [])];
-                    historySessions.value.past_30_days = [...(historySessions.value.past_30_days || []), ...(data.past_30_days || [])];
+                    historySessions.value.today = [...(historySessions.value.today || []), ...(d.today || [])]
+                    historySessions.value.past_30_days = [...(historySessions.value.past_30_days || []), ...(d.past_30_days || [])]
                 } else {
                     historySessions.value = {
-                        today: data.today || [],
-                        past_30_days: data.past_30_days || []
+                        today: d.today || [],
+                        past_30_days: d.past_30_days || []
                     }
                 }
-                historyPage.value = page;
-                historyHasMore.value = data.has_more ?? false;
+                historyPage.value = page
+                historyHasMore.value = d.has_more ?? false
             }
         } catch (e) {
             console.error("[ChatContainer] Failed to load history", e)
@@ -390,15 +390,14 @@ export function useChatLogic(emit) {
                 headers: { 'Authorization': `Bearer ${userToken.value}` }
             })
             if (res.ok) {
-                const data = await res.json()
-                // Reconstruct messages array
-                const msgs = data.messages.map(m => ({
+                const resp = await res.json()
+                const rawMessages = resp.success ? (resp.data?.messages ?? []) : []
+                const msgs = rawMessages.map(m => ({
                     id: m.id,
                     role: m.role,
                     content: m.content,
                     rating: m.rating || 0
                 }))
-
                 previewMessages.value = msgs.length > 0 ? msgs : [{ role: 'ai', content: '（尚無對話紀錄）' }]
             }
         } catch (e) {
@@ -447,36 +446,28 @@ export function useChatLogic(emit) {
             });
 
             if (res.ok) {
-                const data = await res.json();
+                const resp = await res.json()
+                const data = resp.success ? (resp.data || {}) : {}
 
                 if (data.quota_summary) {
-                    quotaSummary.value = data.quota_summary;
+                    quotaSummary.value = data.quota_summary
                 }
 
                 if (data.usable_plans && data.usable_plans.length > 0) {
-                    // Try to parse ends_at to get remaining days
                     try {
-                        // Replace dashes with slashes for Safari compatibility just in case
-                        const endsAtDate = new Date(data.usable_plans[0].ends_at.replace(/-/g, '/'));
-                        const now = new Date();
-
-                        // To exclude today, we get the time difference and use Math.floor
-                        // Math.floor will effectively drop the fractional day (which is "today")
-                        const diffTime = endsAtDate - now;
-                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-                        remainingDays.value = diffDays > 0 ? diffDays : 0;
-                    } catch (err) {
-                        console.error("Failed to parse remaining days", err);
+                        const endsAtDate = new Date(data.usable_plans[0].ends_at.replace(/-/g, '/'))
+                        const diffTime = endsAtDate - new Date()
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+                        remainingDays.value = diffDays > 0 ? diffDays : 0
+                    } catch (e) {
+                        console.error("Failed to parse remaining days", e)
                     }
                 }
 
-                // Widget is enabled if status is true AND remaining quota is > 0
                 isWidgetEnabled.value = data.status === true &&
-                    (data.quota_summary && data.quota_summary.remaining > 0);
-
+                    (data.quota_summary && data.quota_summary.remaining > 0)
             } else {
-                console.warn(`[ChatLogic] /v1/init/ returned status ${res.status}`);
+                console.warn(`[ChatLogic] /v1/init/ returned status ${res.status}`)
             }
         } catch (e) {
             console.error("[ChatLogic] Failed to fetch init data", e);
@@ -593,19 +584,17 @@ export function useChatLogic(emit) {
                     'Authorization': `Bearer ${userToken.value}`
                 }
             })
-            const data = await res.json()
+            const resp = await res.json()
 
-            // API v2 returns { data: [], page: { total, limit, offset } }
             let rawList = []
             let total = 0
 
-            if (data.data) {
-                rawList = data.data
-                total = data.page ? data.page.total : rawList.length
-            } else if (Array.isArray(data)) {
-                // Fallback for Mock which returned partial array or other APIs
-                rawList = data
-                total = 9999 // Unknown
+            if (resp.success) {
+                rawList = Array.isArray(resp.data) ? resp.data : []
+                total = resp.meta?.page?.total ?? rawList.length
+            } else if (Array.isArray(resp)) {
+                rawList = resp
+                total = 9999
             }
 
             totalCandidatesCount.value = total
@@ -805,17 +794,21 @@ export function useChatLogic(emit) {
                 })
 
                 if (res.ok) {
-                    const data = await res.json()
-                    if (data.token) {
-                        // Success!
-                        await handleLoginSuccess(data)
+                    const resp = await res.json()
+                    if (resp.success && resp.data?.token) {
+                        await handleLoginSuccess(resp.data)
                         return
                     } else {
-                        throw new Error("Response OK but no token found")
+                        const msg = resp.error?.message || 'Response OK but no token found'
+                        throw new Error(msg)
                     }
                 } else {
-                    const text = await res.text()
-                    throw new Error(`Server returned ${res.status}: ${text}`)
+                    let msg = `Server returned ${res.status}`
+                    try {
+                        const body = await res.json()
+                        if (body.error?.message) msg = body.error.message
+                    } catch (_) { }
+                    throw new Error(msg)
                 }
             } catch (e) {
                 console.warn(`[AutoLogin] Attempt ${attempt}/${maxRetries} failed:`, e.message)
@@ -925,23 +918,24 @@ export function useChatLogic(emit) {
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         const jsonStr = line.slice(6)
-                        if (jsonStr === '[DONE]') continue
                         try {
-                            const data = JSON.parse(jsonStr)
-                            // 每次動態查詢目標訊息位置，防止陣列被修改導致索引失效
+                            const event = JSON.parse(jsonStr)
+                            if (event.type === 'done') continue
                             const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
                             if (aiMsgIndex === -1) continue
-                            if (data.type === 'meta') {
-                                messages.value[aiMsgIndex].intent = data.intent
-                            } else if (data.type === 'token') {
-                                messages.value[aiMsgIndex].content += data.content
-                            } else if (data.type === 'quota') {
-                                if (data.quota_summary) {
-                                    quotaSummary.value = data.quota_summary
-                                    isWidgetEnabled.value = (data.quota_summary.remaining > 0)
+                            if (event.type === 'error') {
+                                messages.value[aiMsgIndex].content += `\n\n⚠️ ${event.message}`
+                            } else if (event.type === 'meta') {
+                                messages.value[aiMsgIndex].intent = event.intent
+                            } else if (event.type === 'token') {
+                                messages.value[aiMsgIndex].content += event.content
+                            } else if (event.type === 'quota') {
+                                if (event.quota_summary) {
+                                    quotaSummary.value = event.quota_summary
+                                    isWidgetEnabled.value = (event.quota_summary.remaining > 0)
                                 }
-                            } else if (data.type === 'message_id') {
-                                messages.value[aiMsgIndex].id = data.id
+                            } else if (event.type === 'message_id') {
+                                messages.value[aiMsgIndex].id = event.id
                             }
                         } catch (e) { console.error(e) }
                     }

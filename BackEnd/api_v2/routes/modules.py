@@ -1,7 +1,8 @@
 """
 模組清單 API — 提供前端動態拉取快速提問模組清單（單一資料源）
 """
-from flask import Blueprint, jsonify
+from flask import Blueprint
+from ..utils.response_helpers import ok, err
 import json
 import os
 
@@ -22,7 +23,7 @@ def get_modules():
         with open(modules_path, 'r', encoding='utf-8') as f:
             modules = json.load(f)
     except Exception as e:
-        return jsonify({'error': f'Failed to load modules config: {e}'}), 500
+        return err('CONFIG_LOAD_FAILED', f'Failed to load modules config', 500, details=str(e))
 
     # 組裝前端所需格式：依分類分組，保持分類順序
     category_order = ['招募', '管理', '團隊合作', '留才', '培育發展', '深度分析']
@@ -47,4 +48,4 @@ def get_modules():
         if cat not in ordered:
             ordered[cat] = categories[cat]
 
-    return jsonify({'categories': ordered})
+    return ok({'categories': ordered})

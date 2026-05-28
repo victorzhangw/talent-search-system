@@ -69,11 +69,11 @@ const handleLogin = async () => {
             throw new Error('驗證失敗')
         }
 
-        const data = await res.json()
-        if (data.token) {
-            emit('login-success', data)
+        const resp = await res.json()
+        if (resp.success && resp.data?.token) {
+            emit('login-success', resp.data)
         } else {
-            throw new Error('無法取得 Token')
+            throw new Error(resp.error?.message || '無法取得 Token')
         }
     } catch (e) {
         errorMsg.value = e.message || '發生錯誤，請稍後再試'
