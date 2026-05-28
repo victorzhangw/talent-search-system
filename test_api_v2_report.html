@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API v2 測試報告 — 2026-05-28 13:16:57</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #273347;
+    --border: #334155; --text: #e2e8f0; --muted: #94a3b8;
+    --green: #22c55e; --red: #ef4444; --yellow: #f59e0b;
+    --blue: #3b82f6; --purple: #a855f7; --cyan: #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  a { color: var(--blue); }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 24px 32px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  .summary-bar { display: flex; gap: 20px; padding: 20px 32px; background: var(--surface2); border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
+  .stat { text-align: center; }
+  .stat .num { font-size: 28px; font-weight: 800; }
+  .stat .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .stat.green .num { color: var(--green); }
+  .stat.red .num { color: var(--red); }
+  .stat.blue .num { color: var(--blue); }
+  .progress-wrap { flex: 1; min-width: 200px; }
+  .progress-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--cyan)); border-radius: 4px; transition: width .3s; }
+  .progress-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .groups { display: flex; flex-wrap: wrap; gap: 12px; padding: 20px 32px; border-bottom: 1px solid var(--border); }
+  .group-card { background: var(--surface); border-radius: 8px; padding: 12px 16px; min-width: 160px; }
+  .group-name { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .group-stat { display: flex; justify-content: space-between; align-items: center; }
+  .group-rate { font-size: 11px; color: var(--muted); }
+
+  .table-wrap { padding: 24px 32px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: var(--surface2); color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; font-size: 11px; padding: 10px 12px; text-align: left; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr.pass { background: transparent; }
+  tr.fail { background: rgba(239,68,68,.05); }
+  tr.group-header td { background: var(--surface2); color: var(--blue); font-weight: 700; font-size: 13px; letter-spacing: .03em; padding: 8px 12px; }
+  tr:hover:not(.group-header) { background: var(--surface2); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge.pass { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge.fail { background: rgba(239,68,68,.15); color: var(--red); }
+
+  .method { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: .03em; margin-right: 4px; }
+  .method.GET { background: rgba(59,130,246,.2); color: #93c5fd; }
+  .method.POST { background: rgba(34,197,94,.2); color: #86efac; }
+  .method.POST-SSE, .method.POSTSSEstream { background: rgba(168,85,247,.2); color: #d8b4fe; }
+  .method.PUT { background: rgba(245,158,11,.2); color: #fcd34d; }
+  .method.DELETE { background: rgba(239,68,68,.2); color: #fca5a5; }
+  .method.OPTIONS { background: rgba(148,163,184,.2); color: #cbd5e1; }
+
+  .path { background: var(--surface); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 12px; color: var(--muted); }
+  .label { font-weight: 500; max-width: 200px; }
+
+  pre.body, pre.payload {
+    background: var(--surface); padding: 8px 10px; border-radius: 6px;
+    font-size: 11px; font-family: monospace; overflow-x: auto;
+    max-height: 200px; max-width: 380px; color: #93c5fd; white-space: pre-wrap; word-break: break-all;
+  }
+  pre.payload { color: #fcd34d; }
+  .null { color: var(--muted); font-style: italic; }
+  .notes { font-size: 11px; color: var(--yellow); margin-top: 4px; }
+  .conn-error { font-size: 11px; color: var(--red); margin-top: 4px; }
+
+  .status-2xx { color: var(--green); font-weight: 700; }
+  .status-4xx { color: var(--yellow); font-weight: 700; }
+  .status-5xx { color: var(--red); font-weight: 700; }
+  .status-err { color: #f87171; font-weight: 700; }
+
+  footer { text-align: center; padding: 20px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧪 API v2 端點測試報告</h1>
+  <div class="meta">
+    目標伺服器：http://localhost:5000 &nbsp;·&nbsp;
+    產生時間：2026-05-28 13:16:57
+  </div>
+</header>
+
+<div class="summary-bar">
+  <div class="stat blue"><div class="num">35</div><div class="lbl">總測試數</div></div>
+  <div class="stat green"><div class="num">35</div><div class="lbl">通過</div></div>
+  <div class="stat red"><div class="num">0</div><div class="lbl">失敗</div></div>
+  <div class="progress-wrap">
+    <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+    <div class="progress-label">通過率 100%</div>
+  </div>
+</div>
+
+<div class="groups">
+  
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Health</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">1/1</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Auth</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">5/5</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Candidates</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">4/4</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Chat - History</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">2/2</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Chat - Session</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">1/1</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Chat - Rating</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">3/3</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Chat - Send</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">3/3</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Reports - Batch</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">3/3</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Modules</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">2/2</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Init Proxy</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">2/2</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+            <div class="group-card" style="border-left: 4px solid #22c55e">
+                <div class="group-name">Admin</div>
+                <div class="group-stat">
+                    <span style="color:#22c55e">9/9</span>
+                    <span class="group-rate">100%</span>
+                </div>
+            </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>結果</th>
+        <th>測試名稱</th>
+        <th>方法 / 路徑</th>
+        <th>Request Body</th>
+        <th>狀態碼 / 說明</th>
+        <th>Response Body</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+            <tr class="group-header">
+                <td colspan="7">Health</td>
+            </tr>
+            <tr class="pass">
+                <td>1</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">伺服器健康檢查</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/health</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2055ms)</small>
+                    
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;mode&quot;: &quot;REAL&quot;,
+  &quot;service&quot;: &quot;Talent Search API v2&quot;,
+  &quot;status&quot;: &quot;ok&quot;
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Auth</td>
+            </tr>
+            <tr class="pass">
+                <td>2</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功登入（有效 email）</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/auth/login</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;email&quot;: &quot;test@example.com&quot;
+}</pre></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2054ms)</small>
+                    
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;token&quot;: &quot;eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJ1c2VyX2lkIjoxLCJ0b2tlbl90eXBlIjoiYWNjZXNzIiwianRpIjoiY2EzZjEyYjktOGM4OC00YTQwLWI3MzQtNjhjN2Y1NjdkZmNmIiwiaWF0IjoxNzc5OTQ1MzAyLCJleHAiOjE3Nzk5NDYyMDIsImF1ZCI6InRyYWl0dHkiLCJzY29wZSI6InRyYWl0dHlfcGx1Z2luIn0.AjWSn2glBzITOhD6pYpKxc733bRCojL0_yVY4X0rR_E&quot;,
+    &quot;user&quot;: {
+      &quot;email&quot;: &quot;test@example.com&quot;,
+      &quot;id&quot;: 1
+    }
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>3</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：缺少 email 欄位</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/auth/login</code>
+                </td>
+                <td><pre class="payload">{}</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2046ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;MISSING_FIELD&quot;,
+    &quot;field&quot;: &quot;email&quot;,
+    &quot;message&quot;: &quot;Email is required&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>4</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：空 Request Body</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/auth/login</code>
+                </td>
+                <td><pre class="payload">b&#x27;&#x27;</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2055ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">&quot;&lt;!doctype html&gt;\n&lt;html lang=en&gt;\n&lt;title&gt;400 Bad Request&lt;/title&gt;\n&lt;h1&gt;Bad Request&lt;/h1&gt;\n&lt;p&gt;The browser (or proxy) sent a request that this server could not understand.&lt;/p&gt;\n&quot;</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>5</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功 Legacy init（有 userId）</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/auth/init</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;userId&quot;: &quot;user_001&quot;
+}</pre></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2046ms)</small>
+                    
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;mock_token&quot;: &quot;mock.jwt.token&quot;,
+    &quot;sessionId&quot;: &quot;sess_user_001&quot;
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>6</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功 Legacy init（無 userId）</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/auth/init</code>
+                </td>
+                <td><pre class="payload">{}</pre></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2069ms)</small>
+                    <div class="notes">📝 userId 為 None，sessionId 為 sess_None</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;mock_token&quot;: &quot;mock.jwt.token&quot;,
+    &quot;sessionId&quot;: &quot;sess_None&quot;
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Candidates</td>
+            </tr>
+            <tr class="pass">
+                <td>7</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功：列出候選人（已登入）</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/v2/candidates/</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (3131ms)</small>
+                    <div class="notes">📝 可能因上游服務不可用而回傳 503</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: [],
+  &quot;error&quot;: null,
+  &quot;meta&quot;: {
+    &quot;page&quot;: {
+      &quot;total&quot;: 0
+    }
+  },
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>8</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功：列出候選人（帶分頁）</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/v2/candidates/?limit=5&amp;offset=0</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (3433ms)</small>
+                    
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: [],
+  &quot;error&quot;: null,
+  &quot;meta&quot;: {
+    &quot;page&quot;: {
+      &quot;total&quot;: 0
+    }
+  },
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>9</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">降級：非法分頁參數（應 fallback 為預設值）</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/v2/candidates/?limit=abc</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (3591ms)</small>
+                    <div class="notes">📝 程式碼使用 try/except 回退 limit=20</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: [],
+  &quot;error&quot;: null,
+  &quot;meta&quot;: {
+    &quot;page&quot;: {
+      &quot;total&quot;: 0
+    }
+  },
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>10</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：候選人不存在 (404)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/v2/candidates/NONEXISTENT_99999/report</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">404</span>
+                    <small style="color:#888"> / exp: 404</small>
+                    <small style="color:#aaa"> (3219ms)</small>
+                    <div class="notes">📝 預期 error.code = NOT_FOUND</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;NOT_FOUND&quot;,
+    &quot;message&quot;: &quot;Candidate not found in list&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Chat - History</td>
+            </tr>
+            <tr class="pass">
+                <td>11</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功：取得對話歷史（有 user_id）</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/chat/history?user_id=test@example.com</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2057ms)</small>
+                    
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;has_more&quot;: false,
+    &quot;past_30_days&quot;: [],
+    &quot;today&quot;: [
+      {
+        &quot;last_active_at&quot;: &quot;2026-05-28T05:06:52.324009&quot;,
+        &quot;session_id&quot;: &quot;test_session_001&quot;,
+        &quot;started_at&quot;: &quot;2026-05-28T05:04:32.518066&quot;,
+        &quot;status&quot;: &quot;active&quot;,
+        &quot;title&quot;: &quot;「無：職能特質與系統功能概述」&quot;
+      }
+    ]
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>12</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：缺少 user_id 參數 (400)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/chat/history</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2076ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;MISSING_FIELD&quot;,
+    &quot;field&quot;: &quot;user_id&quot;,
+    &quot;message&quot;: &quot;user_id parameter is required&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Chat - Session</td>
+            </tr>
+            <tr class="pass">
+                <td>13</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：Session 不存在 (404)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/chat/nonexistent-session-id-000</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">404</span>
+                    <small style="color:#888"> / exp: 404</small>
+                    <small style="color:#aaa"> (2062ms)</small>
+                    <div class="notes">📝 預期 error.code = NOT_FOUND</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;NOT_FOUND&quot;,
+    &quot;message&quot;: &quot;Session not found&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Chat - Rating</td>
+            </tr>
+            <tr class="pass">
+                <td>14</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：缺少 rating 欄位 (400)</td>
+                <td><span class="method PUT">PUT</span>
+                    <code class="path">/chat/message/1/rating</code>
+                </td>
+                <td><pre class="payload">{}</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2030ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;MISSING_FIELD&quot;,
+    &quot;field&quot;: &quot;rating&quot;,
+    &quot;message&quot;: &quot;rating is required&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>15</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：訊息不存在 (404)</td>
+                <td><span class="method PUT">PUT</span>
+                    <code class="path">/chat/message/999999/rating</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;rating&quot;: 1
+}</pre></td>
+                <td><span class="status-4xx">404</span>
+                    <small style="color:#888"> / exp: 404</small>
+                    <small style="color:#aaa"> (2033ms)</small>
+                    <div class="notes">📝 預期 error.code = NOT_FOUND</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;NOT_FOUND&quot;,
+    &quot;message&quot;: &quot;Message not found or update failed&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>16</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功或 404：對 message_id=1 評分</td>
+                <td><span class="method PUT">PUT</span>
+                    <code class="path">/chat/message/1/rating</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;rating&quot;: 1
+}</pre></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2073ms)</small>
+                    <div class="notes">📝 若資料庫中無此 message 則會得到 404，測試框架允許兩種情況</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;message_id&quot;: 1,
+    &quot;rating&quot;: 1
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Chat - Send</td>
+            </tr>
+            <tr class="pass">
+                <td>17</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：缺少 query 欄位 (400)</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/chat/</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;session_id&quot;: &quot;test_session&quot;
+}</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2054ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;MISSING_FIELD&quot;,
+    &quot;field&quot;: &quot;query&quot;,
+    &quot;message&quot;: &quot;Query is required&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>18</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：無效 JSON 格式 (400)</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/chat/</code>
+                </td>
+                <td><pre class="payload">b&#x27;not-valid-json&#x27;</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2072ms)</small>
+                    <div class="notes">📝 預期 error.code = INVALID_JSON</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;INVALID_JSON&quot;,
+    &quot;message&quot;: &quot;Invalid JSON in request body&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>19</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功：傳送問題（SSE 串流）</td>
+                <td><span class="method POST-SSE">POST (SSE)</span>
+                    <code class="path">/chat/</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;query&quot;: &quot;請簡單介紹你的功能&quot;,
+  &quot;session_id&quot;: &quot;test_session_001&quot;,
+  &quot;user_id&quot;: &quot;test@example.com&quot;,
+  &quot;candidate_ids&quot;: [],
+  &quot;candidates_info&quot;: [],
+  &quot;trait_reports&quot;: {},
+  &quot;mode&quot;: &quot;explanation&quot;
+}</pre></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (41495ms)</small>
+                    <div class="notes">📝 讀取前 4 個 SSE 事件。meta、token、done 型態</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;sse_events_sample&quot;: [
+    {
+      &quot;type&quot;: &quot;meta&quot;,
+      &quot;intent&quot;: &quot;UC-GENERAL&quot;
+    },
+    {
+      &quot;type&quot;: &quot;token&quot;,
+      &quot;content&quot;: &quot;我的&quot;
+    },
+    {
+      &quot;type&quot;: &quot;token&quot;,
+      &quot;content&quot;: &quot;功&quot;
+    },
+    {
+      &quot;type&quot;: &quot;token&quot;,
+      &quot;content&quot;: &quot;能&quot;
+    }
+  ]
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Reports - Batch</td>
+            </tr>
+            <tr class="pass">
+                <td>20</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：缺少 assessment_ids 欄位 (400)</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/api/v2/reports/batch</code>
+                </td>
+                <td><pre class="payload">{}</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2141ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;MISSING_FIELD&quot;,
+    &quot;field&quot;: &quot;assessment_ids&quot;,
+    &quot;message&quot;: &quot;assessment_ids is required&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>21</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：assessment_ids 為空陣列 (400)</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/api/v2/reports/batch</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;assessment_ids&quot;: []
+}</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2061ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;MISSING_FIELD&quot;,
+    &quot;field&quot;: &quot;assessment_ids&quot;,
+    &quot;message&quot;: &quot;assessment_ids is required&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>22</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功：帶有效 assessment_ids</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/api/v2/reports/batch</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;assessment_ids&quot;: [
+    1,
+    2,
+    3
+  ]
+}</pre></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2964ms)</small>
+                    <div class="notes">📝 若上游不可用可能回傳 500；reports 可能為空陣列</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;reports&quot;: []
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Modules</td>
+            </tr>
+            <tr class="pass">
+                <td>23</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功：取得快速提問模組清單</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/v2/modules/</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2070ms)</small>
+                    <div class="notes">📝 從 config/quick_modules.json 載入</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;categories&quot;: {
+      &quot;團隊合作&quot;: [
+        {
+          &quot;id&quot;: &quot;team_comm&quot;,
+          &quot;label&quot;: &quot;有效的溝通方法／模式&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;team_complement&quot;,
+          &quot;label&quot;: &quot;團隊合作的互補與摩擦&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;team_meeting&quot;,
+          &quot;label&quot;: &quot;打造高效會議團隊&quot;,
+          &quot;mode&quot;: &quot;multi_only&quot;
+        }
+      ],
+      &quot;培育發展&quot;: [
+        {
+          &quot;id&quot;: &quot;dev_direction&quot;,
+          &quot;label&quot;: &quot;培育重點與發展方向&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;dev_training&quot;,
+          &quot;label&quot;: &quot;適合的培訓方式與學習節奏&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;dev_assignment&quot;,
+          &quot;label&quot;: &quot;適合承擔的任務與專案&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        }
+      ],
+      &quot;招募&quot;: [
+        {
+          &quot;id&quot;: &quot;recruit_interview&quot;,
+          &quot;label&quot;: &quot;快速面試提問指南&quot;,
+          &quot;mode&quot;: &quot;single_only&quot;
+        },
+        {
+          &quot;id&quot;: &quot;recruit_strengths&quot;,
+          &quot;label&quot;: &quot;工作中的主要優勢與潛力&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;recruit_team_role&quot;,
+          &quot;label&quot;: &quot;在團隊合作中適合的角色&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;recruit_risk&quot;,
+          &quot;label&quot;: &quot;需注意的管理問題或潛在風險&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        }
+      ],
+      &quot;深度分析&quot;: [
+        {
+          &quot;id&quot;: &quot;deep_leadership&quot;,
+          &quot;label&quot;: &quot;領導風格與潛能分析&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;deep_communication&quot;,
+          &quot;label&quot;: &quot;高效溝通模式解析&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        }
+      ],
+      &quot;留才&quot;: [
+        {
+          &quot;id&quot;: &quot;retain_turnover&quot;,
+          &quot;label&quot;: &quot;離職風險因素分析&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;retain_engagement&quot;,
+          &quot;label&quot;: &quot;穩定性和投入度的驅動動機&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        }
+      ],
+      &quot;管理&quot;: [
+        {
+          &quot;id&quot;: &quot;mgmt_pressure&quot;,
+          &quot;label&quot;: &quot;如何面對困難、壓力、挑戰&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;mgmt_style&quot;,
+          &quot;label&quot;: &quot;合適的管理方式與風格&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;mgmt_leadership&quot;,
+          &quot;label&quot;: &quot;展現何種領導風格&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;mgmt_onboarding&quot;,
+          &quot;label&quot;: &quot;入職前 90 天的帶領重點&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;mgmt_manual_mgr&quot;,
+          &quot;label&quot;: &quot;個人使用說明書(主管)&quot;,
+          &quot;mode&quot;: &quot;single_only&quot;
+        },
+        {
+          &quot;id&quot;: &quot;mgmt_manual_self&quot;,
+          &quot;label&quot;: &quot;個人使用說明書(個人)&quot;,
+          &quot;mode&quot;: &quot;single_only&quot;
+        },
+        {
+          &quot;id&quot;: &quot;mgmt_change&quot;,
+          &quot;label&quot;: &quot;變動(AI/轉型)情境的角色與風險&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        },
+        {
+          &quot;id&quot;: &quot;mgmt_hipo&quot;,
+          &quot;label&quot;: &quot;高潛人才識別要點&quot;,
+          &quot;mode&quot;: &quot;both&quot;
+        }
+      ]
+    }
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>24</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功：OPTIONS 預檢回應 (200)</td>
+                <td><span class="method OPTIONS">OPTIONS</span>
+                    <code class="path">/api/v2/modules/</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2063ms)</small>
+                    <div class="notes">📝 CORS preflight 回傳 200 空 body</div>
+                    
+                </td>
+                <td><pre class="body">&quot;&quot;</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Init Proxy</td>
+            </tr>
+            <tr class="pass">
+                <td>25</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">轉送上游（有 JWT，test email）→ 上游回 404</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/v2/init/</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">404</span>
+                    <small style="color:#888"> / exp: 404</small>
+                    <small style="color:#aaa"> (3616ms)</small>
+                    <div class="notes">📝 test@example.com 不存在於上游系統；proxy 正確透傳上游狀態碼 404（UPSTREAM_ERROR）</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;UPSTREAM_ERROR&quot;,
+    &quot;details&quot;: {
+      &quot;detail&quot;: &quot;找不到對應的企業用戶&quot;
+    },
+    &quot;message&quot;: &quot;Upstream service returned an error&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>26</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">成功或錯誤：無 Auth Header（使用預設 email）</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/v2/init/</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-2xx">200</span>
+                    <small style="color:#888"> / exp: 200</small>
+                    <small style="color:#aaa"> (2697ms)</small>
+                    <div class="notes">📝 服務使用 fallback email eva@wepredict.io</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: {
+    &quot;quota_summary&quot;: {
+      &quot;remaining&quot;: 0,
+      &quot;total&quot;: 0,
+      &quot;used&quot;: 0
+    },
+    &quot;status&quot;: true,
+    &quot;usable_plans&quot;: []
+  },
+  &quot;error&quot;: null,
+  &quot;meta&quot;: null,
+  &quot;success&quot;: true
+}</pre></td>
+            </tr>
+            <tr class="group-header">
+                <td colspan="7">Admin</td>
+            </tr>
+            <tr class="pass">
+                <td>27</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：缺少 username/password (400)</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/api/admin/login</code>
+                </td>
+                <td><pre class="payload">{}</pre></td>
+                <td><span class="status-4xx">400</span>
+                    <small style="color:#888"> / exp: 400</small>
+                    <small style="color:#aaa"> (2072ms)</small>
+                    <div class="notes">📝 預期 error.code = MISSING_FIELD</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;MISSING_FIELD&quot;,
+    &quot;message&quot;: &quot;Username and password required&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>28</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：錯誤帳密 (401)</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/api/admin/login</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;username&quot;: &quot;wronguser&quot;,
+  &quot;password&quot;: &quot;wrongpass&quot;
+}</pre></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2060ms)</small>
+                    <div class="notes">📝 預期 error.code = INVALID_CREDENTIALS</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;INVALID_CREDENTIALS&quot;,
+    &quot;message&quot;: &quot;Incorrect username or password&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>29</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">嘗試：預設帳密登入（admin/admin）</td>
+                <td><span class="method POST">POST</span>
+                    <code class="path">/api/admin/login</code>
+                </td>
+                <td><pre class="payload">{
+  &quot;username&quot;: &quot;admin&quot;,
+  &quot;password&quot;: &quot;admin&quot;
+}</pre></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2104ms)</small>
+                    <div class="notes">📝 生產環境不應存在預設帳密；預期 401</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;data&quot;: null,
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;INVALID_CREDENTIALS&quot;,
+    &quot;message&quot;: &quot;Incorrect username or password&quot;
+  },
+  &quot;meta&quot;: null,
+  &quot;success&quot;: false
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>30</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：GET /me 無 token (401)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/admin/me</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2060ms)</small>
+                    <div class="notes">📝 缺少 Bearer token；Flask 回傳 {&#x27;message&#x27;: &#x27;Token is missing!&#x27;}</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;message&quot;: &quot;Token is missing!&quot;
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>31</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：GET /users 無 token (401)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/admin/users</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2058ms)</small>
+                    <div class="notes">📝 缺少 Bearer token；Flask 回傳 {&#x27;message&#x27;: &#x27;Token is missing!&#x27;}</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;message&quot;: &quot;Token is missing!&quot;
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>32</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：GET /sessions 無 token (401)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/admin/sessions</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2024ms)</small>
+                    <div class="notes">📝 缺少 Bearer token；Flask 回傳 {&#x27;message&#x27;: &#x27;Token is missing!&#x27;}</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;message&quot;: &quot;Token is missing!&quot;
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>33</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：GET /stats 無 token (401)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/admin/stats</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2051ms)</small>
+                    <div class="notes">📝 缺少 Bearer token；Flask 回傳 {&#x27;message&#x27;: &#x27;Token is missing!&#x27;}</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;message&quot;: &quot;Token is missing!&quot;
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>34</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：GET /reports/users-usage 無 token (401)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/admin/reports/users-usage</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2079ms)</small>
+                    <div class="notes">📝 缺少 Bearer token；Flask 回傳 {&#x27;message&#x27;: &#x27;Token is missing!&#x27;}</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;message&quot;: &quot;Token is missing!&quot;
+}</pre></td>
+            </tr>
+            <tr class="pass">
+                <td>35</td>
+                <td><span class="badge pass">PASS</span></td>
+                <td class="label">失敗：GET /reports/daily-usage 無 token (401)</td>
+                <td><span class="method GET">GET</span>
+                    <code class="path">/api/admin/reports/daily-usage</code>
+                </td>
+                <td><span class="null">—</span></td>
+                <td><span class="status-4xx">401</span>
+                    <small style="color:#888"> / exp: 401</small>
+                    <small style="color:#aaa"> (2035ms)</small>
+                    <div class="notes">📝 缺少 Bearer token；Flask 回傳 {&#x27;message&#x27;: &#x27;Token is missing!&#x27;}</div>
+                    
+                </td>
+                <td><pre class="body">{
+  &quot;message&quot;: &quot;Token is missing!&quot;
+}</pre></td>
+            </tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  AI Character Chatbot — API v2 自動化測試報告 &nbsp;·&nbsp; 2026-05-28 13:16:57
+</footer>
+
+</body>
+</html>
