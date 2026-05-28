@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traitty AI Chat Widget — 後端 API 文件（UAT）</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #21263a;
+      --border: #2d3352;
+      --accent: #5b78f5;
+      --accent2: #7c5bf5;
+      --green: #34d399;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --orange: #fb923c;
+      --text: #e2e8f0;
+      --text-muted: #8b92b0;
+      --code-bg: #0d1117;
+      --radius: 8px;
+      --font-mono: "Cascadia Code", "Fira Code", "Consolas", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: 260px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 0 0 24px;
+      z-index: 100;
+    }
+
+    #sidebar .logo {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    #sidebar .logo h2 { font-size: 15px; color: var(--text); font-weight: 700; }
+    #sidebar .logo .env-badge {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      background: #fbbf2422;
+      color: #fbbf24;
+      border: 1px solid #fbbf2455;
+    }
+
+    #sidebar nav { padding: 12px 0; }
+    #sidebar .nav-group { padding: 8px 20px 4px; font-size: 10px; font-weight: 700; letter-spacing: .1em; color: var(--text-muted); text-transform: uppercase; }
+    #sidebar a {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 20px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      border-left: 2px solid transparent;
+      transition: all .15s;
+    }
+    #sidebar a:hover { color: var(--text); background: var(--surface2); border-left-color: var(--accent); }
+    #sidebar a .method-chip {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; font-family: var(--font-mono);
+    }
+    .chip-get    { background:#34d39922; color:#34d399; }
+    .chip-post   { background:#5b78f522; color:#5b78f5; }
+    .chip-put    { background:#fbbf2422; color:#fbbf24; }
+    .chip-delete { background:#f8717122; color:#f87171; }
+    .chip-sse    { background:#fb923c22; color:#fb923c; }
+
+    /* ── Main ── */
+    main {
+      margin-left: 260px;
+      flex: 1;
+      padding: 40px 48px;
+      max-width: 960px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(135deg, var(--surface2) 0%, #1b1f35 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 36px;
+      margin-bottom: 40px;
+    }
+    .hero h1 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+    .hero p { color: var(--text-muted); font-size: 14px; margin-bottom: 16px; }
+    .hero .meta-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+    .meta-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 12px;
+    }
+    .meta-item span { color: var(--text-muted); margin-right: 6px; }
+    .meta-item code { font-family: var(--font-mono); color: var(--accent); font-size: 12px; }
+
+    /* ── Section ── */
+    section { margin-bottom: 56px; }
+    section > h2 {
+      font-size: 18px; font-weight: 700;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+      color: var(--text);
+    }
+
+    /* ── Endpoint Card ── */
+    .endpoint {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .endpoint-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .endpoint-header:hover { background: #252b42; }
+    .method-badge {
+      font-family: var(--font-mono);
+      font-size: 11px; font-weight: 800;
+      padding: 3px 9px; border-radius: 4px; min-width: 50px; text-align: center;
+    }
+    .badge-get    { background:#34d39920; color:#34d399; border:1px solid #34d39940; }
+    .badge-post   { background:#5b78f520; color:#7c9aff; border:1px solid #5b78f540; }
+    .badge-put    { background:#fbbf2420; color:#fbbf24; border:1px solid #fbbf2440; }
+    .badge-delete { background:#f8717120; color:#f87171; border:1px solid #f8717140; }
+    .badge-sse    { background:#fb923c20; color:#fb923c; border:1px solid #fb923c40; }
+
+    .endpoint-path {
+      font-family: var(--font-mono); font-size: 14px; font-weight: 600;
+      color: var(--text);
+    }
+    .endpoint-desc { color: var(--text-muted); font-size: 13px; margin-left: auto; }
+
+    .endpoint-body { padding: 20px; }
+
+    /* ── Tags ── */
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .tag {
+      font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    }
+    .tag-auth-req  { background:#34d39915; color:#34d399; border:1px solid #34d39935; }
+    .tag-auth-none { background:#f8717115; color:#f87171; border:1px solid #f8717135; }
+    .tag-stream    { background:#fb923c15; color:#fb923c; border:1px solid #fb923c35; }
+    .tag-public    { background:#5b78f515; color:#7c9aff; border:1px solid #5b78f535; }
+    .tag-proxy     { background:#fbbf2415; color:#fbbf24; border:1px solid #fbbf2435; }
+
+    /* ── Sub-section ── */
+    .subsection { margin-bottom: 16px; }
+    .subsection h4 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--text-muted); font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    /* ── Params table ── */
+    .params-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .params-table th {
+      text-align: left; padding: 6px 12px;
+      background: var(--surface2); color: var(--text-muted);
+      font-weight: 600; font-size: 11px; letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+    }
+    .params-table td { padding: 8px 12px; border-bottom: 1px solid #1e233a; vertical-align: top; }
+    .params-table tr:last-child td { border-bottom: none; }
+    .params-table .param-name { font-family: var(--font-mono); color: var(--accent); font-size: 13px; }
+    .params-table .param-type { color: var(--orange); font-size: 12px; font-family: var(--font-mono); }
+    .params-table .param-opt  { color: var(--text-muted); font-size: 11px; }
+
+    /* ── Code block ── */
+    .code-block {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    .code-block-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 14px;
+      background: #161b2e;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .code-block pre { padding: 14px 16px; overflow-x: auto; }
+    .copy-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-muted);
+      padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;
+      transition: all .15s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── SSE Event table ── */
+    .sse-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .sse-table th {
+      text-align: left; padding: 6px 12px;
+      background: var(--surface2); color: var(--text-muted);
+      font-weight: 600; font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sse-table td { padding: 8px 12px; border-bottom: 1px solid #1e233a; vertical-align: top; }
+    .sse-table tr:last-child td { border-bottom: none; }
+    .sse-type { font-family: var(--font-mono); color: var(--orange); }
+
+    /* ── Status code table ── */
+    .status-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .status-table th {
+      text-align: left; padding: 8px 14px;
+      background: var(--surface2); color: var(--text-muted);
+      font-weight: 600; font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+    .status-table td { padding: 9px 14px; border-bottom: 1px solid #1e233a; }
+    .status-table tr:last-child td { border-bottom: none; }
+    .status-code { font-family: var(--font-mono); font-weight: 700; font-size: 13px; }
+    .s2xx { color: #34d399; } .s4xx { color: #fbbf24; } .s5xx { color: #f87171; }
+
+    /* ── Info box ── */
+    .info-box {
+      border: 1px solid;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .info-box.note    { border-color:#5b78f540; background:#5b78f510; color:#a5b4fc; }
+    .info-box.warning { border-color:#fbbf2440; background:#fbbf2410; color:#fde68a; }
+    .info-box.tip     { border-color:#34d39940; background:#34d39910; color:#6ee7b7; }
+    .info-box strong  { font-weight: 700; }
+
+    /* ── Rating table ── */
+    .rating-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .rating-table th {
+      text-align: left; padding: 6px 12px;
+      background: var(--surface2); color: var(--text-muted);
+      font-weight: 600; font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+    .rating-table td { padding: 8px 12px; border-bottom: 1px solid #1e233a; font-family: var(--font-mono); }
+    .rating-table tr:last-child td { border-bottom: none; }
+
+    /* ── Env var table ── */
+    .env-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .env-table th {
+      text-align: left; padding: 8px 14px;
+      background: var(--surface2); color: var(--text-muted);
+      font-weight: 600; font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+    .env-table td { padding: 8px 14px; border-bottom: 1px solid #1e233a; vertical-align: top; }
+    .env-table tr:last-child td { border-bottom: none; }
+    .env-key { font-family: var(--font-mono); color: var(--accent); }
+    .env-req { color: var(--red); font-size: 11px; font-weight: 600; }
+    .env-opt { color: var(--text-muted); font-size: 11px; }
+
+    /* ── JSON highlight helpers ── */
+    .json { color: #abb2bf; }
+    .json .key { color: #e06c75; }
+    .json .str { color: #98c379; }
+    .json .num { color: #d19a66; }
+    .json .bool { color: #56b6c2; }
+    .json .null { color: #c678dd; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Anchor offset ── */
+    [id] { scroll-margin-top: 24px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<aside id="sidebar">
+  <div class="logo">
+    <h2>Traitty Chat API</h2>
+    <div class="env-badge">UAT ENVIRONMENT</div>
+  </div>
+  <nav>
+    <div class="nav-group">Overview</div>
+    <a href="#overview">基本資訊</a>
+    <a href="#auth-flow">認證流程</a>
+    <a href="#errors">錯誤代碼</a>
+    <a href="#envvars">環境變數</a>
+
+    <div class="nav-group">Auth</div>
+    <a href="#ep-auth-login"><span class="method-chip chip-post">POST</span> /auth/login</a>
+
+    <div class="nav-group">Candidates</div>
+    <a href="#ep-candidates-list"><span class="method-chip chip-get">GET</span> /candidates/</a>
+    <a href="#ep-candidate-report"><span class="method-chip chip-get">GET</span> /candidates/{id}/report</a>
+    <a href="#ep-reports-batch"><span class="method-chip chip-post">POST</span> /reports/batch</a>
+
+    <div class="nav-group">Chat</div>
+    <a href="#ep-chat-send"><span class="method-chip chip-sse">SSE</span> /chat/</a>
+    <a href="#ep-chat-history"><span class="method-chip chip-get">GET</span> /chat/history</a>
+    <a href="#ep-chat-session"><span class="method-chip chip-get">GET</span> /chat/{session_id}</a>
+    <a href="#ep-chat-rating"><span class="method-chip chip-put">PUT</span> /chat/message/{id}/rating</a>
+
+    <div class="nav-group">Config</div>
+    <a href="#ep-init"><span class="method-chip chip-get">GET</span> /init/</a>
+    <a href="#ep-modules"><span class="method-chip chip-get">GET</span> /modules/</a>
+    <a href="#ep-health"><span class="method-chip chip-get">GET</span> /health</a>
+
+    <div class="nav-group">Admin</div>
+    <a href="#ep-admin-login"><span class="method-chip chip-post">POST</span> /admin/login</a>
+    <a href="#ep-admin-me"><span class="method-chip chip-get">GET</span> /admin/me</a>
+    <a href="#ep-admin-sessions"><span class="method-chip chip-get">GET</span> /admin/sessions</a>
+    <a href="#ep-admin-session-detail"><span class="method-chip chip-get">GET</span> /admin/sessions/{id}</a>
+    <a href="#ep-admin-stats"><span class="method-chip chip-get">GET</span> /admin/stats</a>
+    <a href="#ep-admin-user-usage"><span class="method-chip chip-get">GET</span> /admin/reports/users-usage</a>
+    <a href="#ep-admin-daily-usage"><span class="method-chip chip-get">GET</span> /admin/reports/daily-usage</a>
+    <a href="#ep-admin-create-user"><span class="method-chip chip-post">POST</span> /admin/users</a>
+
+    <div class="nav-group">Frontend</div>
+    <a href="#frontend-config">Widget Config</a>
+    <a href="#frontend-storage">Storage Keys</a>
+  </nav>
+</aside>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<main>
+
+  <!-- ── Hero ── -->
+  <div class="hero">
+    <h1>Traitty AI Chat Widget — 後端 API 文件</h1>
+    <p>API v2 完整規格，適用於 UAT 測試環境。所有端點皆以 <code>/api/v2</code> 為前綴（管理端點除外）。</p>
+    <div class="meta-grid">
+      <div class="meta-item"><span>環境</span><code>UAT</code></div>
+      <div class="meta-item"><span>Base URL</span><code>https://uat-api.traitty.com/api/v2</code></div>
+      <div class="meta-item"><span>Admin Base</span><code>https://uat-api.traitty.com/api/admin</code></div>
+      <div class="meta-item"><span>Framework</span><code>Flask + Uvicorn</code></div>
+      <div class="meta-item"><span>預設 Port</span><code>5000</code></div>
+      <div class="meta-item"><span>最後更新</span><code>2026-05-26</code></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════
+       SECTION: OVERVIEW
+  ═════════════════════════════════════ -->
+  <section id="overview">
+    <h2>基本資訊</h2>
+
+    <div class="subsection">
+      <h4>URL 結構</h4>
+      <table class="params-table">
+        <thead><tr><th>前綴</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr><td class="param-name">/api/v2/</td><td>主要業務 API（候選人、聊天、初始化、模組）</td></tr>
+          <tr><td class="param-name">/auth/</td><td>JWT 認證端點</td></tr>
+          <tr><td class="param-name">/chat/</td><td>聊天串流與歷史紀錄</td></tr>
+          <tr><td class="param-name">/api/admin/</td><td>後台管理端點（獨立 JWT 認證）</td></tr>
+          <tr><td class="param-name">/health</td><td>健康檢查（無認證）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection" style="margin-top:16px">
+      <h4>回應格式</h4>
+      <div class="info-box note">
+        <strong>Content-Type：</strong> 所有 JSON 回應使用 <code>application/json</code>；聊天串流端點使用 <code>text/event-stream</code>（SSE）。
+      </div>
+      <div class="info-box warning">
+        <strong>CORS：</strong> 後端全域開啟 CORS，UAT 環境允許所有 Origin。正式環境需限縮。
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: AUTH FLOW
+  ═════════════════════════════════════ -->
+  <section id="auth-flow">
+    <h2>認證流程</h2>
+
+    <p style="color:var(--text-muted);margin-bottom:16px">系統採用兩套獨立 JWT 認證機制：</p>
+
+    <div class="subsection">
+      <h4>1. Plugin JWT（一般使用者）</h4>
+      <div class="info-box note">
+        從 <code>POST /auth/login</code> 取得 token，放入 <code>Authorization: Bearer &lt;token&gt;</code> Header 呼叫所有 <code>/api/v2/*</code> 及 <code>/chat/*</code> 端點。Token 有效期 <strong>15 分鐘</strong>，Audience: <code>traitty</code>，Scope: <code>traitty_plugin</code>。
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h4>2. Admin JWT（後台管理者）</h4>
+      <div class="info-box note">
+        從 <code>POST /api/admin/login</code> 取得 access_token，放入 <code>Authorization: Bearer &lt;token&gt;</code> Header 呼叫所有 <code>/api/admin/*</code> 端點（login 除外）。
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h4>Header 範例</h4>
+      <div class="code-block">
+        <div class="code-block-header"><span>HTTP Header</span></div>
+        <pre>Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: AUTH ENDPOINTS
+  ═════════════════════════════════════ -->
+  <section id="section-auth">
+    <h2>Auth — 認證</h2>
+
+    <!-- POST /auth/login -->
+    <div class="endpoint" id="ep-auth-login">
+      <div class="endpoint-header">
+        <span class="method-badge badge-post">POST</span>
+        <span class="endpoint-path">/auth/login</span>
+        <span class="endpoint-desc">取得 Plugin JWT Token</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags">
+          <span class="tag tag-auth-none">無需認證</span>
+          <span class="tag tag-public">公開端點</span>
+        </div>
+
+        <div class="subsection">
+          <h4>Request Body</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "email": "user@example.com"
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span></div>
+            <pre>{
+  "status": "success",
+  "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "user": {
+    "email": "user@example.com",
+    "id": 1
+  }
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>Token 規格</h4>
+          <table class="params-table">
+            <thead><tr><th>欄位</th><th>值</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">Algorithm</td><td>HS256</td></tr>
+              <tr><td class="param-name">exp</td><td>900 秒（15 分鐘）</td></tr>
+              <tr><td class="param-name">aud</td><td><code>traitty</code></td></tr>
+              <tr><td class="param-name">scope</td><td><code>traitty_plugin</code></td></tr>
+              <tr><td class="param-name">jti</td><td>UUID（每次唯一）</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: CANDIDATES
+  ═════════════════════════════════════ -->
+  <section id="section-candidates">
+    <h2>Candidates — 候選人</h2>
+
+    <!-- GET /api/v2/candidates/ -->
+    <div class="endpoint" id="ep-candidates-list">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/v2/candidates/</span>
+        <span class="endpoint-desc">列出候選人（分頁）</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags">
+          <span class="tag tag-auth-req">需要認證</span>
+          <span class="tag tag-proxy">代理上游 API</span>
+        </div>
+
+        <div class="subsection">
+          <h4>Query Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>預設值</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="param-name">limit</td>
+                <td class="param-type">integer</td>
+                <td><code>20</code></td>
+                <td>每頁筆數</td>
+              </tr>
+              <tr>
+                <td class="param-name">offset</td>
+                <td class="param-type">integer</td>
+                <td><code>0</code></td>
+                <td>跳過筆數</td>
+              </tr>
+              <tr>
+                <td class="param-name">enterprise_code</td>
+                <td class="param-type">string</td>
+                <td><code>ACME-TW</code></td>
+                <td>企業識別碼</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "data": [
+    {
+      "candidate_id": 1,
+      "name": "王大明",
+      "email": "wang@example.com",
+      "phone": "0912345678",
+      "enterprise_name": "Acme Corp",
+      "position": "Software Engineer",
+      "status": "active",
+      "created_at": "2026-01-15T10:30:00Z",
+      "last_assessment_date": "2026-01-20T14:00:00Z",
+      "latest_assessment": {
+        "assessment_id": 62,
+        "completion_time": "2026-01-20T14:00:00Z"
+      }
+    }
+  ],
+  "page": {
+    "total": 150,
+    "limit": 20,
+    "offset": 0
+  }
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>錯誤回應</h4>
+          <table class="params-table">
+            <thead><tr><th>狀態碼</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">503</td><td>上游服務不可用</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /api/v2/candidates/{candidate_id}/report -->
+    <div class="endpoint" id="ep-candidate-report">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/v2/candidates/{candidate_id}/report</span>
+        <span class="endpoint-desc">取得單一候選人特質報告</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags">
+          <span class="tag tag-auth-req">需要認證</span>
+          <span class="tag tag-proxy">代理上游 API</span>
+        </div>
+
+        <div class="subsection">
+          <h4>Path Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="param-name">candidate_id</td>
+                <td class="param-type">string | integer</td>
+                <td>候選人 ID</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "candidate_name": "王大明",
+  "assessment_date": "2026-01-20T14:00:00Z",
+  "traits": [
+    {
+      "trait_id": "achievement",
+      "name": "成就動機",
+      "score": 78,
+      "band": "A"
+    },
+    {
+      "trait_id": "interpersonal",
+      "name": "人際敏感度",
+      "score": 65,
+      "band": "B"
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>錯誤回應</h4>
+          <table class="params-table">
+            <thead><tr><th>狀態碼</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">404</td><td>候選人不存在於清單中</td></tr>
+              <tr><td class="param-name">500</td><td>報告取得失敗</td></tr>
+              <tr><td class="param-name">503</td><td>上游服務不可用</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- POST /api/v2/reports/batch -->
+    <div class="endpoint" id="ep-reports-batch">
+      <div class="endpoint-header">
+        <span class="method-badge badge-post">POST</span>
+        <span class="endpoint-path">/api/v2/reports/batch</span>
+        <span class="endpoint-desc">批次取得多位候選人特質報告</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags">
+          <span class="tag tag-auth-req">需要認證</span>
+        </div>
+
+        <div class="subsection">
+          <h4>Request Body</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "assessment_ids": [62, 63, 64, 61]
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span></div>
+            <pre>{
+  "reports": [
+    {
+      "assessment_id": 62,
+      "project_name_abbreviation": "CIA",
+      "assessment_date": "2026-01-20T14:00:00Z",
+      "traits": [
+        {
+          "trait_id": "achievement",
+          "name": "成就動機",
+          "score": 78,
+          "band": "A"
+        }
+      ]
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>錯誤回應</h4>
+          <table class="params-table">
+            <thead><tr><th>狀態碼</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">400</td><td><code>assessment_ids</code> 為必填</td></tr>
+              <tr><td class="param-name">500</td><td>批次報告取得失敗</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: CHAT
+  ═════════════════════════════════════ -->
+  <section id="section-chat">
+    <h2>Chat — 聊天</h2>
+
+    <!-- POST /chat/ (SSE) -->
+    <div class="endpoint" id="ep-chat-send">
+      <div class="endpoint-header">
+        <span class="method-badge badge-sse">SSE</span>
+        <span class="endpoint-path">/chat/</span>
+        <span class="endpoint-desc">發送問題，串流回傳 AI 回應</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags">
+          <span class="tag tag-auth-none">Body 傳入 user_id</span>
+          <span class="tag tag-stream">Server-Sent Events</span>
+        </div>
+
+        <div class="info-box warning">
+          <strong>注意：</strong> 此端點回傳 <code>text/event-stream</code>，不是 JSON。前端需使用 <code>ReadableStream</code> 或 <code>EventSource</code> 接收。
+        </div>
+
+        <div class="subsection">
+          <h4>Request Body</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "query": "請分析王大明在團隊協作上的優勢",
+  "candidate_ids": [1, 2],
+  "candidates_info": [
+    {
+      "candidate_id": 1,
+      "name": "王大明",
+      "email": "wang@example.com",
+      "phone": "0912345678",
+      "enterprise_name": "Acme Corp",
+      "position": "Software Engineer",
+      "status": "active",
+      "created_at": "2026-01-15T10:30:00Z",
+      "last_assessment_date": "2026-01-20T14:00:00Z",
+      "latest_assessment": {
+        "assessment_id": 62,
+        "completion_time": "2026-01-20T14:00:00Z"
+      }
+    }
+  ],
+  "trait_reports": {
+    "1": {
+      "assessment_id": 62,
+      "traits": [
+        { "trait_id": "achievement", "name": "成就動機", "score": 78, "band": "A" }
+      ]
+    }
+  },
+  "session_id": "sess-uuid-1234",
+  "user_id": "user@example.com",
+  "mode": "auto",
+  "module_id": null
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>Request Fields 說明</h4>
+          <table class="params-table">
+            <thead><tr><th>欄位</th><th>型別</th><th>必填</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="param-name">query</td>
+                <td class="param-type">string</td>
+                <td>✅</td>
+                <td>使用者問題文字</td>
+              </tr>
+              <tr>
+                <td class="param-name">candidate_ids</td>
+                <td class="param-type">integer[]</td>
+                <td>✅</td>
+                <td>選取的候選人 ID 陣列</td>
+              </tr>
+              <tr>
+                <td class="param-name">candidates_info</td>
+                <td class="param-type">object[]</td>
+                <td>✅</td>
+                <td>候選人完整資訊（含 latest_assessment）</td>
+              </tr>
+              <tr>
+                <td class="param-name">trait_reports</td>
+                <td class="param-type">object</td>
+                <td>❌</td>
+                <td>以 <code>candidate_id</code> 為 key 的特質報告，提供後才會扣除配額</td>
+              </tr>
+              <tr>
+                <td class="param-name">session_id</td>
+                <td class="param-type">string</td>
+                <td>❌</td>
+                <td>對話 Session UUID；若未提供則自動建立新 Session</td>
+              </tr>
+              <tr>
+                <td class="param-name">user_id</td>
+                <td class="param-type">string</td>
+                <td>✅</td>
+                <td>使用者 email，用於 Session 歸屬</td>
+              </tr>
+              <tr>
+                <td class="param-name">mode</td>
+                <td class="param-type">string</td>
+                <td>❌</td>
+                <td><code>auto</code> | <code>expert</code> | <code>explanation</code>；快速問題使用 <code>expert</code></td>
+              </tr>
+              <tr>
+                <td class="param-name">module_id</td>
+                <td class="param-type">string | null</td>
+                <td>❌</td>
+                <td>快速問題模組 ID（如 <code>recruit_interview</code>），自由問答時為 <code>null</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>SSE 事件流（Response: text/event-stream）</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>text/event-stream</span></div>
+            <pre>data: {"type": "meta", "intent": "recruit_interview"}
+
+data: {"type": "token", "content": "根"}
+data: {"type": "token", "content": "據"}
+data: {"type": "token", "content": "報"}
+data: {"type": "token", "content": "告"}
+...
+
+data: {"type": "message_id", "id": 12345}
+
+data: {"type": "quota", "quota_summary": {"total": 100, "used": 46, "remaining": 54}}
+
+data: [DONE]</pre>
+          </div>
+          <table class="sse-table" style="margin-top:12px">
+            <thead><tr><th>事件 type</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="sse-type">meta</td><td>首個事件，回傳意圖識別結果（use case ID）</td></tr>
+              <tr><td class="sse-type">token</td><td>逐 token 串流的文字內容，拼接後為完整回應</td></tr>
+              <tr><td class="sse-type">message_id</td><td>本次訊息儲存至資料庫後的主鍵 ID（用於評分）</td></tr>
+              <tr><td class="sse-type">quota</td><td>扣除配額後的最新配額摘要</td></tr>
+              <tr><td class="sse-type">[DONE]</td><td>串流結束信號</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>錯誤回應</h4>
+          <table class="params-table">
+            <thead><tr><th>狀態碼</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">400</td><td>query 為必填 / JSON 格式錯誤</td></tr>
+              <tr><td class="param-name">500</td><td>系統錯誤（traceback.log 已建立）</td></tr>
+              <tr><td class="param-name">503</td><td>資料庫不可用 / LLM 上游不可用</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>行為備註</h4>
+          <div class="info-box tip">
+            <strong>配額扣除：</strong> 僅在 <code>trait_reports</code> 有值時才扣除配額，並即時透過 <code>quota</code> 事件同步到前端。
+          </div>
+          <div class="info-box tip">
+            <strong>Session 標題：</strong> 新 Session 建立後，後端會非同步觸發標題生成，無需前端介入。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /chat/history -->
+    <div class="endpoint" id="ep-chat-history">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/chat/history</span>
+        <span class="endpoint-desc">取得使用者聊天歷史</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要認證</span></div>
+
+        <div class="subsection">
+          <h4>Query Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>必填</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="param-name">user_id</td>
+                <td class="param-type">string</td>
+                <td>✅</td>
+                <td>使用者 email</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "today": [
+    {
+      "session_id": "sess-uuid-1",
+      "started_at": "2026-05-26T10:30:00Z",
+      "last_active_at": "2026-05-26T10:45:00Z",
+      "status": "active",
+      "title": "王大明分析報告"
+    }
+  ],
+  "past_30_days": [
+    {
+      "session_id": "sess-uuid-2",
+      "started_at": "2026-05-20T08:00:00Z",
+      "last_active_at": "2026-05-20T08:15:00Z",
+      "status": "active",
+      "title": "團隊比較"
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /chat/{session_id} -->
+    <div class="endpoint" id="ep-chat-session">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/chat/{session_id}</span>
+        <span class="endpoint-desc">取得指定 Session 的對話內容</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要認證</span></div>
+
+        <div class="subsection">
+          <h4>Path Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">session_id</td><td class="param-type">string</td><td>Session UUID</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "session_id": "sess-uuid-1",
+  "status": "active",
+  "metadata": {
+    "title": "王大明分析報告",
+    "candidates": [
+      { "name": "王大明" },
+      { "name": "李小華" }
+    ]
+  },
+  "messages": [
+    {
+      "id": 1,
+      "role": "user",
+      "content": "他們在壓力下的表現如何？",
+      "rating": 0,
+      "created_at": "2026-05-26T10:30:00Z"
+    },
+    {
+      "id": 2,
+      "role": "ai",
+      "content": "根據報告資料顯示...",
+      "rating": 1,
+      "created_at": "2026-05-26T10:30:05Z"
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>錯誤回應</h4>
+          <table class="params-table">
+            <thead><tr><th>狀態碼</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">404</td><td>Session 不存在</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PUT /chat/message/{message_id}/rating -->
+    <div class="endpoint" id="ep-chat-rating">
+      <div class="endpoint-header">
+        <span class="method-badge badge-put">PUT</span>
+        <span class="endpoint-path">/chat/message/{message_id}/rating</span>
+        <span class="endpoint-desc">對 AI 回應按讚 / 倒讚</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要認證</span></div>
+
+        <div class="subsection">
+          <h4>Path Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">message_id</td><td class="param-type">integer</td><td>訊息資料庫主鍵（由聊天 SSE 的 <code>message_id</code> 事件取得）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>Request Body</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{ "rating": 1 }</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>Rating 值對照</h4>
+          <table class="rating-table">
+            <thead><tr><th>值</th><th>意義</th></tr></thead>
+            <tbody>
+              <tr><td style="color:var(--green)">1</td><td>有幫助 👍</td></tr>
+              <tr><td style="color:var(--red)">-1</td><td>沒幫助 👎</td></tr>
+              <tr><td style="color:var(--text-muted)">0</td><td>取消評分</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span></div>
+            <pre>{
+  "status": "success",
+  "message_id": 2,
+  "rating": 1
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>錯誤回應</h4>
+          <table class="params-table">
+            <thead><tr><th>狀態碼</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">400</td><td>rating 為必填</td></tr>
+              <tr><td class="param-name">404</td><td>訊息不存在</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: CONFIG
+  ═════════════════════════════════════ -->
+  <section id="section-config">
+    <h2>Config — 設定與初始化</h2>
+
+    <!-- GET /api/v2/init/ -->
+    <div class="endpoint" id="ep-init">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/v2/init/</span>
+        <span class="endpoint-desc">取得配額與方案資訊</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags">
+          <span class="tag tag-auth-req">需要認證</span>
+          <span class="tag tag-proxy">代理上游 API</span>
+        </div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "status": true,
+  "quota_summary": {
+    "total": 100,
+    "used": 46,
+    "remaining": 54
+  },
+  "usable_plans": [
+    {
+      "plan_id": 1,
+      "name": "Premium Plan",
+      "ends_at": "2026-12-31"
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /api/v2/modules/ -->
+    <div class="endpoint" id="ep-modules">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/v2/modules/</span>
+        <span class="endpoint-desc">取得快速問題模組清單</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要認證</span></div>
+
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "categories": {
+    "招募": [
+      { "id": "recruit_interview",    "label": "快速面試提問指南",   "mode": "single_only" },
+      { "id": "recruit_strengths",    "label": "工作中的主要優勢與潛力", "mode": "both" },
+      { "id": "recruit_risk",         "label": "潛在風險與注意事項", "mode": "both" },
+      { "id": "recruit_team_role",    "label": "最適合的團隊角色",   "mode": "both" }
+    ],
+    "管理": [
+      { "id": "mgmt_pressure",        "label": "如何面對困難、壓力與挑戰", "mode": "both" },
+      { "id": "mgmt_style",           "label": "領導與管理風格",    "mode": "both" },
+      { "id": "mgmt_leadership",      "label": "領導潛能分析",      "mode": "both" },
+      { "id": "mgmt_onboarding",      "label": "新進員工輔導建議",  "mode": "both" },
+      { "id": "mgmt_change",          "label": "面對組織變革的適應力", "mode": "both" },
+      { "id": "mgmt_hipo",            "label": "高潛力人才識別",    "mode": "both" },
+      { "id": "mgmt_manual_mgr_single","label": "管理者如何引導此人", "mode": "single_only" },
+      { "id": "mgmt_manual_self_single","label": "本人自我成長建議", "mode": "single_only" }
+    ],
+    "團隊合作": [
+      { "id": "team_complement",      "label": "團隊互補性分析",    "mode": "multi_only" },
+      { "id": "team_comm",            "label": "溝通風格差異",      "mode": "both" }
+    ],
+    "留才": [
+      { "id": "retain_engagement",    "label": "提升工作投入度",    "mode": "both" },
+      { "id": "retain_turnover",      "label": "離職風險評估",      "mode": "both" }
+    ],
+    "培育發展": [
+      { "id": "dev_training",         "label": "個人化培訓建議",    "mode": "both" },
+      { "id": "dev_direction",        "label": "職涯發展方向",      "mode": "both" },
+      { "id": "dev_assignment",       "label": "最適合的工作任務",  "mode": "both" }
+    ]
+  }
+}</pre>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h4>Module Mode 說明</h4>
+          <table class="params-table">
+            <thead><tr><th>mode 值</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">single_only</td><td>僅支援 1 位候選人選取</td></tr>
+              <tr><td class="param-name">multi_only</td><td>需選取 2 位以上候選人</td></tr>
+              <tr><td class="param-name">both</td><td>1 位或多位皆可</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /health -->
+    <div class="endpoint" id="ep-health">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/health</span>
+        <span class="endpoint-desc">健康檢查</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-none">無需認證</span></div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span></div>
+            <pre>{
+  "status": "ok",
+  "service": "Talent Search API v2",
+  "mode": "REAL"
+}</pre>
+          </div>
+        </div>
+        <div class="info-box note">
+          <code>mode</code> 為 <code>REAL</code> 或 <code>MOCK</code>，由後端 <code>INTEGRATION_MODE</code> 環境變數控制。UAT 環境應為 <code>REAL</code>。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: ADMIN
+  ═════════════════════════════════════ -->
+  <section id="section-admin">
+    <h2>Admin — 後台管理</h2>
+
+    <div class="info-box warning" style="margin-bottom:20px">
+      <strong>獨立認證系統：</strong> 管理端點使用不同的 JWT 密鑰（<code>JWT_SECRET_KEY</code>），與 Plugin JWT 不通用。
+    </div>
+
+    <!-- POST /api/admin/login -->
+    <div class="endpoint" id="ep-admin-login">
+      <div class="endpoint-header">
+        <span class="method-badge badge-post">POST</span>
+        <span class="endpoint-path">/api/admin/login</span>
+        <span class="endpoint-desc">管理者登入</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-none">無需認證</span></div>
+        <div class="subsection">
+          <h4>Request Body</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{ "username": "admin", "password": "secret123" }</pre>
+          </div>
+        </div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span></div>
+            <pre>{ "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...", "token_type": "bearer" }</pre>
+          </div>
+        </div>
+        <div class="subsection">
+          <h4>錯誤回應</h4>
+          <table class="params-table">
+            <thead><tr><th>狀態碼</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">400</td><td>username 和 password 為必填</td></tr>
+              <tr><td class="param-name">401</td><td>帳號或密碼錯誤</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /api/admin/me -->
+    <div class="endpoint" id="ep-admin-me">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/admin/me</span>
+        <span class="endpoint-desc">取得目前登入管理者資訊</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要 Admin JWT</span></div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span></div>
+            <pre>{ "username": "admin" }</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POST /api/admin/users -->
+    <div class="endpoint" id="ep-admin-create-user">
+      <div class="endpoint-header">
+        <span class="method-badge badge-post">POST</span>
+        <span class="endpoint-path">/api/admin/users</span>
+        <span class="endpoint-desc">建立新管理者帳號</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要 Admin JWT</span></div>
+        <div class="subsection">
+          <h4>Request Body</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{ "username": "newadmin", "password": "newpassword123" }</pre>
+          </div>
+        </div>
+        <div class="subsection">
+          <h4>Response 201</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span></div>
+            <pre>{ "username": "newadmin", "id": 2 }</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /api/admin/sessions -->
+    <div class="endpoint" id="ep-admin-sessions">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/admin/sessions</span>
+        <span class="endpoint-desc">列出所有 Chat Sessions（含篩選）</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要 Admin JWT</span></div>
+        <div class="subsection">
+          <h4>Query Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>預設值</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">skip</td><td class="param-type">integer</td><td><code>0</code></td><td>分頁偏移</td></tr>
+              <tr><td class="param-name">limit</td><td class="param-type">integer</td><td><code>20</code></td><td>每頁筆數</td></tr>
+              <tr><td class="param-name">user_id</td><td class="param-type">string</td><td>—</td><td>依使用者 email 篩選</td></tr>
+              <tr><td class="param-name">start_date</td><td class="param-type">string</td><td>—</td><td>起始日期 <code>YYYY-MM-DD</code>（UTC+8）</td></tr>
+              <tr><td class="param-name">end_date</td><td class="param-type">string</td><td>—</td><td>結束日期 <code>YYYY-MM-DD</code>（UTC+8）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>[
+  {
+    "session_id": "sess-uuid-1",
+    "user_id": "user@example.com",
+    "status": "active",
+    "started_at": "2026-05-26T10:30:00Z",
+    "last_active_at": "2026-05-26T10:45:00Z",
+    "message_count": 5,
+    "total_tokens": 1250
+  }
+]</pre>
+          </div>
+        </div>
+        <div class="info-box note">
+          <strong>時區：</strong> <code>start_date</code> / <code>end_date</code> 以 UTC+8（台灣時間）解析，儲存時轉換為 UTC。
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /api/admin/sessions/{session_id} -->
+    <div class="endpoint" id="ep-admin-session-detail">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/admin/sessions/{session_id}</span>
+        <span class="endpoint-desc">取得指定 Session 的完整對話記錄</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要 Admin JWT</span></div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "session": {
+    "session_id": "sess-uuid-1",
+    "user_id": "user@example.com",
+    "status": "active",
+    "started_at": "2026-05-26T10:30:00Z",
+    "metadata": { "title": "分析報告", "candidates": [] }
+  },
+  "messages": [
+    {
+      "id": 1,
+      "role": "user",
+      "content": "請分析...",
+      "token_usage": 450,
+      "created_at": "2026-05-26T10:30:00Z"
+    },
+    {
+      "id": 2,
+      "role": "ai",
+      "content": "根據報告...",
+      "token_usage": 800,
+      "created_at": "2026-05-26T10:30:05Z"
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /api/admin/stats -->
+    <div class="endpoint" id="ep-admin-stats">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/admin/stats</span>
+        <span class="endpoint-desc">儀表板統計數據</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要 Admin JWT</span></div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>{
+  "total_sessions": 125,
+  "total_tokens": 45000,
+  "total_messages": 380,
+  "active_users_yesterday": 12,
+  "token_trend": [
+    { "date": "05-20", "tokens": 3400 },
+    { "date": "05-21", "tokens": 3100 },
+    { "date": "05-26", "tokens": 4200 }
+  ]
+}</pre>
+          </div>
+        </div>
+        <div class="info-box note"><strong>統計範圍：</strong> 當月累計數據。</div>
+      </div>
+    </div>
+
+    <!-- GET /api/admin/reports/users-usage -->
+    <div class="endpoint" id="ep-admin-user-usage">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/admin/reports/users-usage</span>
+        <span class="endpoint-desc">依使用者統計用量報告</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要 Admin JWT</span></div>
+        <div class="subsection">
+          <h4>Query Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">start_date</td><td class="param-type">string</td><td>YYYY-MM-DD（選填）</td></tr>
+              <tr><td class="param-name">end_date</td><td class="param-type">string</td><td>YYYY-MM-DD（選填）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>[
+  {
+    "user_id": "user1@example.com",
+    "session_count": 8,
+    "total_tokens": 2400,
+    "last_active_at": "2026-05-26T10:45:00Z"
+  }
+]</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GET /api/admin/reports/daily-usage -->
+    <div class="endpoint" id="ep-admin-daily-usage">
+      <div class="endpoint-header">
+        <span class="method-badge badge-get">GET</span>
+        <span class="endpoint-path">/api/admin/reports/daily-usage</span>
+        <span class="endpoint-desc">依日期統計用量報告</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="tags"><span class="tag tag-auth-req">需要 Admin JWT</span></div>
+        <div class="subsection">
+          <h4>Query Parameters</h4>
+          <table class="params-table">
+            <thead><tr><th>參數</th><th>型別</th><th>說明</th></tr></thead>
+            <tbody>
+              <tr><td class="param-name">user_id</td><td class="param-type">string</td><td>依使用者篩選（選填）</td></tr>
+              <tr><td class="param-name">start_date</td><td class="param-type">string</td><td>YYYY-MM-DD（選填）</td></tr>
+              <tr><td class="param-name">end_date</td><td class="param-type">string</td><td>YYYY-MM-DD（選填）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="subsection">
+          <h4>Response 200</h4>
+          <div class="code-block">
+            <div class="code-block-header"><span>application/json</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+            <pre>[
+  { "date": "2026-05-26", "tokens": 3400, "sessions": 5 },
+  { "date": "2026-05-25", "tokens": 2900, "sessions": 4 }
+]</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: ERROR CODES
+  ═════════════════════════════════════ -->
+  <section id="errors">
+    <h2>HTTP 錯誤代碼對照</h2>
+    <table class="status-table">
+      <thead>
+        <tr><th>狀態碼</th><th>說明</th><th>常見原因</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="status-code s2xx">200</span></td>
+          <td>成功</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s2xx">201</span></td>
+          <td>建立成功</td>
+          <td>POST 建立資源（如新增管理者）</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s4xx">400</span></td>
+          <td>Bad Request</td>
+          <td>必填欄位缺漏、JSON 格式錯誤、業務邏輯驗證失敗</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s4xx">401</span></td>
+          <td>Unauthorized</td>
+          <td>JWT Token 遺失、格式錯誤或已過期；帳密錯誤</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s4xx">404</span></td>
+          <td>Not Found</td>
+          <td>候選人、Session 或訊息不存在</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s5xx">500</span></td>
+          <td>Internal Server Error</td>
+          <td>未預期例外，traceback.log 已在伺服器建立</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s5xx">502</span></td>
+          <td>Bad Gateway</td>
+          <td>上游 API 回傳非預期格式</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s5xx">503</span></td>
+          <td>Service Unavailable</td>
+          <td>資料庫連線失敗；上游 Traitty API 不可用；LLM API 不可用</td>
+        </tr>
+        <tr>
+          <td><span class="status-code s5xx">504</span></td>
+          <td>Gateway Timeout</td>
+          <td>上游 API 回應逾時</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="info-box note" style="margin-top:16px">
+      <strong>錯誤 Body 格式：</strong> 錯誤回應通常包含 <code>{"error": "...描述..."}</code> 或 <code>{"message": "..."}</code>，詳見各端點說明。
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: ENV VARS
+  ═════════════════════════════════════ -->
+  <section id="envvars">
+    <h2>環境變數（.env）</h2>
+    <table class="env-table">
+      <thead>
+        <tr><th>變數名稱</th><th>必填</th><th>UAT 範例值</th><th>說明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="env-key">SECRET_KEY</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>uat-flask-secret-key</code></td>
+          <td>Flask Session 密鑰</td>
+        </tr>
+        <tr>
+          <td class="env-key">INTEGRATION_MODE</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>REAL</code></td>
+          <td><code>REAL</code> 或 <code>MOCK</code></td>
+        </tr>
+        <tr>
+          <td class="env-key">DATABASE_URI</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>postgresql://user:pass@uat-db:5432/traitty_uat</code></td>
+          <td>PostgreSQL 連線字串</td>
+        </tr>
+        <tr>
+          <td class="env-key">LLM_API_KEY</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>sk-...</code></td>
+          <td>LLM 服務 API 金鑰</td>
+        </tr>
+        <tr>
+          <td class="env-key">LLM_MODEL</td>
+          <td><span class="env-opt">選填</span></td>
+          <td><code>deepseek-chat</code></td>
+          <td>LLM 模型名稱</td>
+        </tr>
+        <tr>
+          <td class="env-key">LLM_API_BASE</td>
+          <td><span class="env-opt">選填</span></td>
+          <td><code>https://api.deepseek.com/v1</code></td>
+          <td>LLM API 端點（OpenAI 相容）</td>
+        </tr>
+        <tr>
+          <td class="env-key">TRAITTY_API_BASE</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>https://api.traitty.com</code></td>
+          <td>上游 Traitty API 基底 URL</td>
+        </tr>
+        <tr>
+          <td class="env-key">PARTY_A_API_BASE</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>https://service.traitty.com</code></td>
+          <td>甲方服務 API 基底 URL</td>
+        </tr>
+        <tr>
+          <td class="env-key">PARTY_A_PLUGIN_SECRET</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>shared-secret-key</code></td>
+          <td>Plugin JWT 簽署密鑰（HS256）</td>
+        </tr>
+        <tr>
+          <td class="env-key">JWT_SECRET_KEY</td>
+          <td><span class="env-req">必填</span></td>
+          <td><code>admin-jwt-secret</code></td>
+          <td>Admin JWT 簽署密鑰（獨立）</td>
+        </tr>
+        <tr>
+          <td class="env-key">DB_USER</td>
+          <td><span class="env-opt">選填</span></td>
+          <td><code>postgres</code></td>
+          <td>若使用個別 DB 變數（非 DATABASE_URI）</td>
+        </tr>
+        <tr>
+          <td class="env-key">DB_PASSWORD</td>
+          <td><span class="env-opt">選填</span></td>
+          <td><code>postgres</code></td>
+          <td>資料庫密碼</td>
+        </tr>
+        <tr>
+          <td class="env-key">DB_HOST</td>
+          <td><span class="env-opt">選填</span></td>
+          <td><code>localhost</code></td>
+          <td>資料庫主機</td>
+        </tr>
+        <tr>
+          <td class="env-key">DB_PORT</td>
+          <td><span class="env-opt">選填</span></td>
+          <td><code>5432</code></td>
+          <td>資料庫 Port</td>
+        </tr>
+        <tr>
+          <td class="env-key">DB_NAME</td>
+          <td><span class="env-opt">選填</span></td>
+          <td><code>ai_chatbot_v2</code></td>
+          <td>資料庫名稱</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ════════════════════════════════════
+       SECTION: FRONTEND
+  ═════════════════════════════════════ -->
+  <section id="section-frontend">
+    <h2>Frontend Chat Widget 整合</h2>
+
+    <div id="frontend-config" class="subsection">
+      <h4>Widget 注入設定（window.TRAITTY_WIDGET_CONFIG）</h4>
+      <div class="code-block">
+        <div class="code-block-header"><span>JavaScript — 嵌入頁注入</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+        <pre>window.TRAITTY_WIDGET_CONFIG = {
+  apiBaseUrl: "https://uat-api.traitty.com/api/v2",  // UAT Base URL
+  userEmail:  "user@example.com",                     // 目前登入使用者 email
+  features: {
+    quickQuestions: {
+      enabled: true,
+      enforceSingleCandidateLimit: true  // 限制 single_only 模組僅可選 1 位候選人
+    }
+  }
+};</pre>
+      </div>
+      <div class="info-box note">
+        若 <code>apiBaseUrl</code> 未設定，Widget 預設使用 <code>http://localhost:5000/api/v2</code>。
+      </div>
+    </div>
+
+    <div id="frontend-storage" class="subsection" style="margin-top:20px">
+      <h4>前端 Storage Keys</h4>
+      <table class="params-table">
+        <thead><tr><th>Key</th><th>儲存位置</th><th>說明</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="param-name">traitty_session_active_ids</td>
+            <td>Session Storage</td>
+            <td>目前選取的候選人 ID 陣列</td>
+          </tr>
+          <tr>
+            <td class="param-name">traitty_session_messages</td>
+            <td>Session Storage</td>
+            <td>當前對話訊息清單</td>
+          </tr>
+          <tr>
+            <td class="param-name">traitty_session_id</td>
+            <td>Session Storage</td>
+            <td>當前 Session UUID</td>
+          </tr>
+          <tr>
+            <td class="param-name">traitty_selected_candidates</td>
+            <td>Session Storage</td>
+            <td>候選人完整物件（含 latest_assessment）</td>
+          </tr>
+          <tr>
+            <td class="param-name">traitty_batch_reports</td>
+            <td>Session Storage</td>
+            <td>以 candidate_id 為 key 的特質報告 Map</td>
+          </tr>
+          <tr>
+            <td class="param-name">traitty_new_tab_state</td>
+            <td>Local Storage</td>
+            <td>跨 Tab 狀態傳遞（讀取後自動刪除）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection" style="margin-top:20px">
+      <h4>SSE 串流接收範例（JavaScript）</h4>
+      <div class="code-block">
+        <div class="code-block-header"><span>JavaScript</span><button class="copy-btn" onclick="copyCode(this)">複製</button></div>
+        <pre>const response = await fetch(`${apiBaseUrl.replace('/api/v2', '')}/chat/`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`
+  },
+  body: JSON.stringify({ query, candidate_ids, candidates_info, trait_reports, session_id, user_id })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  buffer += decoder.decode(value, { stream: true });
+  const lines = buffer.split("\n");
+  buffer = lines.pop();  // 保留未完成行
+
+  for (const line of lines) {
+    if (!line.startsWith("data: ")) continue;
+    const raw = line.slice(6).trim();
+    if (raw === "[DONE]") return;
+
+    const event = JSON.parse(raw);
+    if (event.type === "token")      appendToken(event.content);
+    if (event.type === "message_id") saveMessageId(event.id);
+    if (event.type === "quota")      updateQuota(event.quota_summary);
+  }
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <div style="height:60px"></div>
+
+</main>
+
+<script>
+  function copyCode(btn) {
+    const pre = btn.closest(".code-block").querySelector("pre");
+    navigator.clipboard.writeText(pre.textContent.trim()).then(() => {
+      btn.textContent = "已複製!";
+      setTimeout(() => btn.textContent = "複製", 1500);
+    });
+  }
+
+  // Active sidebar link on scroll
+  const sections = document.querySelectorAll("[id]");
+  const links = document.querySelectorAll("#sidebar a");
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.style.borderLeftColor = "");
+        const active = document.querySelector(`#sidebar a[href="#${e.target.id}"]`);
+        if (active) active.style.borderLeftColor = "var(--accent)";
+      }
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

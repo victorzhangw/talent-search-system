@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"D:\\\\python\\\\AI-Character-Chatbot\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "PowerShell(head *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\python\\\\AI-Character-Chatbot\\\\BackEnd\\\\api_v2\" -Exclude \".venv\" -Recurse -Filter \"*.py\")",
+      "Bash(Select-Object -ExpandProperty FullName)"
+    ]
+  }
+}
