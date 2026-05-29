@@ -22,9 +22,9 @@ def create_app(config_class=Config):
         return err('INTERNAL_SERVER_ERROR', '伺服器發生未預期錯誤，請聯絡管理員', 500)
 
     # Register Blueprints
-    from .routes import chat, auth, candidates, reports, init_proxy, modules
+    from .routes import chat, auth, candidates, reports, init_proxy, modules, docs
     from .admin import router as admin_router
-    
+
     app.register_blueprint(chat.bp) # Default /chat
     app.register_blueprint(auth.bp, url_prefix='/auth')
     app.register_blueprint(candidates.bp, url_prefix='/api/v2/candidates') # Explicit path
@@ -32,6 +32,7 @@ def create_app(config_class=Config):
     app.register_blueprint(init_proxy.bp, url_prefix='/api/v2/init') # Proxy to upstream /v1/init
     app.register_blueprint(admin_router.bp) # /api/admin as defined in blueprint url_prefix
     app.register_blueprint(modules.bp, url_prefix='/api/v2/modules') # 快速提問模組清單 API
+    app.register_blueprint(docs.bp) # /api/docs — Swagger UI
 
 
     @app.route('/health')

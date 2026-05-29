@@ -1,0 +1,1130 @@
+openapi: 3.0.3
+info:
+  title: Talent Chat API v2
+  description: |
+    **Traitty AI Character Chatbot** 後端 API。
+
+    ### 認證方式
+    | 端點前綴 | Token 來源 |
+    |---|---|
+    | `/chat/*`, `/api/v2/*` | `POST /auth/login` → `data.token` |
+    | `/api/admin/*` | `POST /api/admin/login` → `data.access_token` |
+
+    所有需要認證的端點請在 Header 帶上：
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ### 標準回應格式
+    ```json
+    { "success": true,  "data": { ... }, "error": null,        "meta": null }
+    { "success": false, "data": null,    "error": { "code": "...", "message": "..." }, "meta": null }
+    ```
+
+    ### SSE 串流（`POST /chat/`）
+    回應為 `text/event-stream`，每個事件為 `data: <JSON>\n\n`。
+    事件型態：`meta` → `token` → `message_id` → `quota`（選用）→ `done`。
+    錯誤時發送 `error` 事件後接 `done`。
+  version: 2.0.0
+  contact:
+    name: Traitty Engineering
+servers:
+  - url: http://localhost:5000
+    description: 本地開發
+  - url: https://traittyservice.aurocore.com
+    description: 正式環境
+
+tags:
+  - name: System
+    description: 系統狀態
+  - name: Auth
+    description: 身份驗證（Plugin JWT）
+  - name: Candidates
+    description: 候選人清單與評測報告
+  - name: Chat
+    description: 對話訊息與歷史記錄
+  - name: Reports
+    description: 批次評測報告
+  - name: Modules
+    description: 快速提問模組清單
+  - name: Init Proxy
+    description: 上游初始化代理
+  - name: Admin
+    description: 管理員後台（需 Admin JWT）
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 透過 `POST /auth/login` 取得
+    adminBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 透過 `POST /api/admin/login` 取得
+
+  schemas:
+    # ── 共用回應包裝 ──────────────────────────────────────────
+    ApiError:
+      type: object
+      properties:
+        code:    { type: string, example: MISSING_FIELD }
+        message: { type: string, example: Email is required }
+        details: { description: 可選的詳細錯誤訊息 }
+        field:   { type: string, example: email, description: 欄位層級錯誤時才出現 }
+
+    SuccessEnvelope:
+      type: object
+      required: [success, data, error, meta]
+      properties:
+        success: { type: boolean, example: true }
+        data:    {}
+        error:   { nullable: true, example: null }
+        meta:    { nullable: true, example: null }
+
+    ErrorEnvelope:
+      type: object
+      required: [success, data, error, meta]
+      properties:
+        success: { type: boolean, example: false }
+        data:    { nullable: true, example: null }
+        error:   { $ref: '#/components/schemas/ApiError' }
+        meta:    { nullable: true, example: null }
+
+    # ── Auth ─────────────────────────────────────────────────
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                token: { type: string, description: JWT Access Token（TTL 15 分鐘） }
+                user:
+                  type: object
+                  properties:
+                    email: { type: string }
+                    id:    { type: integer }
+
+    InitSessionResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                sessionId:  { type: string, example: sess_user_001 }
+                mock_token: { type: string, example: mock.jwt.token }
+
+    # ── Candidates ───────────────────────────────────────────
+    Candidate:
+      type: object
+      properties:
+        candidate_id: { type: string }
+        name:         { type: string }
+        latest_assessment:
+          type: object
+          properties:
+            assessment_id:   { type: integer }
+            completion_time: { type: string, format: date-time }
+
+    PageInfo:
+      type: object
+      properties:
+        total:  { type: integer }
+        limit:  { type: integer }
+        offset: { type: integer }
+
+    CandidatesResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/Candidate' }
+            meta:
+              type: object
+              properties:
+                page: { $ref: '#/components/schemas/PageInfo' }
+
+    Trait:
+      type: object
+      properties:
+        trait_id: { type: string }
+        name:     { type: string }
+        score:    { type: number }
+        band:     { type: string }
+
+    CandidateReportResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                candidate_name:  { type: string }
+                assessment_date: { type: string }
+                traits:
+                  type: array
+                  items: { $ref: '#/components/schemas/Trait' }
+
+    # ── Chat ─────────────────────────────────────────────────
+    SessionSummary:
+      type: object
+      properties:
+        session_id:     { type: string }
+        started_at:     { type: string, format: date-time }
+        last_active_at: { type: string, format: date-time }
+        status:         { type: string }
+        title:          { type: string }
+
+    ChatHistoryResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                today:        { type: array, items: { $ref: '#/components/schemas/SessionSummary' } }
+                past_30_days: { type: array, items: { $ref: '#/components/schemas/SessionSummary' } }
+                has_more:     { type: boolean }
+
+    ChatMessage:
+      type: object
+      properties:
+        id:         { type: integer }
+        role:       { type: string, enum: [user, ai] }
+        content:    { type: string }
+        rating:     { type: integer }
+        created_at: { type: string, format: date-time }
+
+    SessionDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                session_id: { type: string }
+                status:     { type: string }
+                metadata:   { type: object }
+                messages:   { type: array, items: { $ref: '#/components/schemas/ChatMessage' } }
+
+    RatingResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                message_id: { type: integer }
+                rating:     { type: integer }
+
+    # SSE 事件型別（僅供文件說明用）
+    SseMetaEvent:
+      type: object
+      properties:
+        type:   { type: string, enum: [meta] }
+        intent: { type: string, description: 意圖識別結果（use_case_id） }
+
+    SseTokenEvent:
+      type: object
+      properties:
+        type:    { type: string, enum: [token] }
+        content: { type: string, description: LLM 串流字元片段 }
+
+    SseMessageIdEvent:
+      type: object
+      properties:
+        type: { type: string, enum: [message_id] }
+        id:   { type: integer }
+
+    SseQuotaEvent:
+      type: object
+      properties:
+        type:          { type: string, enum: [quota] }
+        quota_summary: { type: object }
+
+    SseDoneEvent:
+      type: object
+      properties:
+        type: { type: string, enum: [done] }
+
+    SseErrorEvent:
+      type: object
+      properties:
+        type:    { type: string, enum: [error] }
+        code:    { type: string, example: STREAM_INTERRUPTED }
+        message: { type: string }
+
+    # ── Reports ──────────────────────────────────────────────
+    AssessmentReport:
+      type: object
+      properties:
+        assessment_id:              { type: integer }
+        project_name_abbreviation:  { type: string }
+        assessment_date:            { type: string }
+        traits:                     { type: array, items: { $ref: '#/components/schemas/Trait' } }
+
+    BatchReportsResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                reports: { type: array, items: { $ref: '#/components/schemas/AssessmentReport' } }
+            meta:
+              type: object
+              properties:
+                skipped_count: { type: integer }
+                skipped_ids:   { type: array, items: { type: integer } }
+
+    # ── Modules ──────────────────────────────────────────────
+    ModuleItem:
+      type: object
+      properties:
+        id:    { type: string }
+        label: { type: string }
+        mode:  { type: string, enum: [single, multi] }
+
+    ModulesResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                categories:
+                  type: object
+                  description: 以分類名稱為 key，模組清單為 value
+                  additionalProperties:
+                    type: array
+                    items: { $ref: '#/components/schemas/ModuleItem' }
+                  example:
+                    招募:
+                      - { id: recruit_interview, label: 面試問題推薦, mode: single }
+
+    # ── Admin ─────────────────────────────────────────────────
+    AdminLoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                access_token: { type: string }
+                token_type:   { type: string, example: bearer }
+
+    AdminUser:
+      type: object
+      properties:
+        id:         { type: integer }
+        username:   { type: string }
+        created_at: { type: string, format: date-time }
+
+    AdminSession:
+      type: object
+      properties:
+        session_id:    { type: string }
+        user_id:       { type: string }
+        status:        { type: string }
+        started_at:    { type: string, format: date-time }
+        last_active_at: { type: string, format: date-time }
+        message_count: { type: integer }
+        total_tokens:  { type: integer }
+
+    DashboardStats:
+      type: object
+      properties:
+        total_sessions:        { type: integer }
+        total_tokens:          { type: integer }
+        total_messages:        { type: integer }
+        active_users_yesterday: { type: integer }
+        token_trend:
+          type: array
+          items:
+            type: object
+            properties:
+              date:   { type: string, example: "05-29" }
+              tokens: { type: integer }
+
+# ── Paths ───────────────────────────────────────────────────────────────────
+paths:
+
+  # ── System ────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [System]
+      summary: 服務健康檢查
+      operationId: healthCheck
+      responses:
+        "200":
+          description: 服務正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:  { type: string, example: ok }
+                  service: { type: string, example: Talent Search API v2 }
+                  mode:    { type: string, example: REAL }
+
+  # ── Auth ──────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 取得 Plugin JWT Token
+      operationId: authLogin
+      description: |
+        以 Email 換取 JWT Token（有效期 15 分鐘）。
+        Token 用於 `/api/v2/*` 及 `/chat/*` 端點的 `Authorization: Bearer` Header。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, example: user@example.com }
+      responses:
+        "200":
+          description: 登入成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        "400":
+          description: 缺少 email 欄位
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: MISSING_FIELD, message: Email is required, field: email }
+                meta: null
+
+  /auth/init:
+    post:
+      tags: [Auth]
+      summary: Legacy Session 初始化（舊版）
+      operationId: authInit
+      description: 舊版相容端點，回傳 mock session ID 與 token。
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId: { type: string, example: user_001 }
+      responses:
+        "200":
+          description: 初始化成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InitSessionResponse' }
+
+  # ── Candidates ────────────────────────────────────────────
+  /api/v2/candidates/:
+    get:
+      tags: [Candidates]
+      summary: 列出候選人
+      operationId: listCandidates
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: enterprise_code
+          in: query
+          description: 企業代碼（MOCK 模式使用）
+          schema: { type: string, example: ACME-TW }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0, minimum: 0 }
+      responses:
+        "200":
+          description: 成功（data 為候選人陣列，空陣列表示無資料）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CandidatesResponse' }
+        "503":
+          description: 上游服務不可用
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: UPSTREAM_UNAVAILABLE, message: Upstream service unavailable }
+                meta: null
+
+  /api/v2/candidates/{candidate_id}/report:
+    get:
+      tags: [Candidates]
+      summary: 取得候選人評測報告
+      operationId: getCandidateReport
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: candidate_id
+          in: path
+          required: true
+          schema: { type: string }
+          description: 候選人 ID
+      responses:
+        "200":
+          description: 成功（若無評測記錄，traits 為空陣列）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CandidateReportResponse' }
+        "404":
+          description: 候選人不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: NOT_FOUND, message: Candidate not found in list }
+                meta: null
+        "500":
+          description: 評測報告取得失敗
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "503":
+          description: 上游服務不可用
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  # ── Chat ──────────────────────────────────────────────────
+  /chat/history:
+    get:
+      tags: [Chat]
+      summary: 取得對話歷史清單
+      operationId: getChatHistory
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema: { type: string, format: email }
+          description: 使用者 Email
+      responses:
+        "200":
+          description: 成功，回傳今日與過去 30 天的 session 清單
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatHistoryResponse' }
+        "400":
+          description: 缺少 user_id 參數
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: MISSING_FIELD, message: user_id parameter is required, field: user_id }
+                meta: null
+
+  /chat/{session_id}:
+    get:
+      tags: [Chat]
+      summary: 取得 Session 詳細訊息
+      operationId: getSessionDetail
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 成功，含完整訊息列表（已過濾 system 訊息，assistant 對應為 ai）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionDetailResponse' }
+        "404":
+          description: Session 不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: NOT_FOUND, message: Session not found }
+                meta: null
+
+  /chat/message/{message_id}/rating:
+    put:
+      tags: [Chat]
+      summary: 更新訊息評分
+      operationId: updateMessageRating
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: message_id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, enum: [-1, 0, 1], description: "-1=差評, 0=無, 1=好評" }
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RatingResponse' }
+        "400":
+          description: 缺少 rating 欄位
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "404":
+          description: 訊息不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /chat/:
+    post:
+      tags: [Chat]
+      summary: 傳送訊息（SSE 串流）
+      operationId: sendChatMessage
+      security: [{ bearerAuth: [] }]
+      description: |
+        回應為 `text/event-stream` 格式，每行為 `data: <JSON>\n\n`。
+
+        **事件順序：**
+        1. `{"type":"meta","intent":"<use_case_id>"}` — 意圖識別結果
+        2. `{"type":"token","content":"..."}` — LLM 串流字元（多次）
+        3. `{"type":"message_id","id":123}` — 訊息儲存後的 DB ID
+        4. `{"type":"quota","quota_summary":{...}}` — 扣款後更新額度（選用）
+        5. `{"type":"done"}` — 串流結束
+
+        **錯誤事件（接著 done）：**
+        `{"type":"error","code":"SYSTEM_ERROR","message":"..."}`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  description: 使用者問題
+                  example: 請分析這位候選人的領導特質
+                session_id:
+                  type: string
+                  default: default_session
+                  example: sess_uuid_abc123
+                user_id:
+                  type: string
+                  format: email
+                  example: user@example.com
+                candidate_ids:
+                  type: array
+                  items: { type: string }
+                candidates_info:
+                  type: array
+                  description: 前端傳入的候選人完整資訊
+                  items:
+                    type: object
+                    properties:
+                      name:         { type: string }
+                      candidate_id: { type: string }
+                trait_reports:
+                  type: object
+                  description: 以 candidate_id 為 key 的特質報告 Map（Session Storage 中的資料）
+                mode:
+                  type: string
+                  enum: [explanation, comparison, summary]
+                  default: explanation
+                module_id:
+                  type: string
+                  nullable: true
+                  description: 快速提問模組 ID，自由提問時為 null
+                  example: recruit_interview
+      responses:
+        "200":
+          description: SSE 串流開始
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  每行格式：`data: <JSON>\n\n`
+                  可能的 JSON 結構見 SseMetaEvent / SseTokenEvent / SseDoneEvent / SseErrorEvent
+        "400":
+          description: 缺少 query 欄位或無效 JSON
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  # ── Reports ───────────────────────────────────────────────
+  /api/v2/reports/batch:
+    post:
+      tags: [Reports]
+      summary: 批次取得評測報告
+      operationId: getBatchReports
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assessment_ids]
+              properties:
+                assessment_ids:
+                  type: array
+                  minItems: 1
+                  items: { type: integer }
+                  example: [62, 63, 64]
+      responses:
+        "200":
+          description: 成功（reports 可能為空陣列）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchReportsResponse' }
+        "400":
+          description: 缺少或空的 assessment_ids
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: MISSING_FIELD, message: assessment_ids is required, field: assessment_ids }
+                meta: null
+        "500":
+          description: 從上游取得報告失敗
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  # ── Modules ───────────────────────────────────────────────
+  /api/v2/modules/:
+    get:
+      tags: [Modules]
+      summary: 取得快速提問模組清單
+      operationId: getModules
+      description: 從 `config/quick_modules.json` 載入，依分類分組回傳。
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModulesResponse' }
+        "500":
+          description: 設定檔載入失敗
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: CONFIG_LOAD_FAILED, message: Failed to load modules config }
+                meta: null
+
+  # ── Init Proxy ────────────────────────────────────────────
+  /api/v2/init/:
+    get:
+      tags: [Init Proxy]
+      summary: 上游初始化代理（quota / plan 資訊）
+      operationId: getInitStatus
+      security: [{ bearerAuth: [] }]
+      description: |
+        從 JWT 解析 Email，產生上游 token 後轉送至 `TRAITTY_API_BASE/v1/init/`。
+        回傳上游的方案清單（`usable_plans`）與額度摘要（`quota_summary`）。
+
+        **注意**：若 JWT 中的 Email 在上游系統不存在，上游回傳 404，本端點亦透傳 404。
+      responses:
+        "200":
+          description: 上游初始化資料
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+        "404":
+          description: 上游找不到此使用者
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "502":
+          description: 上游回傳非 JSON 回應
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "503":
+          description: 上游網路錯誤
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "500":
+          description: Proxy 內部錯誤
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  # ── Admin ─────────────────────────────────────────────────
+  /api/admin/login:
+    post:
+      tags: [Admin]
+      summary: 管理員登入
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: admin }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: 登入成功，回傳 Access Token（有效期 24 小時）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminLoginResponse' }
+        "400":
+          description: 缺少 username 或 password
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "401":
+          description: 帳密錯誤
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error: { code: INVALID_CREDENTIALS, message: Incorrect username or password }
+                meta: null
+
+  /api/admin/me:
+    get:
+      tags: [Admin]
+      summary: 取得目前登入的管理員資訊
+      operationId: adminGetMe
+      security: [{ adminBearerAuth: [] }]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          username: { type: string }
+        "401":
+          description: Token 無效或缺失
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: Token is missing! }
+
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: 列出所有管理員
+      operationId: adminListUsers
+      security: [{ adminBearerAuth: [] }]
+      responses:
+        "200":
+          description: 管理員清單
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/AdminUser' }
+        "401":
+          description: 未授權
+
+    post:
+      tags: [Admin]
+      summary: 建立新管理員
+      operationId: adminCreateUser
+      security: [{ adminBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "201":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:       { type: integer }
+                          username: { type: string }
+        "400":
+          description: 缺少欄位或帳號已存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "401":
+          description: 未授權
+
+  /api/admin/users/{user_id}/password:
+    put:
+      tags: [Admin]
+      summary: 更新管理員密碼
+      operationId: adminUpdatePassword
+      security: [{ adminBearerAuth: [] }]
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: 密碼更新成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+        "400":
+          description: 缺少 password 欄位
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "404":
+          description: 管理員不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "401":
+          description: 未授權
+
+  /api/admin/sessions:
+    get:
+      tags: [Admin]
+      summary: 列出對話 Session（分頁 + 篩選）
+      operationId: adminListSessions
+      security: [{ adminBearerAuth: [] }]
+      parameters:
+        - name: skip
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 200 }
+        - name: user_id
+          in: query
+          schema: { type: string }
+          description: 以 Email 篩選
+        - name: start_date
+          in: query
+          schema: { type: string, format: date }
+          description: 開始日期（台灣時間 UTC+8），格式 YYYY-MM-DD
+        - name: end_date
+          in: query
+          schema: { type: string, format: date }
+          description: 結束日期（台灣時間 UTC+8，含當天），格式 YYYY-MM-DD
+      responses:
+        "200":
+          description: Session 清單
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/AdminSession' }
+                      meta:
+                        type: object
+                        properties:
+                          skip:  { type: integer }
+                          limit: { type: integer }
+                          total: { type: integer }
+        "401":
+          description: 未授權
+
+  /api/admin/sessions/{session_id}:
+    get:
+      tags: [Admin]
+      summary: 取得 Session 詳細資訊（含完整訊息）
+      operationId: adminGetSession
+      security: [{ adminBearerAuth: [] }]
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session 詳情
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+        "404":
+          description: Session 不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "401":
+          description: 未授權
+
+  /api/admin/stats:
+    get:
+      tags: [Admin]
+      summary: Dashboard 統計數據（本月累計 + 近 7 日 Token 趨勢）
+      operationId: adminGetStats
+      security: [{ adminBearerAuth: [] }]
+      responses:
+        "200":
+          description: 統計資料
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/DashboardStats' }
+        "401":
+          description: 未授權
+
+  /api/admin/reports/users-usage:
+    get:
+      tags: [Admin]
+      summary: 使用者用量報表
+      operationId: adminUsersUsage
+      security: [{ adminBearerAuth: [] }]
+      parameters:
+        - name: start_date
+          in: query
+          schema: { type: string, format: date }
+        - name: end_date
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: 各使用者的 Session 數與 Token 用量
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            user_id:       { type: string }
+                            session_count: { type: integer }
+                            total_tokens:  { type: integer }
+                            last_active_at: { type: string, format: date-time }
+        "401":
+          description: 未授權
+        "500":
+          description: 查詢失敗
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /api/admin/reports/daily-usage:
+    get:
+      tags: [Admin]
+      summary: 每日用量趨勢報表
+      operationId: adminDailyUsage
+      security: [{ adminBearerAuth: [] }]
+      parameters:
+        - name: start_date
+          in: query
+          schema: { type: string, format: date }
+        - name: end_date
+          in: query
+          schema: { type: string, format: date }
+        - name: user_id
+          in: query
+          schema: { type: string }
+          description: 若指定則只回傳該使用者的每日統計
+      responses:
+        "200":
+          description: 每日 Token 與 Session 數
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date:     { type: string, example: "2026-05-29" }
+                            tokens:   { type: integer }
+                            sessions: { type: integer }
+        "401":
+          description: 未授權
+        "500":
+          description: 查詢失敗
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
