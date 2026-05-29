@@ -1,0 +1,10 @@
+Release Version: 20260528_142948
+Generated At: 2026/5/28 14:29:48
+------------------------------------------
+
+File: loader.css
+SRI: sha384-2/aAfZgiamgN0s9g8uG75KQrOxpTj1gM9D/ETg5VLVZqx50OtIapP2ShZ4vPT4O2
+
+File: loader.iife.js
+SRI: sha384-ihiNkCLdqLrSjD9zrDmVtQq1Wl3jXU5bW1MjqfOIrqCWV/bIf89MgHQjCnkHnpeV
+
