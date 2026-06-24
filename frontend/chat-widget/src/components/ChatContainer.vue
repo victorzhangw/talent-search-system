@@ -148,7 +148,7 @@
                         </div>
                         <div class="preview-footer">
                             <button class="secondary-btn" @click="showPreviewPanel = false">🔙 返回當前對話</button>
-                            
+                            <button class="primary-btn" @click="switchContextToPreview">▶ 繼續對話</button>
                         </div>
                     </div>
                 </transition>

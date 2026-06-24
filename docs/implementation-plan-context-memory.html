@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>技術實作計劃：對話記憶 & 歷史回溯</title>
+<style>
+  :root {
+    --primary: #5b21b6;
+    --primary-light: #ede9fe;
+    --accent: #0ea5e9;
+    --accent-light: #e0f2fe;
+    --success: #16a34a;
+    --success-light: #dcfce7;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --danger: #dc2626;
+    --surface: #ffffff;
+    --bg: #f8fafc;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --code-bg: #0f172a;
+    --code-text: #e2e8f0;
+    --tag-add: #bbf7d0;
+    --tag-add-text: #14532d;
+    --tag-remove: #fecaca;
+    --tag-remove-text: #7f1d1d;
+    --tag-keep: #e2e8f0;
+    --tag-keep-text: #334155;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  .page-wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 6rem;
+  }
+
+  /* ─── Header ─── */
+  .doc-header {
+    background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    color: #fff;
+    margin-bottom: 2.5rem;
+  }
+  .doc-header .badge-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.75rem;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+  }
+  .doc-header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .doc-header p { opacity: 0.85; font-size: 0.95rem; }
+
+  /* ─── TOC ─── */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+  .toc h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.8rem; }
+  .toc ol { padding-left: 1.4rem; }
+  .toc li { margin-bottom: 0.3rem; }
+  .toc a { color: var(--primary); text-decoration: none; font-weight: 500; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ─── Section ─── */
+  section { margin-bottom: 3rem; }
+  .section-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-light);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section-number {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  h3 { font-size: 1rem; font-weight: 600; margin: 1.5rem 0 0.6rem; color: var(--text); }
+  h4 { font-size: 0.9rem; font-weight: 600; margin: 1rem 0 0.4rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  p { margin-bottom: 0.8rem; }
+
+  /* ─── Info Box ─── */
+  .info-box {
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+    display: flex;
+    gap: 0.8rem;
+  }
+  .info-box .icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 2px; }
+  .info-box.problem { background: #fef2f2; border-left: 4px solid var(--danger); }
+  .info-box.solution { background: var(--success-light); border-left: 4px solid var(--success); }
+  .info-box.warning { background: var(--warning-light); border-left: 4px solid var(--warning); }
+  .info-box.info { background: var(--accent-light); border-left: 4px solid var(--accent); }
+
+  /* ─── File Tag ─── */
+  .file-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--code-bg);
+    color: #94a3b8;
+    font-family: 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    margin: 0.5rem 0 1rem;
+  }
+  .file-tag .line-ref { color: #f59e0b; }
+
+  /* ─── Code Block ─── */
+  .code-block {
+    background: var(--code-bg);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0.8rem 0 1.5rem;
+    font-size: 13px;
+  }
+  .code-block .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .code-block .lang-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: 'Menlo', monospace;
+  }
+  .code-block .change-label {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0.15rem 0.6rem;
+    border-radius: 4px;
+  }
+  .change-label.add { background: #14532d; color: #86efac; }
+  .change-label.modify { background: #1e3a5f; color: #7dd3fc; }
+  .code-block pre {
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    color: var(--code-text);
+    line-height: 1.65;
+  }
+  .code-block pre code { font-family: 'Menlo', 'Consolas', 'Courier New', monospace; }
+  .line-add { background: rgba(34,197,94,0.15); display: block; margin: 0 -1.2rem; padding: 0 1.2rem; }
+  .line-remove { background: rgba(239,68,68,0.15); display: block; margin: 0 -1.2rem; padding: 0 1.2rem; color: #fca5a5; }
+  .line-comment { color: #6b7280; }
+  .kw { color: #c084fc; }
+  .fn { color: #60a5fa; }
+  .str { color: #86efac; }
+  .num { color: #fbbf24; }
+  .var { color: #f0abfc; }
+  .op { color: #94a3b8; }
+
+  /* ─── Flow ─── */
+  .flow {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 1rem 0 1.5rem;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    min-width: 150px;
+    flex: 1;
+    position: relative;
+  }
+  .flow-step .step-num {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+  }
+  .flow-step .step-label { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+  .flow-step .step-note { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem; }
+  .flow-step.highlight { border-color: var(--success); background: var(--success-light); }
+  .flow-step.highlight .step-num { color: var(--success); }
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 0.4rem;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    margin-top: 0.9rem;
+  }
+
+  /* ─── Config Table ─── */
+  .config-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.5rem;
+    font-size: 0.9rem;
+  }
+  .config-table th {
+    background: var(--primary-light);
+    color: var(--primary);
+    text-align: left;
+    padding: 0.7rem 1rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .config-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .config-table tr:last-child td { border-bottom: none; }
+  .config-table .mono { font-family: 'Menlo', monospace; font-size: 0.85rem; background: #f1f5f9; padding: 0.15rem 0.4rem; border-radius: 4px; }
+  .config-table .recommended { color: var(--success); font-weight: 600; }
+
+  /* ─── Checklist ─── */
+  .checklist { list-style: none; }
+  .checklist li {
+    padding: 0.5rem 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist .check { color: #9ca3af; font-size: 1.1rem; flex-shrink: 0; }
+  .checklist li.done .check { color: var(--success); }
+
+  /* ─── Summary Card ─── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  @media (max-width: 600px) { .summary-grid { grid-template-columns: 1fr; } }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem;
+  }
+  .summary-card .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; }
+  .summary-card .card-icon { font-size: 1.3rem; }
+  .summary-card .card-title { font-size: 0.9rem; font-weight: 700; }
+  .summary-card .card-content { font-size: 0.85rem; color: var(--text-muted); }
+  .summary-card .card-content strong { color: var(--text); }
+
+  .tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .tag-fe { background: #dbeafe; color: #1d4ed8; }
+  .tag-be { background: #fce7f3; color: #9d174d; }
+  .tag-config { background: #f3e8ff; color: #6b21a8; }
+
+  /* ─── Limitation ─── */
+  .limitation-list { list-style: none; }
+  .limitation-list li {
+    padding: 0.6rem 0.8rem;
+    border-left: 3px solid var(--warning);
+    background: var(--warning-light);
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 0.5rem;
+    font-size: 0.88rem;
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- Header -->
+  <div class="doc-header">
+    <div class="badge-row">
+      <span class="badge">技術實作計劃</span>
+      <span class="badge">後端 · 前端</span>
+      <span class="badge">v1.0</span>
+    </div>
+    <h1>對話記憶 & 歷史回溯功能</h1>
+    <p>Feature 1：多輪對話上下文記憶 ／ Feature 2：關閉視窗後恢復歷史對話</p>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h3>目錄</h3>
+    <ol>
+      <li><a href="#overview">整體架構說明</a></li>
+      <li><a href="#feat1">Feature 1 — 多輪對話上下文（後端）</a></li>
+      <li><a href="#feat2">Feature 2 — 歷史對話恢復（前端）</a></li>
+      <li><a href="#config">Config 參數設計</a></li>
+      <li><a href="#limits">已知限制與後續規劃</a></li>
+      <li><a href="#checklist">測試清單</a></li>
+    </ol>
+  </div>
+
+  <!-- 1. Overview -->
+  <section id="overview">
+    <div class="section-title">
+      <div class="section-number">0</div>
+      整體架構說明
+    </div>
+
+    <h3>現有資料流</h3>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="step-num">Step 1</div>
+        <div class="step-label">前端送出 query</div>
+        <div class="step-note">含 session_id、candidates_info、trait_reports</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="step-num">Step 2</div>
+        <div class="step-label">存入 DB</div>
+        <div class="step-note">session_store.add_message('user', query)</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="step-num">Step 3</div>
+        <div class="step-label">RAG 生成回答</div>
+        <div class="step-note">_call_llm → LLM API</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="step-num">Step 4</div>
+        <div class="step-label">串流回傳</div>
+        <div class="step-note">SSE → 前端 token 累加</div>
+      </div>
+    </div>
+
+    <div class="info-box problem">
+      <div class="icon">⚠️</div>
+      <div>
+        <strong>Feature 1 問題點（後端）：</strong> Step 3 的 <code>_call_llm</code> 每次只帶 system prompt + 當前 query，資料庫裡的歷史訊息從未被讀取並送給 LLM。
+      </div>
+    </div>
+
+    <div class="info-box problem">
+      <div class="icon">⚠️</div>
+      <div>
+        <strong>Feature 2 問題點（前端）：</strong> 歷史側欄已有預覽功能，但預覽面板底部沒有「繼續對話」按鈕，<code>switchContextToPreview()</code> 函式存在卻無 UI 入口。
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="card-header">
+          <span class="card-icon">📁</span>
+          <span class="card-title">Feature 1 修改範圍</span>
+        </div>
+        <div class="card-content">
+          <span class="tag tag-be">後端</span><br><br>
+          <strong>1 個檔案，1 個函式</strong><br>
+          <code>BackEnd/api_v2/services/rag_engine.py</code><br>
+          函式：<code>_call_llm()</code>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="card-header">
+          <span class="card-icon">📁</span>
+          <span class="card-title">Feature 2 修改範圍</span>
+        </div>
+        <div class="card-content">
+          <span class="tag tag-fe">前端</span><br><br>
+          <strong>1 個檔案，1 個位置</strong><br>
+          <code>frontend/chat-widget/src/components/ChatContainer.vue</code><br>
+          位置：預覽面板 <code>.preview-footer</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Feature 1 -->
+  <section id="feat1">
+    <div class="section-title">
+      <div class="section-number">1</div>
+      Feature 1 — 多輪對話上下文（後端）
+    </div>
+
+    <div class="file-tag">
+      📄 BackEnd/api_v2/services/rag_engine.py
+      <span class="line-ref">→ _call_llm() 函式（約第 501 行）</span>
+    </div>
+
+    <h3>修改邏輯</h3>
+
+    <div class="flow">
+      <div class="flow-step">
+        <div class="step-num">已有</div>
+        <div class="step-label">載入 sys_prompt</div>
+        <div class="step-note">候選人特質 + 企業資料</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step highlight">
+        <div class="step-num">新增</div>
+        <div class="step-label">載入歷史訊息</div>
+        <div class="step-note">從 DB 取最近 N 輪 user/assistant</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step highlight">
+        <div class="step-num">新增</div>
+        <div class="step-label">組裝 messages 陣列</div>
+        <div class="step-note">[system, ...history, current_user]</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <div class="step-num">已有</div>
+        <div class="step-label">呼叫 LLM API</div>
+        <div class="step-note">串流回傳</div>
+      </div>
+    </div>
+
+    <h3>關鍵細節：排除當前訊息</h3>
+    <div class="info-box info">
+      <div class="icon">ℹ️</div>
+      <div>
+        <code>routes/chat.py:291</code> 在呼叫 <code>generate_response</code> 之前已執行<br>
+        <code>session_store.add_message(session_id, 'user', query)</code><br><br>
+        因此從 DB 取出的歷史中，最後一條就是當前 query。<strong>必須排除</strong>，否則 LLM 會收到兩次相同的問題。
+      </div>
+    </div>
+
+    <h3>程式碼：修改前</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="lang-label">python</span>
+        <span class="change-label modify">原始版本</span>
+      </div>
+      <pre><code><span class="kw">def</span> <span class="fn">_call_llm</span>(<span class="var">self</span>, <span class="var">sys_prompt</span>, <span class="var">query</span>, <span class="var">uc_id</span>, <span class="var">session_id</span><span class="op">=</span><span class="str">"unknown"</span>):
+    <span class="var">self</span>.<span class="fn">_log_prompt</span>(<span class="var">session_id</span>, <span class="var">uc_id</span>, <span class="var">sys_prompt</span>, <span class="var">query</span>)
+
+    <span class="var">messages</span> <span class="op">=</span> [
+        {<span class="str">"role"</span>: <span class="str">"system"</span>, <span class="str">"content"</span>: <span class="var">sys_prompt</span>.<span class="fn">strip</span>()},
+        {<span class="str">"role"</span>: <span class="str">"user"</span>,   <span class="str">"content"</span>: <span class="var">query</span>}
+    ]
+    <span class="line-comment"># 直接呼叫 LLM，無任何歷史訊息</span></code></pre>
+    </div>
+
+    <h3>程式碼：修改後</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="lang-label">python</span>
+        <span class="change-label add">新增內容</span>
+      </div>
+      <pre><code><span class="kw">def</span> <span class="fn">_call_llm</span>(<span class="var">self</span>, <span class="var">sys_prompt</span>, <span class="var">query</span>, <span class="var">uc_id</span>, <span class="var">session_id</span><span class="op">=</span><span class="str">"unknown"</span>):
+    <span class="var">self</span>.<span class="fn">_log_prompt</span>(<span class="var">session_id</span>, <span class="var">uc_id</span>, <span class="var">sys_prompt</span>, <span class="var">query</span>)
+
+<span class="line-add">    <span class="line-comment"># ── 載入對話歷史 ──────────────────────────────────────────</span></span>
+<span class="line-add">    <span class="var">history_messages</span> <span class="op">=</span> []</span>
+<span class="line-add">    <span class="kw">if</span> <span class="var">session_id</span> <span class="kw">and</span> <span class="var">session_id</span> <span class="op">!=</span> <span class="str">"unknown"</span>:</span>
+<span class="line-add">        <span class="kw">try</span>:</span>
+<span class="line-add">            <span class="kw">from</span> <span class="var">.session_store</span> <span class="kw">import</span> <span class="var">SqlSessionStore</span></span>
+<span class="line-add">            <span class="var">max_turns</span> <span class="op">=</span> <span class="var">current_app</span>.<span class="var">config</span>.<span class="fn">get</span>(<span class="str">'MAX_HISTORY_TURNS'</span>, <span class="num">6</span>)</span>
+<span class="line-add">            <span class="var">db_msgs</span> <span class="op">=</span> <span class="var">SqlSessionStore</span>().<span class="fn">get_messages</span>(<span class="var">session_id</span>)</span>
+<span class="line-add">            <span class="line-comment"># 只保留 user / assistant，排除 system 背景訊息</span></span>
+<span class="line-add">            <span class="var">conv</span> <span class="op">=</span> [<span class="var">m</span> <span class="kw">for</span> <span class="var">m</span> <span class="kw">in</span> <span class="var">db_msgs</span> <span class="kw">if</span> <span class="var">m</span>.<span class="var">role</span> <span class="kw">in</span> (<span class="str">'user'</span>, <span class="str">'assistant'</span>)]</span>
+<span class="line-add">            <span class="line-comment"># 最後一條是剛存入的當前 query，排除避免重複</span></span>
+<span class="line-add">            <span class="kw">if</span> <span class="var">conv</span> <span class="kw">and</span> <span class="var">conv</span>[<span class="op">-</span><span class="num">1</span>].<span class="var">role</span> <span class="op">==</span> <span class="str">'user'</span>:</span>
+<span class="line-add">                <span class="var">conv</span> <span class="op">=</span> <span class="var">conv</span>[:<span class="op">-</span><span class="num">1</span>]</span>
+<span class="line-add">            <span class="line-comment"># 取最近 max_turns 輪（1 輪 = user + assistant 共 2 條）</span></span>
+<span class="line-add">            <span class="var">conv</span> <span class="op">=</span> <span class="var">conv</span>[<span class="op">-</span>(<span class="var">max_turns</span> <span class="op">*</span> <span class="num">2</span>):]</span>
+<span class="line-add">            <span class="var">history_messages</span> <span class="op">=</span> [</span>
+<span class="line-add">                {<span class="str">"role"</span>: <span class="var">m</span>.<span class="var">role</span>, <span class="str">"content"</span>: <span class="var">m</span>.<span class="var">content</span>}</span>
+<span class="line-add">                <span class="kw">for</span> <span class="var">m</span> <span class="kw">in</span> <span class="var">conv</span></span>
+<span class="line-add">            ]</span>
+<span class="line-add">            <span class="var">rag_logger</span>.<span class="fn">info</span>(<span class="str">f"[History] Loaded <span class="op">{</span><span class="fn">len</span>(<span class="var">history_messages</span>)<span class="op">}</span> msgs for session <span class="op">{</span><span class="var">session_id</span><span class="op">}</span>"</span>)</span>
+<span class="line-add">        <span class="kw">except</span> <span class="var">Exception</span> <span class="kw">as</span> <span class="var">e</span>:</span>
+<span class="line-add">            <span class="var">rag_logger</span>.<span class="fn">warning</span>(<span class="str">f"[History] Failed to load history: <span class="op">{</span><span class="var">e</span><span class="op">}</span>"</span>)</span>
+<span class="line-add">    <span class="line-comment"># ──────────────────────────────────────────────────────────</span></span>
+
+    <span class="var">messages</span> <span class="op">=</span> [
+        {<span class="str">"role"</span>: <span class="str">"system"</span>, <span class="str">"content"</span>: <span class="var">sys_prompt</span>.<span class="fn">strip</span>()},
+<span class="line-add">        <span class="op">*</span><span class="var">history_messages</span>,  <span class="line-comment"># 插入歷史輪次</span></span>
+        {<span class="str">"role"</span>: <span class="str">"user"</span>,   <span class="str">"content"</span>: <span class="var">query</span>}
+    ]</code></pre>
+    </div>
+
+    <h3>Token 用量估算（以 deepseek-v4-flash 64K 為例）</h3>
+    <table class="config-table">
+      <thead><tr><th>部分</th><th>估算 Token</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td>System Prompt</td><td>2,000 – 4,000</td><td>候選人特質資料 + 企業背景 + Prompt 模板</td></tr>
+        <tr><td>歷史 6 輪（12 條）</td><td>2,000 – 9,000</td><td>每輪 user ~100 + assistant ~500–1,400 tokens</td></tr>
+        <tr><td>當前 Query</td><td>50 – 200</td><td>使用者提問</td></tr>
+        <tr><td><strong>合計（最壞情況）</strong></td><td class="recommended">~13,200</td><td class="recommended">遠低於 64K 上限，安全</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 3. Feature 2 -->
+  <section id="feat2">
+    <div class="section-title">
+      <div class="section-number">2</div>
+      Feature 2 — 歷史對話恢復（前端）
+    </div>
+
+    <div class="file-tag">
+      📄 frontend/chat-widget/src/components/ChatContainer.vue
+      <span class="line-ref">→ .preview-footer（約第 149 行）</span>
+    </div>
+
+    <h3>現有函式確認</h3>
+    <div class="info-box solution">
+      <div class="icon">✅</div>
+      <div>
+        <code>useChatLogic.js</code> 內 <code>switchContextToPreview()</code> 已實作完整切換邏輯：<br>
+        · 將 <code>currentSessionId</code> 切換為歷史 session ID<br>
+        · 將 <code>messages</code> 替換為歷史訊息<br>
+        · 設定 <code>isSelectionLocked = true</code>（顯示聊天輸入框）<br>
+        · 呼叫 <code>saveSessionToStorage()</code> 持久化狀態<br><br>
+        <strong>只缺一個「繼續對話」按鈕觸發它。</strong>
+      </div>
+    </div>
+
+    <h3>程式碼：修改前</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="lang-label">html (vue template)</span>
+        <span class="change-label modify">原始版本</span>
+      </div>
+      <pre><code><span class="line-comment">&lt;!-- ChatContainer.vue 約第 149 行 --&gt;</span>
+&lt;<span class="kw">div</span> class=<span class="str">"preview-footer"</span>&gt;
+    &lt;<span class="kw">button</span> class=<span class="str">"secondary-btn"</span>
+            @click=<span class="str">"showPreviewPanel = false"</span>&gt;
+        🔙 返回當前對話
+    &lt;/<span class="kw">button</span>&gt;
+    <span class="line-comment">&lt;!-- switchContextToPreview 函式存在但無 UI 入口 --&gt;</span>
+&lt;/<span class="kw">div</span>&gt;</code></pre>
+    </div>
+
+    <h3>程式碼：修改後</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="lang-label">html (vue template)</span>
+        <span class="change-label add">新增按鈕</span>
+      </div>
+      <pre><code>&lt;<span class="kw">div</span> class=<span class="str">"preview-footer"</span>&gt;
+    &lt;<span class="kw">button</span> class=<span class="str">"secondary-btn"</span>
+            @click=<span class="str">"showPreviewPanel = false"</span>&gt;
+        🔙 返回當前對話
+    &lt;/<span class="kw">button</span>&gt;
+<span class="line-add">    &lt;<span class="kw">button</span> class=<span class="str">"primary-btn"</span></span>
+<span class="line-add">            @click=<span class="str">"switchContextToPreview"</span>&gt;</span>
+<span class="line-add">        ▶ 繼續對話</span>
+<span class="line-add">    &lt;/<span class="kw">button</span>&gt;</span>
+&lt;/<span class="kw">div</span>&gt;</code></pre>
+    </div>
+
+    <h3>切換後的資料狀態</h3>
+    <table class="config-table">
+      <thead><tr><th>狀態</th><th>值</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>currentSessionId</code></td><td class="recommended">歷史 session_id</td><td>後續訊息會附加至正確 session</td></tr>
+        <tr><td><code>messages</code></td><td class="recommended">歷史訊息陣列</td><td>對話泡泡正確顯示歷史</td></tr>
+        <tr><td><code>isSelectionLocked</code></td><td class="recommended">true</td><td>顯示聊天輸入框</td></tr>
+        <tr><td><code>activeConversationCandidateIds</code></td><td style="color:var(--warning)">空陣列</td><td>見下方「已知限制」</td></tr>
+        <tr><td><code>trait_reports</code> (sessionStorage)</td><td style="color:var(--warning)">空</td><td>見下方「已知限制」</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 4. Config -->
+  <section id="config">
+    <div class="section-title">
+      <div class="section-number">3</div>
+      Config 參數設計
+    </div>
+
+    <div class="file-tag">
+      📄 BackEnd/api_v2/config/settings.py
+      <span class="line-ref">→ 新增一行</span>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="lang-label">python</span>
+        <span class="change-label add">新增</span>
+      </div>
+      <pre><code><span class="line-comment"># settings.py — 對話歷史上限（單位：輪，1 輪 = user + assistant）</span>
+<span class="line-add"><span class="var">MAX_HISTORY_TURNS</span> <span class="op">=</span> <span class="num">6</span>  <span class="line-comment"># 可依需求調整，建議範圍 4–10</span></span></code></pre>
+    </div>
+
+    <table class="config-table">
+      <thead><tr><th>參數名</th><th>預設值</th><th>建議範圍</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="mono">MAX_HISTORY_TURNS</span></td>
+          <td class="recommended">6</td>
+          <td>4 – 10</td>
+          <td>涵蓋一次完整候選人分析的典型對話輪次；設定越高記憶越長，token 消耗越多</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 5. Limitations -->
+  <section id="limits">
+    <div class="section-title">
+      <div class="section-number">4</div>
+      已知限制與後續規劃
+    </div>
+
+    <h3>V1 已知限制</h3>
+    <ul class="limitation-list">
+      <li>
+        <strong>恢復歷史後，新問題不帶候選人特質資料。</strong><br>
+        恢復後 <code>activeConversationCandidateIds</code> 為空，LLM 只有對話歷史可參考，無法執行新的特質深度分析。使用者若需分析新問題，須重新選取候選人。
+      </li>
+      <li>
+        <strong>context 上限為輪數而非 token 數。</strong><br>
+        極端長回應（如 2,000 字回答）6 輪可能消耗較多 token，但仍在安全範圍內（&lt;15K tokens）。
+      </li>
+    </ul>
+
+    <h3>V2 後續規劃（非本次範圍）</h3>
+    <ul class="limitation-list" style="border-left-color: var(--accent); background: var(--accent-light);">
+      <li>在 <code>switchContextToPreview</code> 中，從 session <code>metadata_.candidates</code> 恢復 candidate IDs，並自動重新 fetch trait reports，讓恢復後的對話能繼續進行特質分析。</li>
+      <li>新增動態 token 計算，當歷史訊息超過閾值時自動截斷最舊輪次（而非固定輪數）。</li>
+    </ul>
+  </section>
+
+  <!-- 6. Checklist -->
+  <section id="checklist">
+    <div class="section-title">
+      <div class="section-number">5</div>
+      測試清單
+    </div>
+
+    <h3>Feature 1 — 上下文記憶</h3>
+    <ul class="checklist">
+      <li><span class="check">☐</span> 第一輪問「分析張三的領導力」，第二輪問「他適合什麼職位？」，確認 AI 回應有提到張三</li>
+      <li><span class="check">☐</span> 連問 7 輪以上，確認第 1 輪的內容不再出現在 messages 陣列（超出 6 輪上限）</li>
+      <li><span class="check">☐</span> 確認 prompts.log 中每次呼叫都包含歷史訊息</li>
+      <li><span class="check">☐</span> 確認 DB 不會存入重複的 user 訊息</li>
+      <li><span class="check">☐</span> 新 session（第一條訊息）正常運作，不因空歷史而報錯</li>
+    </ul>
+
+    <h3>Feature 2 — 歷史恢復</h3>
+    <ul class="checklist">
+      <li><span class="check">☐</span> 完成一次對話後關閉視窗，重新登入，歷史側欄顯示該筆對話</li>
+      <li><span class="check">☐</span> 點擊歷史項目，預覽面板正確顯示歷史訊息</li>
+      <li><span class="check">☐</span> 預覽面板出現「繼續對話」按鈕</li>
+      <li><span class="check">☐</span> 點擊「繼續對話」後，主畫面切換為該歷史 session，顯示聊天輸入框</li>
+      <li><span class="check">☐</span> 在恢復的 session 中輸入新問題，確認回應中 AI 能引用歷史對話內容</li>
+      <li><span class="check">☐</span> <code>currentSessionId</code> 已切換為歷史 session_id（F12 DevTools 確認）</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>Traitty AI — 技術實作計劃 v1.0</span>
+    <span>建立日期：2026-06-16</span>
+  </footer>
+
+</div>
+</body>
+</html>

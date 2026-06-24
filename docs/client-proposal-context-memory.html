@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>功能升級提案：對話記憶 & 歷史回溯</title>
+<style>
+  :root {
+    --primary: #6d28d9;
+    --primary-light: #f5f3ff;
+    --primary-mid: #ddd6fe;
+    --accent: #0284c7;
+    --accent-light: #e0f2fe;
+    --green: #059669;
+    --green-light: #d1fae5;
+    --orange: #d97706;
+    --orange-light: #fef3c7;
+    --surface: #ffffff;
+    --bg: #fafafa;
+    --border: #e5e7eb;
+    --text: #111827;
+    --text-muted: #6b7280;
+    --text-light: #9ca3af;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', 'PingFang TC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 15px;
+  }
+
+  .page-wrapper {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 6rem;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    background: linear-gradient(140deg, #4c1d95 0%, #6d28d9 50%, #7c3aed 100%);
+    border-radius: 20px;
+    padding: 3rem 2.5rem;
+    color: #fff;
+    margin-bottom: 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    right: -60px; top: -60px;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    right: 40px; bottom: -80px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+  .cover-label {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 0.3rem 1rem;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 1.2rem;
+  }
+  .cover h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.6rem;
+    line-height: 1.25;
+    position: relative;
+    z-index: 1;
+  }
+  .cover p {
+    font-size: 1rem;
+    opacity: 0.85;
+    position: relative;
+    z-index: 1;
+    max-width: 520px;
+  }
+  .cover-meta {
+    margin-top: 1.8rem;
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+  }
+  .cover-meta .meta-item { font-size: 0.8rem; opacity: 0.7; }
+  .cover-meta .meta-item strong { display: block; font-size: 1rem; opacity: 1; font-weight: 700; margin-top: 0.15rem; }
+
+  /* ── Section ── */
+  section { margin-bottom: 2.8rem; }
+  .section-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+  }
+  .section-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  p { margin-bottom: 0.9rem; }
+
+  /* ── Feature Cards ── */
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .feature-card-header {
+    padding: 1.4rem 1.6rem 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .feature-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+  .icon-purple { background: var(--primary-light); }
+  .icon-blue { background: var(--accent-light); }
+  .feature-card-header h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+  }
+  .feature-card-header p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  .feature-card-body { padding: 1.2rem 1.6rem 1.4rem; }
+
+  /* ── Before / After ── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin: 1rem 0;
+  }
+  @media (max-width: 560px) { .compare-grid { grid-template-columns: 1fr; } }
+  .compare-box {
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+  }
+  .compare-box.before {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+  }
+  .compare-box.after {
+    background: var(--green-light);
+    border: 1px solid #6ee7b7;
+  }
+  .compare-box .box-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.5rem;
+  }
+  .compare-box.before .box-label { color: #dc2626; }
+  .compare-box.after .box-label { color: var(--green); }
+  .compare-box ul { list-style: none; padding: 0; }
+  .compare-box li {
+    font-size: 0.88rem;
+    padding: 0.3rem 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .compare-box.before li::before { content: '✗'; color: #dc2626; font-weight: 700; flex-shrink: 0; }
+  .compare-box.after li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; }
+
+  /* ── Scenario Mockup ── */
+  .scenario {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem;
+    margin: 1rem 0;
+  }
+  .scenario-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-light);
+    margin-bottom: 0.8rem;
+  }
+  .chat-mock { display: flex; flex-direction: column; gap: 0.6rem; }
+  .chat-bubble {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+  }
+  .chat-bubble.user { flex-direction: row-reverse; }
+  .bubble-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .avatar-user { background: var(--primary); color: #fff; }
+  .avatar-ai { background: var(--primary-mid); color: var(--primary); }
+  .bubble-text {
+    max-width: 75%;
+    padding: 0.55rem 0.85rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .chat-bubble.user .bubble-text {
+    background: var(--primary);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble.ai .bubble-text {
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+  .bubble-highlight {
+    background: rgba(255,235,59,0.3);
+    border-radius: 3px;
+    padding: 0 2px;
+  }
+  .chat-divider {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-light);
+    position: relative;
+    margin: 0.4rem 0;
+  }
+  .chat-divider::before, .chat-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 35%;
+    height: 1px;
+    background: var(--border);
+  }
+  .chat-divider::before { left: 0; }
+  .chat-divider::after { right: 0; }
+
+  /* ── Benefit Chips ── */
+  .benefit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0;
+  }
+  .benefit-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+  }
+  .chip-icon { font-size: 1.3rem; flex-shrink: 0; }
+  .chip-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.15rem; }
+  .chip-desc { font-size: 0.8rem; color: var(--text-muted); }
+
+  /* ── Scope Table ── */
+  .scope-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin: 1rem 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .scope-table th {
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 0.7rem 1rem;
+    text-align: left;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+  .scope-table td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .scope-table tr:nth-child(even) td { background: #fafafa; }
+  .status-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot-green { background: var(--green); }
+  .dot-orange { background: var(--orange); }
+  .dot-blue { background: var(--accent); }
+
+  /* ── Limitation Note ── */
+  .limitation-note {
+    background: var(--orange-light);
+    border: 1px solid #fcd34d;
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    font-size: 0.88rem;
+    display: flex;
+    gap: 0.8rem;
+    margin: 1rem 0;
+  }
+  .limitation-note .note-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+  /* ── CTA ── */
+  .cta-box {
+    background: linear-gradient(135deg, var(--primary-light), var(--accent-light));
+    border: 1px solid var(--primary-mid);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    margin-top: 2.5rem;
+  }
+  .cta-box h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .cta-box p { color: var(--text-muted); font-size: 0.9rem; max-width: 440px; margin: 0 auto 1.2rem; }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-light);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- Cover -->
+  <div class="cover">
+    <div class="cover-label">功能升級提案</div>
+    <h1>讓 AI 記住你們的對話</h1>
+    <p>兩項體驗升級：同一對話自動記憶上下文，以及關閉後隨時回到歷史對話繼續提問。</p>
+    <div class="cover-meta">
+      <div class="meta-item">提案版本 <strong>v1.0</strong></div>
+      <div class="meta-item">提案日期 <strong>2026-06-16</strong></div>
+      <div class="meta-item">功能數量 <strong>2 項</strong></div>
+    </div>
+  </div>
+
+  <!-- 背景說明 -->
+  <section>
+    <div class="section-label">背景</div>
+    <div class="section-title">現在的問題是什麼？</div>
+
+    <p>目前 Traitty AI 在每一次回答時，都是從零開始理解問題，並不知道您剛才問過什麼。這代表：</p>
+
+    <div class="compare-grid">
+      <div class="compare-box before">
+        <div class="box-label">現況（使用者的痛點）</div>
+        <ul>
+          <li>追問時 AI 不記得上一個問題的背景</li>
+          <li>每次都要重新說明「我問的是張三」</li>
+          <li>關閉視窗後，對話內容不見了</li>
+          <li>無法從歷史紀錄繼續上次的分析</li>
+        </ul>
+      </div>
+      <div class="compare-box after">
+        <div class="box-label">升級後</div>
+        <ul>
+          <li>AI 自動記住最近對話，追問不用重複說明</li>
+          <li>可以直接問「他適合嗎？」AI 知道你在說誰</li>
+          <li>歷史側欄保存 30 天對話記錄</li>
+          <li>點一下即可回到上次對話繼續提問</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature 1 -->
+  <section>
+    <div class="section-label">升級項目 1 / 2</div>
+    <div class="section-title">同一對話自動記憶上下文</div>
+
+    <div class="feature-card">
+      <div class="feature-card-header">
+        <div class="feature-icon icon-purple">🧠</div>
+        <div>
+          <h3>多輪對話記憶</h3>
+          <p>AI 在回答時，自動帶入同一對話內最近 6 輪的問答紀錄，讓追問更自然。</p>
+        </div>
+      </div>
+      <div class="feature-card-body">
+
+        <div class="scenario">
+          <div class="scenario-label">使用者情境：升級前 vs 升級後</div>
+          <div class="chat-mock">
+            <div class="chat-bubble user">
+              <div class="bubble-avatar avatar-user">你</div>
+              <div class="bubble-text">幫我分析張三的領導力特質</div>
+            </div>
+            <div class="chat-bubble ai">
+              <div class="bubble-avatar avatar-ai">AI</div>
+              <div class="bubble-text">根據張三的測評結果，他在「規劃統籌」向度得分較高，適合帶領需要系統化執行的團隊……</div>
+            </div>
+            <div class="chat-bubble user">
+              <div class="bubble-avatar avatar-user">你</div>
+              <div class="bubble-text">他適合帶幾個人的團隊？</div>
+            </div>
+
+            <div class="chat-divider">升級前的 AI 回答 ↓</div>
+
+            <div class="chat-bubble ai">
+              <div class="bubble-avatar avatar-ai">AI</div>
+              <div class="bubble-text" style="border-color:#fca5a5; background:#fef2f2;">請問「他」是指哪位候選人？您的需求是什麼職位方向……（不記得上一輪）</div>
+            </div>
+
+            <div class="chat-divider">升級後的 AI 回答 ↓</div>
+
+            <div class="chat-bubble ai">
+              <div class="bubble-avatar avatar-ai">AI</div>
+              <div class="bubble-text">以<span class="bubble-highlight">張三的規劃統籌特質</span>來看，他最適合帶領 3–7 人的小型專案團隊……</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="benefit-grid">
+          <div class="benefit-chip">
+            <span class="chip-icon">💬</span>
+            <div>
+              <div class="chip-title">追問更流暢</div>
+              <div class="chip-desc">不必每次重複說「我問的是誰、什麼職位」</div>
+            </div>
+          </div>
+          <div class="benefit-chip">
+            <span class="chip-icon">🔁</span>
+            <div>
+              <div class="chip-title">比較分析更自然</div>
+              <div class="chip-desc">「和上面提到的李四相比，他如何？」這類問法可正確運作</div>
+            </div>
+          </div>
+          <div class="benefit-chip">
+            <span class="chip-icon">⚙️</span>
+            <div>
+              <div class="chip-title">記憶深度可調</div>
+              <div class="chip-desc">預設記住最近 6 輪問答，可根據需求調整</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature 2 -->
+  <section>
+    <div class="section-label">升級項目 2 / 2</div>
+    <div class="section-title">關閉視窗後仍可回到歷史對話</div>
+
+    <div class="feature-card">
+      <div class="feature-card-header">
+        <div class="feature-icon icon-blue">📋</div>
+        <div>
+          <h3>歷史對話恢復</h3>
+          <p>在左側歷史側欄找到過去的對話，點擊「繼續對話」即可從中斷處接續提問。</p>
+        </div>
+      </div>
+      <div class="feature-card-body">
+
+        <div class="scenario">
+          <div class="scenario-label">操作流程</div>
+          <div class="chat-mock" style="gap: 0.8rem;">
+            <div style="display:flex; align-items:center; gap:0.8rem; background:#fff; border:1px solid var(--border); border-radius:10px; padding:0.8rem;">
+              <span style="font-size:1.2rem;">1️⃣</span>
+              <div>
+                <div style="font-size:0.88rem; font-weight:600;">左側歷史側欄</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">顯示「今天」與「過去 30 天」的對話，以 AI 自動生成的標題呈現（如「張三領導力分析」）</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.8rem; background:#fff; border:1px solid var(--border); border-radius:10px; padding:0.8rem;">
+              <span style="font-size:1.2rem;">2️⃣</span>
+              <div>
+                <div style="font-size:0.88rem; font-weight:600;">點擊任一歷史項目</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">右側彈出預覽面板，顯示完整的歷史對話內容（唯讀檢視）</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.8rem; background:var(--green-light); border:1px solid #6ee7b7; border-radius:10px; padding:0.8rem;">
+              <span style="font-size:1.2rem;">3️⃣</span>
+              <div>
+                <div style="font-size:0.88rem; font-weight:600; color:var(--green);">點擊「▶ 繼續對話」按鈕（新增）</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">主對話畫面切換至該歷史 session，輸入框可直接繼續提問</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="benefit-grid">
+          <div class="benefit-chip">
+            <span class="chip-icon">🗂️</span>
+            <div>
+              <div class="chip-title">30 天對話存檔</div>
+              <div class="chip-desc">所有對話自動保存，不怕誤關視窗</div>
+            </div>
+          </div>
+          <div class="benefit-chip">
+            <span class="chip-icon">🔍</span>
+            <div>
+              <div class="chip-title">標題自動生成</div>
+              <div class="chip-desc">AI 根據對話內容自動命名，方便快速定位</div>
+            </div>
+          </div>
+          <div class="benefit-chip">
+            <span class="chip-icon">▶️</span>
+            <div>
+              <div class="chip-title">一鍵接續對話</div>
+              <div class="chip-desc">不需重新選取候選人，點擊即可繼續提問</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="limitation-note">
+          <span class="note-icon">⚠️</span>
+          <div>
+            <strong>使用說明：</strong>從歷史記錄恢復對話後，AI 能根據過去的問答內容繼續回答。若需要針對候選人進行<strong>新的特質深度分析</strong>，建議重新選取候選人後再開始新對話，以取得最完整的分析結果。
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- 修改範圍 -->
+  <section>
+    <div class="section-label">實作範圍</div>
+    <div class="section-title">這次需要異動的內容</div>
+
+    <table class="scope-table">
+      <thead>
+        <tr>
+          <th>功能</th>
+          <th>異動位置</th>
+          <th>規模</th>
+          <th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>上下文記憶</strong></td>
+          <td>後端 RAG 服務（<code>rag_engine.py</code>）</td>
+          <td>1 個函式，約 15 行新增</td>
+          <td><span class="status-dot"><span class="dot dot-green"></span>可立即實作</span></td>
+        </tr>
+        <tr>
+          <td><strong>歷史對話恢復</strong></td>
+          <td>前端 Widget（<code>ChatContainer.vue</code>）</td>
+          <td>1 個位置，新增 1 個按鈕</td>
+          <td><span class="status-dot"><span class="dot dot-green"></span>可立即實作</span></td>
+        </tr>
+        <tr>
+          <td><strong>記憶輪數設定</strong></td>
+          <td>後端設定檔（<code>settings.py</code>）</td>
+          <td>1 行設定值</td>
+          <td><span class="status-dot"><span class="dot dot-blue"></span>隨 Feature 1 一併設定</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="font-size:0.88rem; color:var(--text-muted);">
+      ✅ 兩項功能的<strong>歷史儲存架構（資料庫、API）均已存在</strong>，本次修改屬於「把資料接通」的性質，不涉及資料庫結構異動或第三方服務串接，風險低。
+    </p>
+  </section>
+
+  <!-- CTA -->
+  <div class="cta-box">
+    <h3>確認後可立即排入開發</h3>
+    <p>兩項功能的後端基礎建設均已就緒，修改範圍集中，開發後建議在測試環境驗收後再部署至正式站。</p>
+  </div>
+
+  <footer>
+    <span>Traitty AI — 功能升級提案</span>
+    <span>文件版本 v1.0 · 2026-06-16</span>
+  </footer>
+
+</div>
+</body>
+</html>

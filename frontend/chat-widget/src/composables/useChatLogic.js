@@ -799,16 +799,10 @@ export function useChatLogic(emit) {
                         await handleLoginSuccess(resp.data)
                         return
                     } else {
-                        const msg = resp.error?.message || 'Response OK but no token found'
-                        throw new Error(msg)
+                        throw new Error('伺服器回應異常，請稍後再試')
                     }
                 } else {
-                    let msg = `Server returned ${res.status}`
-                    try {
-                        const body = await res.json()
-                        if (body.error?.message) msg = body.error.message
-                    } catch (_) { }
-                    throw new Error(msg)
+                    throw new Error(`登入失敗（錯誤碼 ${res.status}），請稍後再試`)
                 }
             } catch (e) {
                 console.warn(`[AutoLogin] Attempt ${attempt}/${maxRetries} failed:`, e.message)
@@ -816,7 +810,7 @@ export function useChatLogic(emit) {
                 if (attempt < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000))
             }
         }
-        autoLoginError.value = `自動登入失敗 (重試 ${maxRetries} 次): ${lastError?.message || '未知錯誤'}`
+        autoLoginError.value = `自動登入失敗，請重新整理頁面或聯繫管理員`
     }
 
     const sendMessage = async (e, isQuick = false) => {

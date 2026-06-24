@@ -56,7 +56,7 @@ class RAGService:
         # 3. Setup LLM Client (LLM / MockConfig)
         api_key = current_app.config.get('LLM_API_KEY')
         api_base = current_app.config.get('LLM_API_BASE')
-        self.model_name = current_app.config.get('LLM_MODEL', 'deepseek-chat')
+        self.model_name = current_app.config.get('LLM_MODEL', 'deepseek-v4-flash')
         
         # Fallback: Retry loading .env if key is missing (Hotfix for loading issue)
         if not api_key:
@@ -501,11 +501,28 @@ class RAGService:
     def _call_llm(self, sys_prompt, query, uc_id, session_id="unknown"):
         # Log the prompt before calling
         self._log_prompt(session_id, uc_id, sys_prompt, query)
-        
+
         rag_logger.debug(f"--- DEBUG RAG SYSTEM PROMPT ---\n{sys_prompt}\n-------------------------")
-        
+
+        history_messages = []
+        if session_id and session_id != "unknown":
+            try:
+                from .session_store import SqlSessionStore
+                max_turns = current_app.config.get('MAX_HISTORY_TURNS', 6)
+                db_msgs = SqlSessionStore().get_messages(session_id)
+                conv = [m for m in db_msgs if m.role in ('user', 'assistant')]
+                # 排除最後一條：chat.py 在呼叫本函式前已將當前 query 存入 DB
+                if conv and conv[-1].role == 'user':
+                    conv = conv[:-1]
+                conv = conv[-(max_turns * 2):]
+                history_messages = [{"role": m.role, "content": m.content} for m in conv]
+                rag_logger.info(f"[History] Loaded {len(history_messages)} msgs for session {session_id}")
+            except Exception as e:
+                rag_logger.warning(f"[History] Failed to load history: {e}")
+
         messages = [
             {"role": "system", "content": sys_prompt.strip()},
+            *history_messages,
             {"role": "user", "content": query}
         ]
 

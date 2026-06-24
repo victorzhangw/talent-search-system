@@ -73,10 +73,10 @@ const handleLogin = async () => {
         if (resp.success && resp.data?.token) {
             emit('login-success', resp.data)
         } else {
-            throw new Error(resp.error?.message || '無法取得 Token')
+            throw new Error('無法取得授權，請稍後再試')
         }
     } catch (e) {
-        errorMsg.value = e.message || '發生錯誤，請稍後再試'
+        errorMsg.value = e.message?.includes('fetch') ? '無法連線至伺服器，請確認網路後重試' : (e.message || '發生錯誤，請稍後再試')
     } finally {
         isLoading.value = false
     }

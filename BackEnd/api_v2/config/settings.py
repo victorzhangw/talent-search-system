@@ -51,8 +51,10 @@ class Config:
     # LLM Settings
     LLM_API_KEY = os.getenv('LLM_API_KEY')
     # Load from .env, with deepseek defaults
-    LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-chat')
+    LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-v4-flash')
     LLM_API_BASE = os.getenv('LLM_API_BASE', 'https://api.deepseek.com/v1')
+    # Conversation history depth (1 turn = user + assistant pair)
+    MAX_HISTORY_TURNS = int(os.getenv('MAX_HISTORY_TURNS', 6))
     
     # External API Settings
     TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE') # Must be provided in .env
