@@ -56,7 +56,7 @@ class RAGService:
         # 3. Setup LLM Client (LLM / MockConfig)
         api_key = current_app.config.get('LLM_API_KEY')
         api_base = current_app.config.get('LLM_API_BASE')
-        self.model_name = current_app.config.get('LLM_MODEL', 'deepseek-v4-flash')
+        self.model_name = current_app.config.get('LLM_MODEL') or 'deepseek-v4-flash'
         
         # Fallback: Retry loading .env if key is missing (Hotfix for loading issue)
         if not api_key:

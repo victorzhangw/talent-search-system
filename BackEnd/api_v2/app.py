@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from .config.settings import Config
 from .database import init_db
@@ -38,6 +38,11 @@ def create_app(config_class=Config):
     @app.route('/health')
     def health_check():
         return {'status': 'ok', 'service': 'Talent Search API v2', 'mode': app.config['INTEGRATION_MODE']}
+
+    @app.route('/widget/<path:filename>')
+    def widget_static(filename):
+        widget_dir = os.path.join(app.static_folder, 'widget')
+        return send_from_directory(widget_dir, filename)
 
     return app
 

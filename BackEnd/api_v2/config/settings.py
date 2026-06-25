@@ -48,9 +48,8 @@ class Config:
     # SQLAlchemy handles Windows paths fine usually, but let's be safe.
     DATABASE_URI = os.getenv('DATABASE_URI', f'sqlite:///{_db_path}')
     
-    # LLM Settings
-    LLM_API_KEY = os.getenv('LLM_API_KEY')
-    # Load from .env, with deepseek defaults
+    # LLM Settings — default mirrors BackEnd/api_v2/.env (DeepSeek)
+    LLM_API_KEY = os.getenv('LLM_API_KEY')                                     # 必填，無預設值：key 遺失時 rag_engine 會報錯而非靜默呼叫錯誤服務
     LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-v4-flash')
     LLM_API_BASE = os.getenv('LLM_API_BASE', 'https://api.deepseek.com/v1')
     # Conversation history depth (1 turn = user + assistant pair)
