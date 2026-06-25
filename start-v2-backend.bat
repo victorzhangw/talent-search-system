@@ -1,34 +1,33 @@
 @echo off
-title Talent Search V2 - Backend API
-echo ===========================================
-echo Starting Talent Search V2 Backend (Port 5000)
-echo ===========================================
+setlocal
+title Backend API - Port 5000
 
 cd /d "%~dp0"
+set "VENV=BackEnd\api_v2\.venv"
 
-set VENV=BackEnd\api_v2\.venv
+:: Check if venv Python is usable
+"%VENV%\Scripts\python.exe" --version >nul 2>&1
+if %errorlevel% equ 0 goto :activate
 
-REM ── Check if venv Python is usable ──────────────────────────────
-%VENV%\Scripts\python.exe --version >nul 2>&1
-if errorlevel 1 (
-    echo [INFO] .venv broken or missing. Recreating with Python 3.13...
-    py -3.13 -m venv %VENV% --clear
-    if errorlevel 1 (
-        echo [ERR] py -3.13 not found. Install Python 3.13 and retry.
-        pause & exit /b 1
-    )
-    echo [INFO] Installing dependencies...
-    %VENV%\Scripts\pip install -r BackEnd\api_v2\requirements.txt
-    if errorlevel 1 (
-        echo [ERR] pip install failed.
-        pause & exit /b 1
-    )
-    echo [OK] venv ready.
+:: Venv missing or broken - recreate with system python
+echo Recreating .venv with system Python...
+python -m venv "%VENV%" --clear
+if %errorlevel% neq 0 (
+    echo [ERR] Failed to create venv. Make sure Python is installed.
+    pause
+    exit /b 1
 )
+echo Installing dependencies (this may take a few minutes)...
+"%VENV%\Scripts\pip.exe" install -r BackEnd\api_v2\requirements.txt
+if %errorlevel% neq 0 (
+    echo [ERR] pip install failed. Check BackEnd\api_v2\requirements.txt
+    pause
+    exit /b 1
+)
+echo venv ready.
 
-call %VENV%\Scripts\activate.bat
-
+:activate
+call "%VENV%\Scripts\activate.bat"
 echo Starting Backend...
 python run_backend.py
-
 pause
