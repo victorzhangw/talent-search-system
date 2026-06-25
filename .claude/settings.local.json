@@ -37,7 +37,9 @@
       "PowerShell(python -c \"import flask, flask_cors, sqlalchemy, openai, yaml, psycopg2; print\\('all OK'\\)\" 2>&1)",
       "PowerShell(Start-Sleep -Seconds 4; Invoke-WebRequest -Uri \"http://localhost:5000/health\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode, Content)",
       "PowerShell(Start-Sleep -Seconds 5; Invoke-WebRequest -Uri \"http://localhost:5300/health\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode)",
-      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:5300/api/docs/\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode, @{N='HasSwagger';E={$_.Content -match 'swagger-ui'}})"
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:5300/api/docs/\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode, @{N='HasSwagger';E={$_.Content -match 'swagger-ui'}})",
+      "Bash(cmd //c \"rd /s /q frontend\\\\\\\\admin-panel\")",
+      "Bash(git rm *)"
     ]
   }
 }

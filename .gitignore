@@ -20,6 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 venv/
+.venv/
 ENV/
 env/
 
@@ -50,6 +51,7 @@ yarn-error.log*
 # 前端建置
 frontend/dist/
 frontend/.vite/
+frontend/chat-widget/releases/
 
 # 日誌
 *.log
