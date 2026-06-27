@@ -3,6 +3,7 @@ from ..utils.response_helpers import ok, err
 import json
 import threading
 import os
+import time
 from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
@@ -265,6 +266,10 @@ def chat():
                        f'Daily token budget exhausted ({used_today}/{daily_limit}). Try again tomorrow.',
                        429)
 
+    # Capture caller IP for logging (shared into generate() via closure)
+    xff = request.headers.get('X-Forwarded-For', '')
+    caller_ip = xff.split(',')[0].strip() if xff else (request.remote_addr or 'unknown')
+
     print(f">>> [DEBUG] Candidate IDs: {candidate_ids}", flush=True)
     print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}, Mode: {mode}", flush=True)
     
@@ -325,9 +330,10 @@ def chat():
             session_store.add_message(session_id, 'user', query)
             conv_logger.info(f"[USER] SessionID: {session_id} | UserID: {user_id} | Content: {query}")
 
+            llm_start = time.time()
             try:
                 response_stream, use_case_id = rag_service.generate_response(
-                    query, candidate_ids, session_id, 
+                    query, candidate_ids, session_id,
                     candidates_info=candidates_info,
                     trait_reports=trait_reports,
                     mode=mode,
@@ -396,7 +402,14 @@ def chat():
                 yield f"data: {json.dumps({'type': 'message_id', 'id': msg_id})}\n\n"
                 
             # Log Assistant Message to File
-            conv_logger.info(f"[AI] SessionID: {session_id} | Content: {full_assistant_content} | Tokens: {prompt_tokens + completion_tokens} (P:{prompt_tokens}, C:{completion_tokens}) | Model: {rag_service.model_name}")
+            latency_ms = int((time.time() - llm_start) * 1000)
+            conv_logger.info(
+                f"[AI] SessionID: {session_id} | UserID: {user_id} | CallerIP: {caller_ip}"
+                f" | UseCase: {use_case_id} | Latency: {latency_ms}ms"
+                f" | Tokens: {prompt_tokens + completion_tokens} (P:{prompt_tokens}, C:{completion_tokens})"
+                f" | Error: {has_llm_error} | Model: {rag_service.model_name}"
+                f" | Content: {full_assistant_content}"
+            )
             
             # --- 扣除額度並即時同步回傳給前端 ---
             if not has_llm_error:
