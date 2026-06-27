@@ -6,7 +6,7 @@ from .database import init_db
 from .extensions import limiter
 
 _LOCALHOST = {'127.0.0.1', '::1', 'localhost'}
-_PROTECTED_PREFIXES = ('/chat', '/api/v2')
+_PROTECTED_PREFIXES = ('/chat',)
 
 def create_app(config_class=Config):
     app = Flask(__name__)
