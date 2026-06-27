@@ -410,6 +410,12 @@ def chat():
                 f" | Error: {has_llm_error} | Model: {rag_service.model_name}"
                 f" | Content: {full_assistant_content}"
             )
+            if has_llm_error:
+                conv_logger.error(
+                    f"[LLM ERROR] SessionID: {session_id} | UserID: {user_id}"
+                    f" | CallerIP: {caller_ip} | UseCase: {use_case_id}"
+                    f" | Model: {rag_service.model_name} | Detail: {full_assistant_content}"
+                )
             
             # --- 扣除額度並即時同步回傳給前端 ---
             if not has_llm_error:
