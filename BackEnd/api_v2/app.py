@@ -15,7 +15,10 @@ def create_app(config_class=Config):
     # Initialize CORS — restrict to allowed origins from env
     _raw = os.getenv('ALLOWED_ORIGINS', '')
     _origins = [o.strip() for o in _raw.split(',') if o.strip()]
-    CORS(app, origins=_origins if _origins else '*', supports_credentials=True)
+    # Always include localhost for local development (safe: prod browsers never originate from localhost)
+    _dev_origins = ['http://localhost:5300', 'http://localhost:5000', 'http://127.0.0.1:5300']
+    _final_origins = list(set(_origins + _dev_origins)) if _origins else '*'
+    CORS(app, origins=_final_origins, supports_credentials=True)
 
     # Initialize Rate Limiter
     limiter.init_app(app)
