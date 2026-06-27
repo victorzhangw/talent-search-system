@@ -39,7 +39,8 @@
       "PowerShell(Start-Sleep -Seconds 5; Invoke-WebRequest -Uri \"http://localhost:5300/health\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode)",
       "PowerShell(Invoke-WebRequest -Uri \"http://localhost:5300/api/docs/\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode, @{N='HasSwagger';E={$_.Content -match 'swagger-ui'}})",
       "Bash(cmd //c \"rd /s /q frontend\\\\\\\\admin-panel\")",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(where python *)"
     ]
   }
 }
