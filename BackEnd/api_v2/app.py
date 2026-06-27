@@ -9,9 +9,27 @@ from .extensions import limiter
 _LOCALHOST = {'127.0.0.1', '::1', 'localhost'}
 _IP_PROTECTED_PATHS = {'/chat/'}  # only the LLM streaming endpoint
 
-def _is_private(ip: str) -> bool:
+def _build_allowlist(entries: list):
+    """Parse ALLOWED_IPS entries into a set of exact IPs and a list of networks (CIDR)."""
+    exact, networks = set(), []
+    for entry in entries:
+        if '/' in entry:
+            try:
+                networks.append(ipaddress.ip_network(entry, strict=False))
+            except ValueError:
+                pass
+        else:
+            exact.add(entry)
+    return exact, networks
+
+def _ip_allowed(client_ip: str, exact: set, networks: list) -> bool:
+    if client_ip in _LOCALHOST:
+        return True
+    if client_ip in exact:
+        return True
     try:
-        return ipaddress.ip_address(ip).is_private
+        addr = ipaddress.ip_address(client_ip)
+        return any(addr in net for net in networks)
     except ValueError:
         return False
 
@@ -31,31 +49,27 @@ def create_app(config_class=Config):
     limiter.init_app(app)
 
     # IP allowlist middleware — applies to /chat/ (LLM call) only
-    allowed_ips = app.config.get('ALLOWED_IPS', [])
+    _exact, _networks = _build_allowlist(app.config.get('ALLOWED_IPS', []))
 
     @app.before_request
     def check_ip():
-        if not allowed_ips:
+        if not _exact and not _networks:
             return  # Disabled when ALLOWED_IPS is not set
 
         # Only enforce on the LLM endpoint (exact match)
         if request.path not in _IP_PROTECTED_PATHS:
             return
 
-        # Resolve real client IP:
-        # X-Forwarded-For may contain a chain; take the first (original client).
-        # Note: only trust X-Forwarded-For if the server is behind a known proxy.
         xff = request.headers.get('X-Forwarded-For', '')
         client_ip = xff.split(',')[0].strip() if xff else request.remote_addr
 
-        if client_ip in _LOCALHOST or _is_private(client_ip):
-            return  # Always allow localhost and internal/private network
+        if _ip_allowed(client_ip, _exact, _networks):
+            return
 
-        if client_ip not in allowed_ips:
-            app.logger.warning(f'[IP Block] {client_ip} -> {request.path}')
-            resp = jsonify({'success': False, 'code': 'FORBIDDEN', 'message': 'Access denied'})
-            resp.status_code = 403
-            return resp
+        app.logger.warning(f'[IP Block] {client_ip} -> {request.path}')
+        resp = jsonify({'success': False, 'code': 'FORBIDDEN', 'message': 'Access denied'})
+        resp.status_code = 403
+        return resp
 
     # Initialize Database
     init_db(app)
