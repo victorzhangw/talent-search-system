@@ -1,9 +1,12 @@
 import os
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 from .config.settings import Config
 from .database import init_db
 from .extensions import limiter
+
+_LOCALHOST = {'127.0.0.1', '::1', 'localhost'}
+_PROTECTED_PREFIXES = ('/chat', '/api/v2')
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -16,6 +19,33 @@ def create_app(config_class=Config):
 
     # Initialize Rate Limiter
     limiter.init_app(app)
+
+    # IP allowlist middleware — applies to /chat/ and /api/v2/* only
+    allowed_ips = app.config.get('ALLOWED_IPS', [])
+
+    @app.before_request
+    def check_ip():
+        if not allowed_ips:
+            return  # Disabled when ALLOWED_IPS is not set
+
+        # Only enforce on protected paths
+        if not request.path.startswith(_PROTECTED_PREFIXES):
+            return
+
+        # Resolve real client IP:
+        # X-Forwarded-For may contain a chain; take the first (original client).
+        # Note: only trust X-Forwarded-For if the server is behind a known proxy.
+        xff = request.headers.get('X-Forwarded-For', '')
+        client_ip = xff.split(',')[0].strip() if xff else request.remote_addr
+
+        if client_ip in _LOCALHOST:
+            return  # Always allow local development
+
+        if client_ip not in allowed_ips:
+            app.logger.warning(f'[IP Block] {client_ip} -> {request.path}')
+            resp = jsonify({'success': False, 'code': 'FORBIDDEN', 'message': 'Access denied'})
+            resp.status_code = 403
+            return resp
 
     # Initialize Database
     init_db(app)

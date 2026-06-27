@@ -56,6 +56,8 @@ class Config:
     MAX_HISTORY_TURNS = int(os.getenv('MAX_HISTORY_TURNS', 6))
     # Daily token budget (all users combined); 0 = unlimited
     DAILY_TOKEN_LIMIT = int(os.getenv('DAILY_TOKEN_LIMIT', 0))
+    # IP allowlist for /chat/ and /api/v2/* — comma-separated; empty = disabled
+    ALLOWED_IPS = [ip.strip() for ip in os.getenv('ALLOWED_IPS', '').split(',') if ip.strip()]
     
     # External API Settings
     TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE') # Must be provided in .env
