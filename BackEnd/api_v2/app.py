@@ -1,4 +1,5 @@
 import os
+import ipaddress
 from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 from .config.settings import Config
@@ -7,6 +8,12 @@ from .extensions import limiter
 
 _LOCALHOST = {'127.0.0.1', '::1', 'localhost'}
 _IP_PROTECTED_PATHS = {'/chat/'}  # only the LLM streaming endpoint
+
+def _is_private(ip: str) -> bool:
+    try:
+        return ipaddress.ip_address(ip).is_private
+    except ValueError:
+        return False
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -41,8 +48,8 @@ def create_app(config_class=Config):
         xff = request.headers.get('X-Forwarded-For', '')
         client_ip = xff.split(',')[0].strip() if xff else request.remote_addr
 
-        if client_ip in _LOCALHOST:
-            return  # Always allow local development
+        if client_ip in _LOCALHOST or _is_private(client_ip):
+            return  # Always allow localhost and internal/private network
 
         if client_ip not in allowed_ips:
             app.logger.warning(f'[IP Block] {client_ip} -> {request.path}')
