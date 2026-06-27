@@ -6,7 +6,7 @@ from .database import init_db
 from .extensions import limiter
 
 _LOCALHOST = {'127.0.0.1', '::1', 'localhost'}
-_PROTECTED_PREFIXES = ('/chat',)
+_IP_PROTECTED_PATHS = {'/chat/'}  # only the LLM streaming endpoint
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -23,7 +23,7 @@ def create_app(config_class=Config):
     # Initialize Rate Limiter
     limiter.init_app(app)
 
-    # IP allowlist middleware — applies to /chat/ and /api/v2/* only
+    # IP allowlist middleware — applies to /chat/ (LLM call) only
     allowed_ips = app.config.get('ALLOWED_IPS', [])
 
     @app.before_request
@@ -31,8 +31,8 @@ def create_app(config_class=Config):
         if not allowed_ips:
             return  # Disabled when ALLOWED_IPS is not set
 
-        # Only enforce on protected paths
-        if not request.path.startswith(_PROTECTED_PREFIXES):
+        # Only enforce on the LLM endpoint (exact match)
+        if request.path not in _IP_PROTECTED_PATHS:
             return
 
         # Resolve real client IP:
