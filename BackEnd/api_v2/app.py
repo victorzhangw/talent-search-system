@@ -1,37 +1,9 @@
 import os
-import ipaddress
 from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
 from .config.settings import Config
 from .database import init_db
 from .extensions import limiter
-
-_LOCALHOST = {'127.0.0.1', '::1', 'localhost'}
-_IP_PROTECTED_PATHS = {'/chat/'}  # only the LLM streaming endpoint
-
-def _build_allowlist(entries: list):
-    """Parse ALLOWED_IPS entries into a set of exact IPs and a list of networks (CIDR)."""
-    exact, networks = set(), []
-    for entry in entries:
-        if '/' in entry:
-            try:
-                networks.append(ipaddress.ip_network(entry, strict=False))
-            except ValueError:
-                pass
-        else:
-            exact.add(entry)
-    return exact, networks
-
-def _ip_allowed(client_ip: str, exact: set, networks: list) -> bool:
-    if client_ip in _LOCALHOST:
-        return True
-    if client_ip in exact:
-        return True
-    try:
-        addr = ipaddress.ip_address(client_ip)
-        return any(addr in net for net in networks)
-    except ValueError:
-        return False
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -40,46 +12,12 @@ def create_app(config_class=Config):
     # Initialize CORS — restrict to allowed origins from env
     _raw = os.getenv('ALLOWED_ORIGINS', '')
     _origins = [o.strip() for o in _raw.split(',') if o.strip()]
-    # Always include localhost for local development (safe: prod browsers never originate from localhost)
     _dev_origins = ['http://localhost:5300', 'http://localhost:5000', 'http://127.0.0.1:5300']
     _final_origins = list(set(_origins + _dev_origins)) if _origins else '*'
     CORS(app, origins=_final_origins, supports_credentials=True)
 
     # Initialize Rate Limiter
     limiter.init_app(app)
-
-    # IP allowlist middleware — applies to /chat/ (LLM call) only
-    _raw_allowed = app.config.get('ALLOWED_IPS', [])
-    _exact, _networks = _build_allowlist(_raw_allowed)
-    print(f"[IP Allowlist] exact={_exact} networks={_networks}", flush=True)
-
-    @app.before_request
-    def check_ip():
-        if not _exact and not _networks:
-            return  # Disabled when ALLOWED_IPS is not set
-
-        # Only enforce on the LLM endpoint (exact match)
-        if request.path not in _IP_PROTECTED_PATHS:
-            return
-
-        xff = request.headers.get('X-Forwarded-For', '')
-        raw_ip = xff.split(',')[0].strip() if xff else (request.remote_addr or '')
-        # Strip port if present: "1.2.3.4:port" → "1.2.3.4", "[::1]:port" → "::1"
-        if raw_ip.startswith('['):
-            client_ip = raw_ip.split(']')[0].lstrip('[')
-        elif raw_ip.count(':') == 1:
-            client_ip = raw_ip.split(':')[0]
-        else:
-            client_ip = raw_ip
-        print(f"[IP Check] client_ip={client_ip!r} xff={xff!r} allowed={_ip_allowed(client_ip, _exact, _networks)}", flush=True)
-
-        if _ip_allowed(client_ip, _exact, _networks):
-            return
-
-        app.logger.warning(f'[IP Block] {client_ip} -> {request.path}')
-        resp = jsonify({'success': False, 'code': 'FORBIDDEN', 'message': 'Access denied'})
-        resp.status_code = 403
-        return resp
 
     # Initialize Database
     init_db(app)

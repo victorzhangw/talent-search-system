@@ -857,10 +857,33 @@ export function useChatLogic(emit) {
             // 快速提問時攜帶 module_id
             const moduleId = currentModuleId.value || null;
 
+            // Obtain a fresh short-lived token before every LLM call
+            let _chatToken = null
+            const _email = window.TRAITTY_WIDGET_CONFIG?.userEmail || ''
+            if (_email) {
+                try {
+                    const _tokenRes = await fetch(`${serverRoot}/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: _email })
+                    })
+                    if (_tokenRes.ok) {
+                        const _tokenData = await _tokenRes.json()
+                        _chatToken = _tokenData.data?.token || null
+                    }
+                } catch (_e) {
+                    console.warn('[Chat] Failed to obtain fresh token:', _e)
+                }
+            }
+            if (!_chatToken) {
+                throw new Error('無法取得認證 Token，請重新整理頁面後再試')
+            }
+
             const response = await fetch(`${serverRoot}/chat/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${_chatToken}`,
                 },
                 body: JSON.stringify({
                     query: query,
