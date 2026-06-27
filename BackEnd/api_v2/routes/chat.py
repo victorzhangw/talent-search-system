@@ -370,7 +370,7 @@ def chat():
                         content = delta.content
                         if content:
                             full_assistant_content += content
-                            if "⚠️ 系統提示：AI 服務暫時無法連線" in content or "由於 LLM 連線失敗" in content:
+                            if "AI 服務暫時無法回應" in content or "由於 LLM 連線失敗" in content:
                                 has_llm_error = True
                             yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
             except Exception as e:

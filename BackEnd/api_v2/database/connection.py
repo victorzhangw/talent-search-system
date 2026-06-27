@@ -13,7 +13,7 @@ db_session = None
 def get_db_url():
     """Construct DB URL from env or default to localhost."""
     user = os.getenv('DB_USER', 'postgres')
-    password = os.getenv('DB_PASSWORD', 'postgres') # Common default, user might need to change
+    password = os.getenv('DB_PASSWORD', '   ') # Common default, user might need to change
     host = os.getenv('DB_HOST', 'localhost')
     port = os.getenv('DB_PORT', '5432')
     dbname = os.getenv('DB_NAME', 'ai_chatbot_v2')

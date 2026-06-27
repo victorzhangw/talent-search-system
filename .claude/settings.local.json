@@ -40,7 +40,13 @@
       "PowerShell(Invoke-WebRequest -Uri \"http://localhost:5300/api/docs/\" -UseBasicParsing -TimeoutSec 5 | Select-Object StatusCode, @{N='HasSwagger';E={$_.Content -match 'swagger-ui'}})",
       "Bash(cmd //c \"rd /s /q frontend\\\\\\\\admin-panel\")",
       "Bash(git rm *)",
-      "Bash(where python *)"
+      "Bash(where python *)",
+      "Bash(BackEnd/api_v2/.venv/Scripts/python.exe -c ' *)",
+      "Bash(git push *)",
+      "Bash(findstr \":5000\")",
+      "Bash(taskkill *)",
+      "Bash(BackEnd/api_v2/.venv/Scripts/python.exe run_backend.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/health)"
     ]
   }
 }

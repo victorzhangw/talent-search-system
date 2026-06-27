@@ -541,16 +541,15 @@ class RAGService:
             return self._mock_stream_fallback(error_msg=str(e)), uc_id
 
     def _mock_stream_fallback(self, error_msg=None):
-        class MockChunk: 
+        # Log the raw error server-side; never expose API details to the frontend.
+        if error_msg:
+            rag_logger.error(f"[LLM Fallback] Raw error suppressed from frontend: {error_msg}")
+
+        class MockChunk:
             def __init__(self, content):
                 self.choices = [type('obj', (object,), {'delta': type('obj', (object,), {'content': content})})]
-        
+
         def generator():
-            if error_msg:
-                 yield MockChunk(f"⚠️ 系統提示：AI 服務暫時無法連線 ({error_msg})。\n\n")
-            else:
-                 yield MockChunk("注意：由於 LLM 連線失敗 (或 Key 設定為 Mock)，以下為模擬回應。\n\n")
-            
-            yield MockChunk("很抱歉，因為後端服務暫時沒有回應，無法為您分析這幾位候選人。\n")
-            yield MockChunk("請稍後再試，或聯繫管理員檢查 API 設定。")
+            yield MockChunk("很抱歉，AI 服務暫時無法回應，請稍後再試。\n")
+            yield MockChunk("如問題持續發生，請聯繫管理員。")
         return generator()
