@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Chatbot API v2 安全強化與監控改善報告</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  /* ── Header ── */
+  .report-header {
+    background: #1d1d1f;
+    color: #f5f5f7;
+    padding: 40px 48px 32px;
+    border-bottom: 4px solid #6a25f4;
+  }
+  .report-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .report-header .meta {
+    font-size: 13px;
+    color: #a1a1a6;
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+  }
+  .report-header .meta span { display: flex; align-items: center; gap: 6px; }
+  .badge {
+    display: inline-block;
+    background: #6a25f4;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 18px 28px;
+    border-bottom: 1px solid #e5e5ea;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-header h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1d1d1f;
+  }
+  .card-header .icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .icon-purple { background: #f2ecff; }
+  .icon-red    { background: #fff0f0; }
+  .icon-blue   { background: #e8f4ff; }
+  .icon-green  { background: #e8fff0; }
+  .icon-orange { background: #fff4e0; }
+  .card-body { padding: 24px 28px; }
+
+  /* ── Cost Alert ── */
+  .cost-alert {
+    border: 2px solid #ff3b30;
+    border-radius: 14px;
+    background: #fff8f8;
+    overflow: hidden;
+  }
+  .cost-alert .card-header { border-bottom-color: #ffcdd2; background: #fff0f0; }
+  .cost-alert .card-header h2 { color: #c0392b; }
+  .cost-amount {
+    font-size: 48px;
+    font-weight: 800;
+    color: #ff3b30;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .cost-period { font-size: 14px; color: #666; margin-bottom: 20px; }
+  .cost-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .cost-stat {
+    background: #fff;
+    border: 1px solid #ffcdd2;
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+  .cost-stat .label { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cost-stat .value { font-size: 18px; font-weight: 700; color: #1d1d1f; margin-top: 4px; }
+
+  /* ── Root cause list ── */
+  .vuln-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .vuln-list li {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 16px;
+    background: #fafafa;
+    border: 1px solid #e5e5ea;
+    border-radius: 10px;
+  }
+  .vuln-list li .num {
+    width: 24px; height: 24px; min-width: 24px;
+    background: #ff3b30; color: #fff;
+    border-radius: 50%;
+    font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .vuln-list li .desc { font-size: 14px; line-height: 1.5; }
+  .vuln-list li .desc strong { color: #1d1d1f; display: block; margin-bottom: 2px; }
+  .vuln-list li .desc span { color: #666; font-size: 13px; }
+
+  /* ── Change timeline ── */
+  .change-list { display: flex; flex-direction: column; gap: 0; }
+  .change-item {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 0;
+    border-bottom: 1px solid #f0f0f5;
+  }
+  .change-item:last-child { border-bottom: none; }
+  .change-tag {
+    padding: 16px 16px 16px 0;
+    display: flex; align-items: flex-start; justify-content: flex-end;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 5px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .tag-purple { background: #f2ecff; color: #6a25f4; }
+  .tag-blue   { background: #e8f4ff; color: #0071e3; }
+  .tag-green  { background: #e8fff0; color: #1a9f4e; }
+  .tag-orange { background: #fff4e0; color: #d4700a; }
+  .tag-red    { background: #fff0f0; color: #d0312d; }
+  .tag-gray   { background: #f0f0f5; color: #555; }
+
+  .change-content { padding: 16px 0 16px 20px; border-left: 2px solid #e5e5ea; }
+  .change-title { font-size: 15px; font-weight: 600; color: #1d1d1f; margin-bottom: 4px; }
+  .change-desc  { font-size: 13px; color: #555; margin-bottom: 8px; line-height: 1.6; }
+  .change-files { display: flex; flex-wrap: wrap; gap: 6px; }
+  .file-chip {
+    font-size: 11px; font-family: "SF Mono", "Fira Code", Consolas, monospace;
+    background: #f5f5f7; border: 1px solid #e5e5ea;
+    border-radius: 5px; padding: 2px 8px; color: #444;
+  }
+  .file-chip.new { border-color: #b8f0d0; background: #f0fff7; color: #1a9f4e; }
+  .env-chip {
+    font-size: 11px; font-family: "SF Mono", "Fira Code", Consolas, monospace;
+    background: #fffbe8; border: 1px solid #ffe58f;
+    border-radius: 5px; padding: 2px 8px; color: #a16207;
+  }
+
+  /* ── Before / After table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead tr { background: #f5f5f7; }
+  thead th {
+    text-align: left; padding: 10px 16px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.4px; color: #888;
+    border-bottom: 2px solid #e5e5ea;
+  }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid #f0f0f5; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  .layer { font-weight: 600; color: #1d1d1f; }
+  .before { color: #d0312d; }
+  .after  { color: #1a9f4e; font-weight: 500; }
+  .check  { color: #1a9f4e; font-weight: 700; }
+  .cross  { color: #d0312d; font-weight: 700; }
+
+  /* ── Remaining items ── */
+  .todo-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .todo-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 16px;
+    background: #fffbe8; border: 1px solid #ffe58f; border-radius: 10px;
+  }
+  .todo-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+  .todo-text strong { display: block; font-size: 14px; color: #1d1d1f; margin-bottom: 2px; }
+  .todo-text span { font-size: 13px; color: #666; }
+
+  /* ── Commit log ── */
+  .commit-list { list-style: none; display: flex; flex-direction: column; gap: 0; }
+  .commit-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f5;
+    font-size: 13px;
+  }
+  .commit-item:last-child { border-bottom: none; }
+  .commit-hash {
+    font-family: "SF Mono", "Fira Code", Consolas, monospace;
+    font-size: 12px; background: #f0f0f5;
+    padding: 2px 7px; border-radius: 4px;
+    color: #555; flex-shrink: 0; white-space: nowrap;
+  }
+  .commit-msg { color: #1d1d1f; line-height: 1.4; }
+  .commit-type {
+    font-size: 11px; font-weight: 600; padding: 2px 7px;
+    border-radius: 4px; flex-shrink: 0; white-space: nowrap;
+  }
+  .type-feat   { background: #f2ecff; color: #6a25f4; }
+  .type-fix    { background: #e8f4ff; color: #0071e3; }
+  .type-chore  { background: #f0f0f5; color: #555; }
+
+  /* ── Footer ── */
+  .report-footer {
+    text-align: center;
+    font-size: 12px;
+    color: #aaa;
+    padding-top: 24px;
+    border-top: 1px solid #e5e5ea;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
+<div class="report-header">
+  <h1>AI Chatbot API v2 安全強化與監控改善報告</h1>
+  <div class="meta">
+    <span>&#128197; 生成日期：2026-06-27</span>
+    <span>&#127959; 專案：talent-search-system</span>
+    <span>&#127811; 分支：feature/mobile-style-desktop</span>
+    <span><span class="badge">DeepSeek API</span></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════════ 1. COST ALERT ═══════════════════ -->
+  <div class="card cost-alert">
+    <div class="card-header">
+      <div class="icon icon-red" style="background:#fff0f0;">&#9888;</div>
+      <h2>API Token 費用警示</h2>
+    </div>
+    <div class="card-body">
+      <div class="cost-amount">$71 USD</div>
+      <div class="cost-period">統計區間：2026 年 6 月 1 日 — 2026 年 6 月 26 日（26 天）</div>
+      <p style="font-size:14px;color:#555;line-height:1.7;">
+        用量不高的服務期間，DeepSeek Token 消耗異常暴增，觸發此次緊急代碼審查。<br>
+        根本原因：後端 <code style="background:#ffd7d7;padding:1px 5px;border-radius:3px;">/chat/</code> 端點完全開放，無任何身份驗證、速率限制或來源限制，任何人只要知道 URL 即可無限呼叫 LLM API，費用由服務端全額承擔。
+      </p>
+      <div class="cost-grid">
+        <div class="cost-stat">
+          <div class="label">使用模型</div>
+          <div class="value">deepseek-v4-flash</div>
+        </div>
+        <div class="cost-stat">
+          <div class="label">API 供應商</div>
+          <div class="value">DeepSeek Official</div>
+        </div>
+        <div class="cost-stat">
+          <div class="label">目前狀態</div>
+          <div class="value" style="color:#d0312d;">餘額不足（402）</div>
+        </div>
+        <div class="cost-stat">
+          <div class="label">每日 Token 預算（新）</div>
+          <div class="value">50,000 tokens</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 2. ROOT CAUSE ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-red">&#128270;</div>
+      <h2>根本原因分析 — 安全缺口</h2>
+    </div>
+    <div class="card-body">
+      <ul class="vuln-list">
+        <li>
+          <span class="num">1</span>
+          <div class="desc">
+            <strong>/chat/ 端點無任何認證</strong>
+            <span>任何人只要知道 API URL，即可不限次數直接呼叫 LLM。沒有 API Key、沒有 Session Token 驗證。</span>
+          </div>
+        </li>
+        <li>
+          <span class="num">2</span>
+          <div class="desc">
+            <strong>CORS 完全開放（<code>CORS(app)</code>，無 origins 限制）</strong>
+            <span>任何網域的瀏覽器都可以對後端發出跨域請求，等同無 CORS 防護。</span>
+          </div>
+        </li>
+        <li>
+          <span class="num">3</span>
+          <div class="desc">
+            <strong>/auth/login 無密碼驗證</strong>
+            <span>登入端點接受任意 email，不核對密碼即可取得 session token，無法有效識別合法用戶。</span>
+          </div>
+        </li>
+        <li>
+          <span class="num">4</span>
+          <div class="desc">
+            <strong>無 Rate Limiting</strong>
+            <span>同一 IP 或用戶可在短時間內發出無數請求，無任何頻率保護。</span>
+          </div>
+        </li>
+        <li>
+          <span class="num">5</span>
+          <div class="desc">
+            <strong>無每日 Token 預算上限</strong>
+            <span>LLM 費用完全無上限控制，費用異常時沒有任何自動熔斷機制。</span>
+          </div>
+        </li>
+        <li>
+          <span class="num">6</span>
+          <div class="desc">
+            <strong>無 IP 來源限制</strong>
+            <span>系統僅應被特定伺服器（UAT/App 後端）呼叫，但實際上任何 IP 皆可存取。</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 3. CHANGES ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-purple">&#128295;</div>
+      <h2>各項修改詳情</h2>
+    </div>
+    <div class="card-body" style="padding:0 28px;">
+      <div class="change-list">
+
+        <!-- T2 CORS -->
+        <div class="change-item">
+          <div class="change-tag"><span class="tag tag-purple">T2</span></div>
+          <div class="change-content">
+            <div class="change-title">CORS 來源白名單</div>
+            <div class="change-desc">
+              將 <code>CORS(app)</code> 改為僅允許環境變數 <code>ALLOWED_ORIGINS</code> 列出的網域。<br>
+              本機開發用的 <code>localhost:5300</code>、<code>localhost:5000</code>、<code>127.0.0.1:5300</code> 自動加入例外，不受環境變數影響。
+            </div>
+            <div class="change-files">
+              <span class="file-chip">BackEnd/api_v2/app.py</span>
+              <span class="env-chip">ALLOWED_ORIGINS=https://uat.traitty.com,https://app.traitty.com</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- T3 Rate Limiting -->
+        <div class="change-item">
+          <div class="change-tag"><span class="tag tag-blue">T3</span></div>
+          <div class="change-content">
+            <div class="change-title">Rate Limiting（速率限制）</div>
+            <div class="change-desc">
+              引入 <strong>flask-limiter 4.1.1</strong>，對 <code>/chat/</code> 路由套用：每用戶 <strong>30 次/小時、150 次/天</strong>。<br>
+              限速 Key 優先使用 <code>user_id</code>（請求 body），無則退回 IP。超限回傳 429。<br>
+              新建 <code>extensions.py</code> 避免 <code>app.py</code> ↔ <code>routes/chat.py</code> 循環匯入。
+            </div>
+            <div class="change-files">
+              <span class="file-chip new">BackEnd/api_v2/extensions.py（新建）</span>
+              <span class="file-chip">BackEnd/api_v2/routes/chat.py</span>
+              <span class="file-chip">BackEnd/api_v2/requirements.txt</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- T4 Token Budget -->
+        <div class="change-item">
+          <div class="change-tag"><span class="tag tag-orange">T4</span></div>
+          <div class="change-content">
+            <div class="change-title">每日 Token 預算上限</div>
+            <div class="change-desc">
+              在 <code>chat()</code> 函式開頭，查詢當日 <code>ChatMessage.token_usage</code> 累計值。<br>
+              若超過 <code>DAILY_TOKEN_LIMIT</code> 立即回傳 429（QUOTA_EXCEEDED），不呼叫 LLM。<br>
+              重置時間：UTC 00:00（每日自動歸零）。
+            </div>
+            <div class="change-files">
+              <span class="file-chip">BackEnd/api_v2/routes/chat.py</span>
+              <span class="file-chip">BackEnd/api_v2/config/settings.py</span>
+              <span class="env-chip">DAILY_TOKEN_LIMIT=50000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- IP Allowlist -->
+        <div class="change-item">
+          <div class="change-tag"><span class="tag tag-red">IP</span></div>
+          <div class="change-content">
+            <div class="change-title">IP 白名單中介層</div>
+            <div class="change-desc">
+              <code>before_request</code> middleware 對 <code>/chat/</code> 及 <code>/api/v2/*</code> 路徑執行 IP 驗證。<br>
+              讀取 <code>X-Forwarded-For</code> 首個 IP（支援 Proxy 環境），不符合白名單回傳 403。<br>
+              <code>127.0.0.1</code>、<code>::1</code>、<code>localhost</code> 永遠放行（本機開發例外）。
+            </div>
+            <div class="change-files">
+              <span class="file-chip">BackEnd/api_v2/app.py</span>
+              <span class="env-chip">ALLOWED_IPS=3.169.55.15,54.192.248.91</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Logging -->
+        <div class="change-item">
+          <div class="change-tag"><span class="tag tag-gray">LOG</span></div>
+          <div class="change-content">
+            <div class="change-title">LLM 呼叫記錄強化</div>
+            <div class="change-desc">
+              <code>conversations.log</code> 每筆 <code>[AI]</code> 記錄新增四個欄位，方便事後稽核與計費分析：
+            </div>
+            <div class="change-files" style="margin-bottom:8px;">
+              <span class="file-chip">CallerIP</span>
+              <span class="file-chip">UseCase</span>
+              <span class="file-chip">Latency (ms)</span>
+              <span class="file-chip">Error (bool)</span>
+              <span class="file-chip">BackEnd/api_v2/routes/chat.py</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Log -->
+        <div class="change-item">
+          <div class="change-tag"><span class="tag tag-red">ERR</span></div>
+          <div class="change-content">
+            <div class="change-title">LLM 錯誤獨立 ERROR 記錄</div>
+            <div class="change-desc">
+              當 LLM 呼叫失敗（<code>has_llm_error = True</code>）時，額外在 <code>conversations.log</code> 寫入 <strong>ERROR 級別</strong>的 <code>[LLM ERROR]</code> 條目，方便監控系統過濾告警，不需掃描全部 INFO 記錄。
+            </div>
+            <div class="change-files">
+              <span class="file-chip">BackEnd/api_v2/routes/chat.py</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- UX Error Sanitize -->
+        <div class="change-item">
+          <div class="change-tag"><span class="tag tag-green">UX</span></div>
+          <div class="change-content">
+            <div class="change-title">前端錯誤訊息脫敏</div>
+            <div class="change-desc">
+              <code>_mock_stream_fallback()</code> 不再將原始 API 錯誤字串（如 <code>Error code: 402 - {'error': {'message': 'Insufficient Balance'...}}</code>）串流至前端。<br>
+              使用者改看乾淨的中文提示，原始錯誤僅記錄至後端 <code>rag_service.log</code>。
+            </div>
+            <div class="change-files">
+              <span class="file-chip">BackEnd/api_v2/services/rag_engine.py</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 4. BEFORE / AFTER ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-blue">&#9878;</div>
+      <h2>防護層級對照：修改前 vs 修改後</h2>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:160px;">防護層級</th>
+            <th>修改前</th>
+            <th>修改後</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="layer">CORS</td>
+            <td><span class="cross">✗</span> <span class="before">完全開放（任何網域）</span></td>
+            <td><span class="check">✓</span> <span class="after">白名單限制：uat / app.traitty.com + localhost 開發例外</span></td>
+          </tr>
+          <tr>
+            <td class="layer">Rate Limit</td>
+            <td><span class="cross">✗</span> <span class="before">無任何限制</span></td>
+            <td><span class="check">✓</span> <span class="after">30 次/小時、150 次/天（per user_id，fallback to IP）</span></td>
+          </tr>
+          <tr>
+            <td class="layer">Token 預算</td>
+            <td><span class="cross">✗</span> <span class="before">無上限</span></td>
+            <td><span class="check">✓</span> <span class="after">50,000 tokens / 天（全站合計，超限 429）</span></td>
+          </tr>
+          <tr>
+            <td class="layer">IP 限制</td>
+            <td><span class="cross">✗</span> <span class="before">任何 IP 可存取</span></td>
+            <td><span class="check">✓</span> <span class="after">僅允許 3.169.55.15、54.192.248.91 + 本機</span></td>
+          </tr>
+          <tr>
+            <td class="layer">LLM 錯誤記錄</td>
+            <td><span class="cross">✗</span> <span class="before">僅 print()，無結構化記錄</span></td>
+            <td><span class="check">✓</span> <span class="after">conversations.log ERROR 級別 [LLM ERROR] + rag_service.log</span></td>
+          </tr>
+          <tr>
+            <td class="layer">前端錯誤訊息</td>
+            <td><span class="cross">✗</span> <span class="before">暴露原始 API 錯誤 JSON（含 error code）</span></td>
+            <td><span class="check">✓</span> <span class="after">只顯示中文提示，技術細節僅保留於後端 log</span></td>
+          </tr>
+          <tr>
+            <td class="layer">呼叫記錄</td>
+            <td><span class="cross">✗</span> <span class="before">無 IP / 延遲 / 用例 / 錯誤旗標</span></td>
+            <td><span class="check">✓</span> <span class="after">CallerIP、UseCase、Latency ms、Error flag 全數記錄</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 5. TODO ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-orange">&#9200;</div>
+      <h2>遺留項目（建議後續處理）</h2>
+    </div>
+    <div class="card-body">
+      <ul class="todo-list">
+        <li class="todo-item">
+          <div class="todo-icon">&#128274;</div>
+          <div class="todo-text">
+            <strong>T1 — JWT / Bearer Token 驗證套用至 /chat/</strong>
+            <span>目前 /chat/ 仍未驗證 Authorization header。需前端在每次 LLM 請求附上 Bearer Token，後端驗證合法性後才允許呼叫。需前後端協調實作。</span>
+          </div>
+        </li>
+        <li class="todo-item">
+          <div class="todo-icon">&#128273;</div>
+          <div class="todo-text">
+            <strong>/auth/login 無密碼驗證</strong>
+            <span>目前任意 email 即可取得 session token，建議加入 email 白名單、一次性密碼（OTP）或 API Secret 驗證。</span>
+          </div>
+        </li>
+        <li class="todo-item">
+          <div class="todo-icon">&#128421;</div>
+          <div class="todo-text">
+            <strong>TraitReportModal.vue 硬編碼 localhost:5000</strong>
+            <span>前端元件內有 <code>http://localhost:5000</code> 硬編碼，部署至生產環境後 API 呼叫會失效，應改用環境變數或相對路徑。</span>
+          </div>
+        </li>
+        <li class="todo-item">
+          <div class="todo-icon">&#128200;</div>
+          <div class="todo-text">
+            <strong>DeepSeek API Key 餘額不足（402 Error）</strong>
+            <span>目前 API Key 餘額已耗盡，需前往 DeepSeek 平台充值，或替換至有效 Key，才能恢復 LLM 正常功能。</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 6. GIT COMMITS ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-purple">&#128640;</div>
+      <h2>相關 Git Commits</h2>
+    </div>
+    <div class="card-body" style="padding:16px 28px;">
+      <ul class="commit-list">
+        <li class="commit-item">
+          <span class="commit-type type-fix">fix</span>
+          <span class="commit-hash">e1e25f1</span>
+          <span class="commit-msg">fix(ux): hide raw LLM API error details from frontend</span>
+        </li>
+        <li class="commit-item">
+          <span class="commit-type type-feat">feat</span>
+          <span class="commit-hash">68369b7</span>
+          <span class="commit-msg">feat(logging): log LLM API errors at ERROR level in conversations.log</span>
+        </li>
+        <li class="commit-item">
+          <span class="commit-type type-fix">fix</span>
+          <span class="commit-hash">800b08b</span>
+          <span class="commit-msg">fix(cors): always allow localhost:5300/5000 origins for local dev</span>
+        </li>
+        <li class="commit-item">
+          <span class="commit-type type-feat">feat</span>
+          <span class="commit-hash">02a4bf1</span>
+          <span class="commit-msg">feat(logging): add caller_ip, use_case_id, latency_ms, error flag to conversations.log</span>
+        </li>
+        <li class="commit-item">
+          <span class="commit-type type-feat">feat</span>
+          <span class="commit-hash">ddc4587</span>
+          <span class="commit-msg">feat(security): add server-side IP allowlist middleware for /chat/ and /api/v2/*</span>
+        </li>
+        <li class="commit-item">
+          <span class="commit-type type-feat">feat</span>
+          <span class="commit-hash">26e929b</span>
+          <span class="commit-msg">feat(security): add CORS origin whitelist, rate limiting, daily token budget (T2+T3+T4)</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="report-footer">
+    生成時間：2026-06-27 &nbsp;|&nbsp; 分支：feature/mobile-style-desktop &nbsp;|&nbsp; 由 Claude Sonnet 4.6 輔助生成
+  </div>
+
+</div>
+</body>
+</html>
