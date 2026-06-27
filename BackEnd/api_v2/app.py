@@ -3,13 +3,19 @@ from flask import Flask, send_from_directory
 from flask_cors import CORS
 from .config.settings import Config
 from .database import init_db
+from .extensions import limiter
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    # Initialize CORS
-    CORS(app)
+    # Initialize CORS — restrict to allowed origins from env
+    _raw = os.getenv('ALLOWED_ORIGINS', '')
+    _origins = [o.strip() for o in _raw.split(',') if o.strip()]
+    CORS(app, origins=_origins if _origins else '*', supports_credentials=True)
+
+    # Initialize Rate Limiter
+    limiter.init_app(app)
 
     # Initialize Database
     init_db(app)

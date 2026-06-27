@@ -3,13 +3,16 @@ from ..utils.response_helpers import ok, err
 import json
 import threading
 import os
+from datetime import datetime
+from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
 from ..services.session_store import SqlSessionStore
 from ..database.connection import get_db_session
-from ..database.models import ChatSession
+from ..database.models import ChatSession, ChatMessage
 from ..database import db_session
 from ..utils.logger import get_conversation_logger
+from ..extensions import limiter
 
 conv_logger = get_conversation_logger()
 
@@ -206,7 +209,21 @@ def update_message_rating(message_id):
     else:
         return err('NOT_FOUND', 'Message not found or update failed', 404)
 
+def _chat_rate_key():
+    """Rate limit key: prefer user_id from body, fall back to IP."""
+    try:
+        body = request.get_json(silent=True) or {}
+        uid = body.get('user_id', '').strip()
+        if uid and uid != 'anonymous':
+            return uid
+    except Exception:
+        pass
+    from flask_limiter.util import get_remote_address
+    return get_remote_address()
+
+
 @bp.route('/', methods=['POST'])
+@limiter.limit("30 per hour;150 per day", key_func=_chat_rate_key)
 def chat():
     print(">>> [DEBUG] /chat/ endpoint called", flush=True)
     try:
@@ -222,14 +239,31 @@ def chat():
     trait_reports = data.get('trait_reports', {})  # NEW: Trait reports from frontend Session Storage
     session_id = data.get('session_id', 'default_session')
     user_id = data.get('user_id') # Copied from frontend config email
-    
+
     mode = data.get('mode', 'explanation') # Default to explanation if not provided
     module_id = data.get('module_id')  # 快速提問模組 ID（如 recruit_interview），自由提問時為 None
-    
+
     print(f"[Chat] Received trait_reports for {len(trait_reports)} candidates, module_id={module_id}", flush=True)
-    
+
     if not query:
         return err('MISSING_FIELD', 'Query is required', 400, field='query')
+
+    # T4 — Daily token budget check (global across all users)
+    daily_limit = current_app.config.get('DAILY_TOKEN_LIMIT', 0)
+    if daily_limit and daily_limit > 0:
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        db = get_db_session()
+        try:
+            used_today = db.query(func.sum(ChatMessage.token_usage))\
+                .filter(ChatMessage.created_at >= today_start)\
+                .scalar() or 0
+        finally:
+            db.close()
+        if used_today >= daily_limit:
+            print(f"[T4] Daily token limit reached: {used_today}/{daily_limit}", flush=True)
+            return err('QUOTA_EXCEEDED',
+                       f'Daily token budget exhausted ({used_today}/{daily_limit}). Try again tomorrow.',
+                       429)
 
     print(f">>> [DEBUG] Candidate IDs: {candidate_ids}", flush=True)
     print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}, Mode: {mode}", flush=True)

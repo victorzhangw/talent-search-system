@@ -54,6 +54,8 @@ class Config:
     LLM_API_BASE = os.getenv('LLM_API_BASE', 'https://api.deepseek.com/v1')
     # Conversation history depth (1 turn = user + assistant pair)
     MAX_HISTORY_TURNS = int(os.getenv('MAX_HISTORY_TURNS', 6))
+    # Daily token budget (all users combined); 0 = unlimited
+    DAILY_TOKEN_LIMIT = int(os.getenv('DAILY_TOKEN_LIMIT', 0))
     
     # External API Settings
     TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE') # Must be provided in .env
