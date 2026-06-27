@@ -49,7 +49,9 @@ def create_app(config_class=Config):
     limiter.init_app(app)
 
     # IP allowlist middleware — applies to /chat/ (LLM call) only
-    _exact, _networks = _build_allowlist(app.config.get('ALLOWED_IPS', []))
+    _raw_allowed = app.config.get('ALLOWED_IPS', [])
+    _exact, _networks = _build_allowlist(_raw_allowed)
+    print(f"[IP Allowlist] exact={_exact} networks={_networks}", flush=True)
 
     @app.before_request
     def check_ip():
@@ -61,7 +63,15 @@ def create_app(config_class=Config):
             return
 
         xff = request.headers.get('X-Forwarded-For', '')
-        client_ip = xff.split(',')[0].strip() if xff else request.remote_addr
+        raw_ip = xff.split(',')[0].strip() if xff else (request.remote_addr or '')
+        # Strip port if present: "1.2.3.4:port" → "1.2.3.4", "[::1]:port" → "::1"
+        if raw_ip.startswith('['):
+            client_ip = raw_ip.split(']')[0].lstrip('[')
+        elif raw_ip.count(':') == 1:
+            client_ip = raw_ip.split(':')[0]
+        else:
+            client_ip = raw_ip
+        print(f"[IP Check] client_ip={client_ip!r} xff={xff!r} allowed={_ip_allowed(client_ip, _exact, _networks)}", flush=True)
 
         if _ip_allowed(client_ip, _exact, _networks):
             return
