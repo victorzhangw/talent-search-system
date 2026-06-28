@@ -46,7 +46,10 @@
       "Bash(findstr \":5000\")",
       "Bash(taskkill *)",
       "Bash(BackEnd/api_v2/.venv/Scripts/python.exe run_backend.py)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/health)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/health)",
+      "Bash(BackEnd/api_v2/.venv/Scripts/python.exe -c \"import py_compile; py_compile.compile\\('BackEnd/api_v2/app.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(curl -s -i -X POST https://devzoneapi1.aurocore.com/auth/login -H 'Content-Type: application/json' -H 'Origin: https://uat.traitty.com' -d '{\"email\":\"fakeemail@notexist.com\"}' --max-time 15)",
+      "PowerShell(git push *)"
     ]
   }
 }
