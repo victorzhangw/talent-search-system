@@ -814,7 +814,7 @@ export function useChatLogic(emit) {
     }
 
     const sendMessage = async (e, isQuick = false) => {
-        if (e && e.shiftKey) return;
+        if (e && (e.shiftKey || e.isComposing)) return;
 
         const query = inputQuery.value.trim()
         if (!query || isTyping.value) return
