@@ -915,6 +915,9 @@ export function useChatLogic(emit) {
                 if (response.status === 504 || response.status === 503 || response.status === 524) {
                     throw new Error("TIMEOUT_RESPONSE")
                 }
+                if (response.status === 429) {
+                    throw new Error("QUOTA_EXCEEDED")
+                }
                 throw new Error(`API Error: ${response.status}`)
             }
 
@@ -962,7 +965,11 @@ export function useChatLogic(emit) {
             console.error(e)
             const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
             if (aiMsgIndex !== -1) {
-                messages.value[aiMsgIndex].content += "\n\n(發生錯誤，請重試)"
+                if (e.message === 'QUOTA_EXCEEDED') {
+                    messages.value[aiMsgIndex].content = '今日使用額度已達上限，請明天再試。'
+                } else {
+                    messages.value[aiMsgIndex].content += '\n\n(發生錯誤，請重試)'
+                }
             }
         } finally {
             const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)

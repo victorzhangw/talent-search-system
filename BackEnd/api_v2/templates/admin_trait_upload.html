@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traitty 特質定義管理</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f6fa; color: #2d2d2d; min-height: 100vh; }
+
+  /* Layout */
+  .app-wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+  .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.07); padding: 28px; margin-bottom: 24px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #1a1a2e; }
+  h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #444; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+
+  /* Login */
+  .login-wrap { max-width: 380px; margin: 80px auto 0; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; margin-bottom: 12px; outline: none; transition: border-color .2s;
+  }
+  input:focus { border-color: #6c63ff; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border: none; border-radius: 8px;
+         font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity .15s; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { background: #6c63ff; color: #fff; }
+  .btn-danger  { background: #e74c3c; color: #fff; }
+  .btn-ghost   { background: #f0f0f0; color: #555; }
+  .btn:not(:disabled):hover { opacity: .85; }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed #c4c4c4; border-radius: 12px; padding: 40px 20px; text-align: center;
+    transition: border-color .2s, background .2s; cursor: pointer;
+  }
+  .drop-zone.over { border-color: #6c63ff; background: #f0eeff; }
+  .drop-zone p { font-size: 14px; color: #888; margin-top: 8px; }
+  .drop-zone .icon { font-size: 36px; }
+
+  /* Stats row */
+  .stats-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat-box { flex: 1; min-width: 140px; background: #f8f7ff; border-radius: 10px; padding: 16px; text-align: center; }
+  .stat-box .num { font-size: 28px; font-weight: 700; color: #6c63ff; }
+  .stat-box .label { font-size: 12px; color: #888; margin-top: 4px; }
+
+  /* Preview table */
+  .preview-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+  .preview-table th { background: #f5f5f5; padding: 8px 10px; text-align: left; font-weight: 600; color: #555; }
+  .preview-table td { padding: 7px 10px; border-top: 1px solid #f0f0f0; word-break: break-all; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Progress */
+  .progress-wrap { margin: 16px 0; }
+  .progress-bar { height: 6px; background: #eee; border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #6c63ff; border-radius: 99px; transition: width .3s; }
+  .progress-label { font-size: 12px; color: #888; margin-top: 6px; }
+
+  /* Backup list */
+  .backup-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+  .backup-item:last-child { border-bottom: none; }
+  .backup-name { font-family: monospace; color: #444; }
+  .backup-meta { color: #aaa; font-size: 12px; margin-top: 2px; }
+
+  /* Alerts */
+  .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+  .alert-success { background: #e8f8f0; color: #1e7e46; }
+  .alert-error   { background: #fdf0ef; color: #c0392b; }
+  .alert-info    { background: #eef4ff; color: #2c5fa8; }
+
+  /* Confirm modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 999; }
+  .modal { background: #fff; border-radius: 14px; padding: 28px; max-width: 420px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,.2); }
+  .modal h3 { font-size: 17px; margin-bottom: 10px; }
+  .modal p  { font-size: 14px; color: #666; margin-bottom: 20px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* Misc */
+  .flex-end { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  .empty { color: #bbb; font-size: 13px; text-align: center; padding: 20px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .tag-green { background: #e3f9ed; color: #1a7a45; }
+  .tag-blue  { background: #e5eeff; color: #2c5fa8; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== LOGIN ===== -->
+  <div v-if="!token" class="login-wrap">
+    <div class="card">
+      <h1>Traitty 管理後台</h1>
+      <p class="subtitle">請以管理員帳號登入</p>
+      <div v-if="loginError" class="alert alert-error">{{ loginError }}</div>
+      <input v-model="loginForm.username" type="text" placeholder="帳號" @keyup.enter="doLogin" />
+      <input v-model="loginForm.password" type="password" placeholder="密碼" @keyup.enter="doLogin" />
+      <button class="btn btn-primary" style="width:100%" :disabled="loginLoading" @click="doLogin">
+        {{ loginLoading ? '登入中...' : '登入' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN ===== -->
+  <div v-else class="app-wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+      <div>
+        <h1>特質定義管理</h1>
+        <p class="subtitle">上傳新版 Excel 覆蓋特質定義，操作前會自動備份</p>
+      </div>
+      <button class="btn btn-ghost" @click="doLogout">登出</button>
+    </div>
+
+    <!-- Current stats -->
+    <div class="card">
+      <h2>目前資料庫筆數</h2>
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="num">{{ stats.trait_definitions ?? '—' }}</div>
+          <div class="label">trait_definitions</div>
+        </div>
+        <div class="stat-box">
+          <div class="num">{{ stats.trait_bands ?? '—' }}</div>
+          <div class="label">trait_bands</div>
+        </div>
+        <div class="stat-box">
+          <div class="num">{{ stats.trait_interactions ?? '—' }}</div>
+          <div class="label">trait_interactions</div>
+        </div>
+        <button class="btn btn-ghost" style="align-self:center" @click="loadStats">重新整理</button>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="card">
+      <h2>上傳新版 Excel</h2>
+      <div v-if="uploadMsg" :class="['alert', uploadMsg.type === 'success' ? 'alert-success' : uploadMsg.type === 'error' ? 'alert-error' : 'alert-info']">
+        {{ uploadMsg.text }}
+      </div>
+
+      <div
+        class="drop-zone"
+        :class="{over: dragging}"
+        @dragover.prevent="dragging=true"
+        @dragleave="dragging=false"
+        @drop.prevent="onDrop"
+        @click="$refs.fileInput.click()"
+      >
+        <div class="icon">📂</div>
+        <p>拖曳 .xlsx 到這裡，或點擊選取</p>
+        <p v-if="selectedFile" style="color:#6c63ff;margin-top:8px;font-weight:600">{{ selectedFile.name }}</p>
+      </div>
+      <input ref="fileInput" type="file" accept=".xlsx" style="display:none" @change="onFileChange" />
+
+      <!-- Progress -->
+      <div v-if="uploading" class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" :style="{width: uploadProgress + '%'}"></div></div>
+        <div class="progress-label">{{ uploadStage }}</div>
+      </div>
+
+      <!-- Preview -->
+      <div v-if="preview" style="margin-top:20px">
+        <div class="alert alert-info">
+          解析完成 ── 特質定義 <strong>{{ preview.trait_definitions }}</strong> 筆、
+          Band <strong>{{ preview.trait_bands }}</strong> 筆、
+          互動規則 <strong>{{ preview.trait_interactions }}</strong> 筆
+        </div>
+        <p style="font-size:13px;color:#888;margin-bottom:8px">前 3 筆特質定義預覽：</p>
+        <table class="preview-table">
+          <thead><tr><th>trait_id</th><th>name_zh</th><th>name_en</th><th>dimension</th></tr></thead>
+          <tbody>
+            <tr v-for="d in preview.sample_definitions" :key="d.trait_id">
+              <td>{{ d.trait_id }}</td><td>{{ d.name_zh }}</td><td>{{ d.name_en }}</td><td>{{ d.dimension }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex-end">
+        <button class="btn btn-ghost" :disabled="!selectedFile || uploading" @click="doPreview">解析預覽</button>
+        <button class="btn btn-danger" :disabled="!preview || uploading" @click="showConfirm=true">確認覆蓋資料庫</button>
+      </div>
+    </div>
+
+    <!-- Backup list -->
+    <div class="card">
+      <h2>備份記錄 <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;margin-left:8px" @click="loadBackups">重新整理</button></h2>
+      <div v-if="backups.length === 0" class="empty">尚無備份</div>
+      <div v-for="b in backups" :key="b.filename" class="backup-item">
+        <div>
+          <div class="backup-name">{{ b.filename }}</div>
+          <div class="backup-meta">{{ b.created_at }} ｜ {{ (b.size_bytes/1024).toFixed(1) }} KB</div>
+        </div>
+        <button class="btn btn-ghost" style="font-size:12px" @click="doRestore(b.filename)">還原</button>
+      </div>
+    </div>
+
+    <!-- Confirm dialog -->
+    <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm=false">
+      <div class="modal">
+        <h3>⚠️ 確認覆蓋？</h3>
+        <p>
+          此操作會先備份目前資料，再以新版 Excel 完整覆蓋三張特質資料表。<br>
+          確認後無法即時撤銷，但可從備份記錄還原。
+        </p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" @click="showConfirm=false">取消</button>
+          <button class="btn btn-danger" @click="doConfirmedUpload">確認覆蓋</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, onMounted } = Vue
+
+createApp({
+  setup() {
+    const API = ''  // same origin
+
+    // Auth
+    const token = ref(localStorage.getItem('admin_token') || '')
+    const loginForm = ref({ username: '', password: '' })
+    const loginError = ref('')
+    const loginLoading = ref(false)
+
+    // Stats
+    const stats = ref({})
+
+    // Upload
+    const selectedFile = ref(null)
+    const dragging = ref(false)
+    const uploading = ref(false)
+    const uploadProgress = ref(0)
+    const uploadStage = ref('')
+    const preview = ref(null)
+    const uploadMsg = ref(null)
+    const showConfirm = ref(false)
+
+    // Backups
+    const backups = ref([])
+
+    function headers() {
+      return { Authorization: `Bearer ${token.value}` }
+    }
+
+    async function doLogin() {
+      loginLoading.value = true
+      loginError.value = ''
+      try {
+        const res = await fetch(`${API}/api/admin/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(loginForm.value)
+        })
+        const json = await res.json()
+        if (!res.ok) { loginError.value = json.error?.message || '登入失敗'; return }
+        token.value = json.data.access_token
+        localStorage.setItem('admin_token', token.value)
+        loginForm.value = { username: '', password: '' }
+        afterLogin()
+      } catch(e) {
+        loginError.value = '無法連線至後端'
+      } finally {
+        loginLoading.value = false
+      }
+    }
+
+    function doLogout() {
+      token.value = ''
+      localStorage.removeItem('admin_token')
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API}/api/admin/traits/stats`, { headers: headers() })
+        const json = await res.json()
+        if (res.ok) stats.value = json.data
+      } catch(e) {}
+    }
+
+    async function loadBackups() {
+      try {
+        const res = await fetch(`${API}/api/admin/traits/backups`, { headers: headers() })
+        const json = await res.json()
+        if (res.ok) backups.value = json.data
+      } catch(e) {}
+    }
+
+    function afterLogin() {
+      loadStats()
+      loadBackups()
+    }
+
+    function onDrop(e) {
+      dragging.value = false
+      const f = e.dataTransfer.files[0]
+      if (f && f.name.endsWith('.xlsx')) { selectedFile.value = f; preview.value = null; uploadMsg.value = null }
+      else uploadMsg.value = { type: 'error', text: '請選取 .xlsx 檔案' }
+    }
+
+    function onFileChange(e) {
+      const f = e.target.files[0]
+      if (f) { selectedFile.value = f; preview.value = null; uploadMsg.value = null }
+    }
+
+    async function _upload(confirm) {
+      const fd = new FormData()
+      fd.append('file', selectedFile.value)
+      if (confirm) fd.append('confirm', 'true')
+
+      uploading.value = true
+      uploadProgress.value = confirm ? 30 : 10
+      uploadStage.value = confirm ? '備份中...' : '解析中...'
+
+      try {
+        const res = await fetch(`${API}/api/admin/traits/upload`, {
+          method: 'POST',
+          headers: headers(),
+          body: fd
+        })
+        uploadProgress.value = confirm ? 80 : 70
+        uploadStage.value = confirm ? '寫入資料庫...' : '分析完成'
+        const json = await res.json()
+        uploadProgress.value = 100
+        if (!res.ok) {
+          uploadMsg.value = { type: 'error', text: json.error?.message || '操作失敗' }
+          return null
+        }
+        return json.data
+      } catch(e) {
+        uploadMsg.value = { type: 'error', text: '網路錯誤，請重試' }
+        return null
+      } finally {
+        uploading.value = false
+        uploadStage.value = ''
+      }
+    }
+
+    async function doPreview() {
+      preview.value = null
+      uploadMsg.value = null
+      const data = await _upload(false)
+      if (data) preview.value = data.preview
+    }
+
+    async function doConfirmedUpload() {
+      showConfirm.value = false
+      const data = await _upload(true)
+      if (data && data.confirmed) {
+        uploadMsg.value = { type: 'success', text: `覆蓋成功！備份檔：${data.backup_file}` }
+        preview.value = null
+        selectedFile.value = null
+        loadStats()
+        loadBackups()
+      }
+    }
+
+    async function doRestore(filename) {
+      if (!confirm(`確定從 ${filename} 還原？此操作會覆蓋目前資料。`)) return
+      try {
+        const res = await fetch(`${API}/api/admin/traits/backups/${filename}/restore`, {
+          method: 'POST', headers: headers()
+        })
+        const json = await res.json()
+        if (res.ok) { alert('還原成功'); loadStats() }
+        else alert('還原失敗：' + (json.error?.message || '未知錯誤'))
+      } catch(e) {
+        alert('網路錯誤')
+      }
+    }
+
+    onMounted(() => {
+      if (token.value) afterLogin()
+    })
+
+    return {
+      token, loginForm, loginError, loginLoading, doLogin, doLogout,
+      stats, loadStats,
+      selectedFile, dragging, uploading, uploadProgress, uploadStage, preview,
+      uploadMsg, showConfirm, onDrop, onFileChange,
+      doPreview, doConfirmedUpload,
+      backups, loadBackups, doRestore,
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>

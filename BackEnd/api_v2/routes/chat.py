@@ -52,6 +52,8 @@ def background_generate_title(session_id, user_query, candidate_names):
         title = response.choices[0].message.content.strip().strip('"\'')
         if len(title) > 20:
             title = title[:20]
+        if not title:
+            title = "新對話"
             
         # 1.5 Record Token Usage
         total_tokens = getattr(response.usage, 'total_tokens', 0) if hasattr(response, 'usage') else 0
@@ -78,11 +80,12 @@ def background_generate_title(session_id, user_query, candidate_names):
             if session_obj:
                 meta = dict(session_obj.metadata_ or {})
                 meta['title'] = title
-                
+                meta['title_attempted'] = True
+
                 # Update candidates info if not present
                 if 'candidates' not in meta and candidate_names:
                     meta['candidates'] = [{"name": n} for n in candidate_names]
-                    
+
                 session_obj.metadata_ = meta
                 db.commit()
                 print(f"[Background Title] Updated session {session_id} title to: {title}")
@@ -93,6 +96,17 @@ def background_generate_title(session_id, user_query, candidate_names):
             db.close()
     except Exception as e:
         print(f"[Background Title] Error: {e}")
+        try:
+            db = get_db_session()
+            session_obj = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
+            if session_obj:
+                meta = dict(session_obj.metadata_ or {})
+                meta['title_attempted'] = True
+                session_obj.metadata_ = meta
+                db.commit()
+            db.close()
+        except Exception:
+            pass
 
 @bp.before_request
 def init_service():
@@ -262,22 +276,28 @@ def chat():
     if not query:
         return err('MISSING_FIELD', 'Query is required', 400, field='query')
 
-    # T4 — Daily token budget check (global across all users)
+    # T4 — Daily token budget check (per user)
     daily_limit = current_app.config.get('DAILY_TOKEN_LIMIT', 0)
-    if daily_limit and daily_limit > 0:
+    if daily_limit and daily_limit > 0 and user_id and user_id != 'anonymous':
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         db = get_db_session()
         try:
             used_today = db.query(func.sum(ChatMessage.token_usage))\
-                .filter(ChatMessage.created_at >= today_start)\
+                .join(ChatSession, ChatMessage.session_id == ChatSession.session_id)\
+                .filter(
+                    ChatMessage.created_at >= today_start,
+                    ChatSession.user_id == user_id
+                )\
                 .scalar() or 0
+            if used_today >= daily_limit:
+                print(f"[T4] Daily token limit reached for user {user_id}: {used_today}/{daily_limit}", flush=True)
+                return err('QUOTA_EXCEEDED',
+                           f'Daily token budget exhausted ({used_today}/{daily_limit}). Try again tomorrow.',
+                           429)
+        except OperationalError as db_err:
+            print(f"[T4] DB unavailable for token budget check, skipping: {db_err}", flush=True)
         finally:
             db.close()
-        if used_today >= daily_limit:
-            print(f"[T4] Daily token limit reached: {used_today}/{daily_limit}", flush=True)
-            return err('QUOTA_EXCEEDED',
-                       f'Daily token budget exhausted ({used_today}/{daily_limit}). Try again tomorrow.',
-                       429)
 
     # Capture caller IP for logging (shared into generate() via closure)
     xff = request.headers.get('X-Forwarded-For', '')
@@ -310,7 +330,7 @@ def chat():
                      
                     # 檢查現有 Session 是否缺少 title
                     meta = existing_session.metadata_ or {}
-                    if not meta.get('title'):
+                    if not meta.get('title') and not meta.get('title_attempted'):
                         print(f"[Chat] Existing session {session_id} is missing a title. Will generate one.", flush=True)
                         needs_title_generation = True
                         

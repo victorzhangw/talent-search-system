@@ -53,29 +53,34 @@ class ChatMessage(Base):
 # --- Trait System (Migrated from SQLite) ---
 class TraitDefinition(Base):
     __tablename__ = 'trait_definitions'
-    
+
     trait_id = Column(String(50), primary_key=True) # system_name e.g. "Achievement"
     name_zh = Column(String(100))
     name_en = Column(String(100))
     dimension = Column(String(50))
     definition = Column(Text)
+    definition_en = Column(Text)
+    hidden_anchor = Column(Text)
 
 class TraitBand(Base):
     __tablename__ = 'trait_bands'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     trait_id = Column(String(50), ForeignKey('trait_definitions.trait_id'))
     band = Column(String(10)) # A, B, C
     min_score = Column(Integer)
     max_score = Column(Integer)
-    
+
     semantic_label = Column(String(50))
     description = Column(Text)
     management_focus = Column(Text)
+    usage_note = Column(Text)
+    trait_interaction_guide = Column(Text)
     report_wording = Column(Text)
     report_wording_friendly = Column(Text)
     trait_project = Column(String(50))
     ai_guidance = Column(JSON) # {do: [], dont: []}
+    version = Column(String(20))
 
 class TraitInteraction(Base):
     __tablename__ = 'trait_interactions'

@@ -1,13 +1,15 @@
 
-from flask import Blueprint, request
-from sqlalchemy import func
+from flask import Blueprint, request, render_template, send_from_directory
+from sqlalchemy import func, text
 from datetime import datetime, timedelta
 import datetime as dt
+import os
 
-from ..database.connection import get_db_session
+from ..database.connection import get_db_session, get_db_engine
 from ..database.models import ChatSession, ChatMessage, AdminUser
 from .auth import create_access_token, verify_password, get_password_hash, token_required
 from ..utils.response_helpers import ok, err
+from . import trait_importer
 
 bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -291,31 +293,31 @@ def daily_usage_report(current_user):
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
     user_id = request.args.get('user_id')
-    
+
     db = get_db_session()
     try:
         # Postgres date_trunc
         date_col = func.date_trunc('day', ChatMessage.created_at).label('date')
-        
+
         query = db.query(
             date_col,
             func.sum(ChatMessage.token_usage).label('tokens'),
             func.count(func.distinct(ChatSession.session_id)).label('sessions')
         ).join(ChatSession, ChatSession.session_id == ChatMessage.session_id)
-        
+
         if user_id:
             query = query.filter(ChatSession.user_id == user_id)
-            
+
         if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
             query = query.filter(ChatMessage.created_at >= start_date)
-            
+
         if end_date_str:
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
             query = query.filter(ChatMessage.created_at < end_date)
-            
+
         results = query.group_by(date_col).order_by(date_col).all()
-        
+
         data = []
         for r in results:
             data.append({
@@ -323,12 +325,117 @@ def daily_usage_report(current_user):
                 "tokens": r.tokens or 0,
                 "sessions": r.sessions
             })
-            
+
         return ok(data)
     except Exception as e:
         print(f"[Admin] Daily Report Error: {e}")
         return err('QUERY_FAILED', str(e), 500)
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Trait Definition Management
+# ---------------------------------------------------------------------------
+
+@bp.route('/ui', methods=['GET'])
+def admin_ui():
+    """Serve the standalone admin management page."""
+    templates_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
+    return send_from_directory(templates_dir, 'admin_trait_upload.html')
+
+
+@bp.route('/traits/stats', methods=['GET'])
+@token_required
+def trait_stats(current_user):
+    """Return current row counts for the three trait tables."""
+    engine = get_db_engine()
+    try:
+        with engine.connect() as conn:
+            def count(table):
+                return conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0
+            return ok({
+                'trait_definitions': count('trait_definitions'),
+                'trait_bands':       count('trait_bands'),
+                'trait_interactions': count('trait_interactions'),
+            })
+    except Exception as e:
+        return err('DB_ERROR', str(e), 500)
+
+
+@bp.route('/traits/upload', methods=['POST'])
+@token_required
+def upload_traits(current_user):
+    """
+    Stage 1 (no confirm): parse Excel, return preview counts + sample rows.
+    Stage 2 (confirm=true): backup → schema migration → truncate + insert.
+    """
+    if 'file' not in request.files:
+        return err('MISSING_FILE', 'No file uploaded', 400)
+
+    file = request.files['file']
+    if not file.filename.endswith('.xlsx'):
+        return err('INVALID_FILE', 'Only .xlsx files are accepted', 400)
+
+    file_bytes = file.read()
+    definitions, bands, interactions, parse_error = trait_importer.parse_excel_bytes(file_bytes)
+
+    if parse_error:
+        return err('PARSE_ERROR', parse_error, 422)
+
+    preview = {
+        'trait_definitions': len(definitions),
+        'trait_bands':       len(bands),
+        'trait_interactions': len(interactions),
+        'sample_definitions': definitions[:3],
+        'sample_bands': [{k: v for k, v in b.items() if k != 'ai_guidance'} for b in bands[:3]],
+        'sample_interactions': interactions[:3],
+    }
+
+    confirm = request.form.get('confirm', 'false').lower() == 'true'
+    if not confirm:
+        return ok({'preview': preview, 'confirmed': False})
+
+    # Stage 2: apply changes
+    try:
+        backup_path = trait_importer.create_backup_sql()
+    except Exception as e:
+        return err('BACKUP_FAILED', f'Could not create backup: {e}', 500)
+
+    try:
+        trait_importer.apply_schema_migration()
+        trait_importer.write_traits_to_db(definitions, bands, interactions)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return err('IMPORT_FAILED', f'DB write failed: {e}', 500)
+
+    return ok({
+        'preview': preview,
+        'confirmed': True,
+        'backup_file': os.path.basename(backup_path),
+    })
+
+
+@bp.route('/traits/backups', methods=['GET'])
+@token_required
+def list_backups(current_user):
+    """List all available backup SQL files."""
+    return ok(trait_importer.list_backups())
+
+
+@bp.route('/traits/backups/<filename>/restore', methods=['POST'])
+@token_required
+def restore_backup(current_user, filename):
+    """Restore the three trait tables from a named backup file."""
+    try:
+        trait_importer.restore_from_backup(filename)
+        return ok({'restored': filename})
+    except FileNotFoundError as e:
+        return err('NOT_FOUND', str(e), 404)
+    except ValueError as e:
+        return err('INVALID_FILENAME', str(e), 400)
+    except Exception as e:
+        return err('RESTORE_FAILED', str(e), 500)
 
 
