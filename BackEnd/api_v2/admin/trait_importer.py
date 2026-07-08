@@ -18,8 +18,8 @@ except ImportError:
 from sqlalchemy import text
 from ..database.connection import get_db_engine
 
-BAND_SHEET = '02_TraitSemanticBands'
-INTERACTION_SHEET = '08 interaction_narrative'
+BAND_SHEET_KEY = 'TraitSemanticBands'
+INTERACTION_SHEET_KEY = 'interaction_narrative'
 
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'scripts', 'backups')
 
@@ -67,14 +67,36 @@ def _extract_project(trait_id):
     return trait_id.split('_')[0] if trait_id and '_' in trait_id else None
 
 
+def _is_valid_trait_id(trait_id):
+    return bool(trait_id and re.match(r'^[A-Z]{2,6}_\d{2,3}$', str(trait_id).strip()))
+
+
+def _row_has_data(row):
+    return any(c is not None and str(c).strip() != '' for c in row)
+
+
+def _is_template_row(row):
+    """Template/instruction rows (e.g. a '// 系統顯示名稱' guide row under the header) aren't real data."""
+    return any(isinstance(c, str) and c.strip().startswith('//') for c in row)
+
+
 def _parse_band_sheet(ws):
     definitions = {}
     bands = []
+    skipped = []
     rows = list(ws.iter_rows(values_only=True))
-    for row in rows[1:]:
+    total_rows = 0
+    for excel_row, row in enumerate(rows[1:], start=2):
+        if not _row_has_data(row) or _is_template_row(row):
+            continue
+        total_rows += 1
         trait_id = _cell(row, COL['trait_id'])
         band = _cell(row, COL['band'])
-        if not trait_id or not band:
+        if not _is_valid_trait_id(trait_id):
+            skipped.append({'row': excel_row, 'reason': f'無效的 trait_id: {trait_id!r}'})
+            continue
+        if band not in ('A', 'B', 'C'):
+            skipped.append({'row': excel_row, 'trait_id': trait_id, 'reason': f'無效的 band 值（需為 A/B/C）: {band!r}'})
             continue
         if trait_id not in definitions:
             definitions[trait_id] = {
@@ -105,15 +127,21 @@ def _parse_band_sheet(ws):
             'version':                _cell(row, COL['version']),
             'trait_project':          _extract_project(trait_id),
         })
-    return list(definitions.values()), bands
+    return list(definitions.values()), bands, total_rows, skipped
 
 
 def _parse_interaction_sheet(ws):
     interactions = []
+    skipped = []
     rows = list(ws.iter_rows(values_only=True))
-    for row in rows[1:]:
+    total_rows = 0
+    for excel_row, row in enumerate(rows[1:], start=2):
+        if not _row_has_data(row) or _is_template_row(row):
+            continue
+        total_rows += 1
         primary_trait_id = _cell(row, 0)
         if not primary_trait_id:
+            skipped.append({'row': excel_row, 'reason': '缺少 primary_trait_id'})
             continue
         trigger_trait_id = trigger_band = None
         try:
@@ -131,31 +159,72 @@ def _parse_interaction_sheet(ws):
             'trigger_band':     trigger_band,
             'narrative':        _cell(row, 5),
         })
-    return interactions
+    return interactions, total_rows, skipped
+
+
+def _find_sheet(wb, key):
+    for name in wb.sheetnames:
+        if key.lower() in name.lower():
+            return name
+    return None
 
 
 def parse_excel_bytes(file_bytes):
-    """Parse Excel from bytes (for API upload). Returns (definitions, bands, interactions, error)."""
+    """
+    Parse Excel from bytes (for API upload).
+    Returns (definitions, bands, interactions, error, mismatch).
+    `mismatch` is None when parsed row counts match the Excel data row counts,
+    otherwise a dict describing which rows were skipped and why.
+    """
     if not OPENPYXL_AVAILABLE:
-        return None, None, None, 'openpyxl not installed on server'
+        return None, None, None, 'openpyxl not installed on server', None
     try:
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
     except Exception as e:
-        return None, None, None, f'Cannot open Excel: {e}'
+        return None, None, None, f'Cannot open Excel: {e}', None
 
-    missing = [s for s in (BAND_SHEET, INTERACTION_SHEET) if s not in wb.sheetnames]
+    band_name = _find_sheet(wb, BAND_SHEET_KEY)
+    interaction_name = _find_sheet(wb, INTERACTION_SHEET_KEY)
+    missing = [k for k, v in {BAND_SHEET_KEY: band_name, INTERACTION_SHEET_KEY: interaction_name}.items() if not v]
     if missing:
-        return None, None, None, f'Missing sheets: {missing}. Found: {wb.sheetnames}'
+        return None, None, None, f'Cannot find sheets for: {missing}. Found: {wb.sheetnames}', None
 
     try:
-        definitions, bands = _parse_band_sheet(wb[BAND_SHEET])
-        interactions = _parse_interaction_sheet(wb[INTERACTION_SHEET])
+        definitions, bands, band_total, band_skipped = _parse_band_sheet(wb[band_name])
+        interactions, interaction_total, interaction_skipped = _parse_interaction_sheet(wb[interaction_name])
     except Exception as e:
-        return None, None, None, f'Parse error: {e}'
+        return None, None, None, f'Parse error: {e}', None
     finally:
         wb.close()
 
-    return definitions, bands, interactions, None
+    mismatch = None
+    if band_skipped or interaction_skipped:
+        parts = []
+        if band_skipped:
+            parts.append(
+                f'TraitSemanticBands：Excel 有 {band_total} 筆資料，成功解析 {len(bands)} 筆，'
+                f'跳過 {len(band_skipped)} 筆（' +
+                '；'.join(f"第{s['row']}列：{s['reason']}" for s in band_skipped[:10]) +
+                ('…' if len(band_skipped) > 10 else '') + '）'
+            )
+        if interaction_skipped:
+            parts.append(
+                f'interaction_narrative：Excel 有 {interaction_total} 筆資料，成功解析 {len(interactions)} 筆，'
+                f'跳過 {len(interaction_skipped)} 筆（' +
+                '；'.join(f"第{s['row']}列：{s['reason']}" for s in interaction_skipped[:10]) +
+                ('…' if len(interaction_skipped) > 10 else '') + '）'
+            )
+        mismatch = {
+            'message': '匯入筆數與 Excel 資料筆數不符，已拒絕匯入。' + ' '.join(parts),
+            'band_total': band_total,
+            'band_parsed': len(bands),
+            'band_skipped': band_skipped,
+            'interaction_total': interaction_total,
+            'interaction_parsed': len(interactions),
+            'interaction_skipped': interaction_skipped,
+        }
+
+    return definitions, bands, interactions, None, mismatch
 
 
 def _escape_sql_value(v):

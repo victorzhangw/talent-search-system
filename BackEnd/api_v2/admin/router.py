@@ -378,10 +378,13 @@ def upload_traits(current_user):
         return err('INVALID_FILE', 'Only .xlsx files are accepted', 400)
 
     file_bytes = file.read()
-    definitions, bands, interactions, parse_error = trait_importer.parse_excel_bytes(file_bytes)
+    definitions, bands, interactions, parse_error, mismatch = trait_importer.parse_excel_bytes(file_bytes)
 
     if parse_error:
         return err('PARSE_ERROR', parse_error, 422)
+
+    if mismatch:
+        return err('ROW_COUNT_MISMATCH', mismatch['message'], 422, details=mismatch)
 
     preview = {
         'trait_definitions': len(definitions),

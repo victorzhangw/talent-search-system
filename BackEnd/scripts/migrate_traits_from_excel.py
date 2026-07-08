@@ -38,8 +38,8 @@ from api_v2.database.connection import get_db_engine
 # Excel parsing
 # ---------------------------------------------------------------------------
 
-BAND_SHEET = '02_TraitSemanticBands'
-INTERACTION_SHEET = '08 interaction_narrative'
+BAND_SHEET_KEY = 'TraitSemanticBands'
+INTERACTION_SHEET_KEY = 'interaction_narrative'
 
 # Expected column indices (0-based) for Sheet 2
 COL = {
@@ -93,6 +93,11 @@ def _extract_project(trait_id):
     return None
 
 
+def _is_valid_trait_id(trait_id):
+    """Accept only IDs like CIA_01, ANI_10 — skip header/comment rows."""
+    return bool(trait_id and re.match(r'^[A-Z]{2,6}_\d{2,3}$', str(trait_id).strip()))
+
+
 def parse_band_sheet(ws):
     """
     Returns:
@@ -107,11 +112,11 @@ def parse_band_sheet(ws):
 
     for row in rows[1:]:
         trait_id = _cell(row, COL['trait_id'])
-        if not trait_id:
+        if not _is_valid_trait_id(trait_id):
             continue
 
         band = _cell(row, COL['band'])
-        if not band:
+        if not band or band not in ('A', 'B', 'C'):
             continue
 
         # Accumulate one definition per trait_id (first occurrence wins)
@@ -189,19 +194,33 @@ def parse_interaction_sheet(ws):
     return interactions
 
 
+def _find_sheet(wb, key):
+    """Return the first sheet whose name contains key (case-insensitive)."""
+    for name in wb.sheetnames:
+        if key.lower() in name.lower():
+            return name
+    return None
+
+
 def parse_excel(excel_path):
     print(f"[Parse] Opening: {excel_path}")
     wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
     sheets = wb.sheetnames
     print(f"[Parse] Sheets found: {sheets}")
 
-    if BAND_SHEET not in sheets:
-        raise ValueError(f"Sheet '{BAND_SHEET}' not found in Excel. Available: {sheets}")
-    if INTERACTION_SHEET not in sheets:
-        raise ValueError(f"Sheet '{INTERACTION_SHEET}' not found in Excel. Available: {sheets}")
+    band_sheet_name = _find_sheet(wb, BAND_SHEET_KEY)
+    interaction_sheet_name = _find_sheet(wb, INTERACTION_SHEET_KEY)
 
-    definitions, bands = parse_band_sheet(wb[BAND_SHEET])
-    interactions = parse_interaction_sheet(wb[INTERACTION_SHEET])
+    if not band_sheet_name:
+        raise ValueError(f"No sheet containing '{BAND_SHEET_KEY}' found. Available: {sheets}")
+    if not interaction_sheet_name:
+        raise ValueError(f"No sheet containing '{INTERACTION_SHEET_KEY}' found. Available: {sheets}")
+
+    print(f"[Parse] Using band sheet: '{band_sheet_name}'")
+    print(f"[Parse] Using interaction sheet: '{interaction_sheet_name}'")
+
+    definitions, bands = parse_band_sheet(wb[band_sheet_name])
+    interactions = parse_interaction_sheet(wb[interaction_sheet_name])
     wb.close()
 
     print(f"[Parse] trait_definitions: {len(definitions)} records")
@@ -228,9 +247,10 @@ def _escape_sql_value(v):
 
 
 def backup_table(conn, table_name, f):
-    result = conn.execute(f"SELECT * FROM {table_name}")
+    from sqlalchemy import text as sa_text
+    result = conn.execute(sa_text(f"SELECT * FROM {table_name}"))
     cols = list(result.keys())
-    rows = result.fetchall()
+    rows = result.mappings().fetchall()
     f.write(f"\n-- ========== {table_name} ({len(rows)} rows) ==========\n")
     f.write(f"DELETE FROM {table_name};\n")
     for row in rows:
@@ -249,7 +269,6 @@ def create_backup(engine, backup_dir):
         with open(path, 'w', encoding='utf-8') as f:
             f.write(f"-- Trait tables backup generated {ts}\n")
             f.write("BEGIN;\n")
-            # Backup in FK-safe restore order
             backup_table(conn, 'trait_definitions', f)
             backup_table(conn, 'trait_bands', f)
             backup_table(conn, 'trait_interactions', f)
@@ -315,15 +334,20 @@ def write_to_db(engine, definitions, bands, interactions):
             """), b_copy)
         print(f"[Write] trait_bands: {len(bands)} rows inserted")
 
-        # Insert trait_interactions
-        for i in interactions:
+        # Insert trait_interactions — only where primary_trait_id exists in definitions
+        valid_ids = {d['trait_id'] for d in definitions}
+        filtered = [i for i in interactions if i['primary_trait_id'] in valid_ids]
+        skipped = len(interactions) - len(filtered)
+        if skipped:
+            print(f"[Write] Skipping {skipped} interactions with unknown primary_trait_id")
+        for i in filtered:
             conn.execute(text("""
                 INSERT INTO trait_interactions
                     (primary_trait_id, primary_band, trigger_trait_id, trigger_band, narrative)
                 VALUES
                     (:primary_trait_id, :primary_band, :trigger_trait_id, :trigger_band, :narrative)
             """), i)
-        print(f"[Write] trait_interactions: {len(interactions)} rows inserted")
+        print(f"[Write] trait_interactions: {len(filtered)} rows inserted")
 
     print("[Write] Commit successful.")
 
@@ -373,7 +397,7 @@ def main():
     print("\n[Step 3] Writing new data...")
     write_to_db(engine, definitions, bands, interactions)
 
-    print(f"\n✓ Migration complete. Backup saved at: {backup_path}")
+    print(f"\n[DONE] Migration complete. Backup saved at: {backup_path}")
 
 
 if __name__ == '__main__':
