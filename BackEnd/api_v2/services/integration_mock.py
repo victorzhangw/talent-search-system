@@ -32,6 +32,12 @@ class MockIntegrationService(IntegrationServiceInterface):
             }
         }
 
+    def get_candidate_by_id(self, candidate_id: str) -> Dict[str, Any]:
+        return next(
+            (c for c in self.data['candidates'] if str(c.get('candidate_id')) == str(candidate_id)),
+            None
+        )
+
     def get_assessments(self, enterprise_code: str, candidate_ids: List[str]) -> List[Dict[str, Any]]:
         results = []
         for cid in candidate_ids:

@@ -60,6 +60,7 @@ export function useChatLogic(emit) {
     const previewMessages = ref([])
     const showPreviewPanel = ref(false)
     const previewSessionData = ref(null)
+    const isSwitchingContext = ref(false)
 
     // Modal Logic
     const showReportModal = ref(false)
@@ -399,33 +400,100 @@ export function useChatLogic(emit) {
                     rating: m.rating || 0
                 }))
                 previewMessages.value = msgs.length > 0 ? msgs : [{ role: 'ai', content: '（尚無對話紀錄）' }]
+                // Keep metadata (candidates locked for this session) so switchContextToPreview
+                // can restore trait_reports/activeConversationCandidateIds later.
+                previewSessionData.value = { ...sessionData, metadata: resp.success ? (resp.data?.metadata ?? null) : null }
             }
         } catch (e) {
             console.error("[ChatContainer] Failed to load session details for preview", e)
         }
     }
 
-    const switchContextToPreview = () => {
+    const switchContextToPreview = async () => {
         if (!previewSessionData.value) return;
-
-        // Draft preservation is implicitly handled as current session is just left behind
-        // We override the active messages
-        currentSessionId.value = previewSessionData.value.session_id;
-        messages.value = [...previewMessages.value];
-        showPreviewPanel.value = false;
-
-        // Also update selection lock if possible
-        if (!isSelectionLocked.value && messages.value.length > 0) {
-            isSelectionLocked.value = true;
+        if (isTyping.value) {
+            messages.value.push({ role: 'ai', content: '請等待目前回覆完成後再切換對話。' });
+            return;
         }
+        if (isSwitchingContext.value) return;
 
-        // Add small AI prompt confirming context switch
-        messages.value.push({
-            role: 'ai',
-            content: '已為您切換至歷史對話，您可以繼續提問。'
-        });
+        isSwitchingContext.value = true;
+        // Version marker for the staleness guard below: loadHistorySession() resets
+        // previewSessionData.value on every click, so if the user picks a different
+        // history item while this await is in flight, this comparison will catch it.
+        const targetSessionId = previewSessionData.value.session_id;
 
-        saveSessionToStorage();
+        try {
+            const metaCandidates = previewSessionData.value.metadata?.candidates ?? [];
+            const isRestorable = metaCandidates.length > 0 && metaCandidates.every(c => c && c.candidate_id != null);
+
+            let restoredCandidates = [];
+            let missingIds = [];
+
+            if (isRestorable) {
+                const { apiBaseUrl } = getApiConfig();
+                const ids = metaCandidates.map(c => c.candidate_id);
+                try {
+                    const res = await fetch(`${apiBaseUrl}/candidates/by-ids?ids=${ids.join(',')}`, {
+                        headers: { 'Authorization': `Bearer ${userToken.value}` }
+                    });
+                    if (res.ok) {
+                        const resp = await res.json();
+                        restoredCandidates = resp.success ? (resp.data ?? []) : [];
+                        missingIds = resp.success ? (resp.meta?.missing_candidate_ids ?? []) : ids;
+                    } else {
+                        missingIds = ids;
+                    }
+                } catch (e) {
+                    console.error('[ChatContainer] Failed to restore candidates for history session:', e);
+                    missingIds = ids;
+                }
+            }
+
+            // Staleness guard: discard this result if the user has since previewed a
+            // different history session, so a slow response can't clobber newer state.
+            if (previewSessionData.value?.session_id !== targetSessionId) {
+                console.warn('[ChatContainer] Restore result stale, discarding for', targetSessionId);
+                return;
+            }
+
+            let switchMessage = '已為您切換至歷史對話，您可以繼續提問。';
+
+            if (restoredCandidates.length > 0) {
+                await fetchBatchTraitReports(restoredCandidates);
+                const restoredIds = restoredCandidates.map(c => c.candidate_id);
+                activeConversationCandidateIds.value = restoredIds;
+                try {
+                    sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(restoredIds));
+                    sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(restoredCandidates));
+                } catch (e) {
+                    console.error('[ChatContainer] Failed to persist restored candidates:', e);
+                }
+
+                if (missingIds.length > 0) {
+                    switchMessage = `已為您切換至歷史對話。有 ${missingIds.length} 位候選人的資料已無法取得（可能已被刪除或停用），本次僅還原其餘 ${restoredCandidates.length} 位。若要詢問已移除的候選人，請重新選擇。`;
+                }
+            } else if (metaCandidates.length > 0) {
+                // Either a pre-fix session (metadata only had names, no candidate_id) or
+                // every candidate_id failed to resolve upstream — don't silently continue
+                // with empty/mismatched trait data, tell the user to reselect instead.
+                switchMessage = '此對話記錄的候選人資料無法自動還原，請重新選擇候選人後再繼續提問。';
+            }
+
+            currentSessionId.value = targetSessionId;
+            messages.value = [...previewMessages.value];
+            showPreviewPanel.value = false;
+
+            if (!isSelectionLocked.value && messages.value.length > 0) {
+                isSelectionLocked.value = true;
+            }
+
+            messages.value.push({ role: 'ai', content: switchMessage });
+
+            saveSessionToStorage();
+        } finally {
+            isSwitchingContext.value = false;
+        }
     }
 
     // Init Data Fetching
@@ -1062,6 +1130,7 @@ export function useChatLogic(emit) {
         candidates,
         selectedCandidateIds,
         activeConversationCandidateIds,
+        isSwitchingContext,
         isLoadingCandidates,
         hasMoreCandidates,
         candidateOffset, // Might not need to expose

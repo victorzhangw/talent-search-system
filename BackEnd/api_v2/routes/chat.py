@@ -350,6 +350,19 @@ def chat():
             except Exception as e:
                 print(f"[Chat] Session Init Error: {e}")
 
+            # Persist the candidates locked for THIS message so history sessions can be
+            # restored later (metadata['candidates'] is fully replaced, not unioned, so
+            # it always reflects the latest lock-in state rather than every candidate
+            # ever discussed in the session). Must run before the title thread below,
+            # which does its own read-modify-write on the same metadata column.
+            if candidates_info:
+                cand_meta = [
+                    {"candidate_id": c.get("candidate_id"), "name": c.get("name")}
+                    for c in candidates_info if c.get("candidate_id") is not None
+                ]
+                if cand_meta:
+                    session_store.update_session_metadata(session_id, {"candidates": cand_meta})
+
             # Fire Background Task for Title Generation
             if needs_title_generation:
                 candidate_names = [c.get('name') for c in candidates_info if 'name' in c]

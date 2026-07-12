@@ -72,6 +72,55 @@ def list_candidates():
 
     return ok(candidates, meta={'page': page_info})
 
+@bp.route('/by-ids', methods=['GET'])
+def list_candidates_by_ids():
+    """
+    Batch-fetch full candidate objects by ID (used to restore a history session's
+    locked candidates, which may no longer be on the first page(s) of list_candidates).
+    Request: GET /by-ids?ids=1,2,3
+    """
+    raw_ids = request.args.get('ids', '')
+    requested_ids = [i.strip() for i in raw_ids.split(',') if i.strip()]
+    if not requested_ids:
+        return err('MISSING_FIELD', 'ids parameter is required', 400, field='ids')
+
+    user_email = "eva@wepredict.io"
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        incoming_token = auth_header.split(" ")[1]
+        try:
+            decoded = jwt.decode(incoming_token, options={"verify_signature": False})
+            user_email = decoded.get('email', user_email)
+        except Exception:
+            pass
+
+    upstream_token = generate_upstream_token(user_email)
+    service = get_service()
+
+    # No get-by-id upstream call is exercised in production yet, so reuse the same
+    # proven "fetch list, filter in Python" approach as get_candidate_report below.
+    try:
+        if isinstance(service, RealIntegrationService):
+            resp = service.get_candidates(upstream_token, limit=500)
+        else:
+            resp = service.get_candidates("ACME-TW", limit=500)
+        all_candidates = resp.get('data', [])
+    except Exception as e:
+        print(f"ERROR: Failed to fetch candidate list for by-ids: {e}")
+        return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503, details=str(e))
+
+    by_id = {str(c.get('candidate_id')): c for c in all_candidates}
+    found = []
+    missing = []
+    for cid in requested_ids:
+        cand = by_id.get(str(cid))
+        if cand:
+            found.append(cand)
+        else:
+            missing.append(cid)
+
+    return ok(found, meta={'missing_candidate_ids': missing})
+
 @bp.route('/<candidate_id>/report', methods=['GET'])
 def get_candidate_report(candidate_id):
     # 1. Auth & Token

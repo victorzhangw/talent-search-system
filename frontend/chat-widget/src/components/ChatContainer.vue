@@ -147,8 +147,8 @@
                             <MessageList :messages="previewMessages" />
                         </div>
                         <div class="preview-footer">
-                            <button class="secondary-btn" @click="showPreviewPanel = false">🔙 返回當前對話</button>
-                            <button class="primary-btn" @click="switchContextToPreview">▶ 繼續對話</button>
+                            <button class="secondary-btn" @click="showPreviewPanel = false" :disabled="isSwitchingContext">🔙 返回當前對話</button>
+                            <button class="primary-btn" @click="switchContextToPreview" :disabled="isSwitchingContext">{{ isSwitchingContext ? '還原中…' : '▶ 繼續對話' }}</button>
                         </div>
                     </div>
                 </transition>
@@ -435,6 +435,7 @@ const {
     candidates,
     selectedCandidateIds,
     activeConversationCandidateIds, // Not directly used in template but good to have if extending
+    isSwitchingContext,
     isLoadingCandidates,
     hasMoreCandidates,
     candidateOffset,
