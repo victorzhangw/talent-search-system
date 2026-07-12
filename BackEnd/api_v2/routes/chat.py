@@ -46,7 +46,11 @@ def background_generate_title(session_id, user_query, candidate_names):
         response = rag_service.client.chat.completions.create(
             model=rag_service.model_name,
             messages=messages,
-            max_tokens=30,
+            # Reasoning models (e.g. deepseek-v4-flash) spend tokens on an invisible
+            # reasoning_content pass before emitting the actual title in content.
+            # 30 was too low: the whole budget went to reasoning and content came
+            # back empty, so every session's title silently fell back to "新對話".
+            max_tokens=200,
             temperature=0.3
         )
         title = response.choices[0].message.content.strip().strip('"\'')
