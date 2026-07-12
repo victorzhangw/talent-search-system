@@ -29,7 +29,7 @@ def get_batch_reports():
     
     # 強制輸出到 stderr 確保一定會顯示
     print("\n" + "=" * 80, file=sys.stderr, flush=True)
-    print("🔥🔥🔥 BATCH REPORTS API CALLED! 🔥🔥🔥", file=sys.stderr, flush=True)
+    print("BATCH REPORTS API CALLED!", file=sys.stderr, flush=True)
     print("=" * 80, file=sys.stderr, flush=True)
     
     # 同時輸出到 stdout
@@ -59,16 +59,16 @@ def get_batch_reports():
     
     # 2. Get assessment IDs from request
     data = request.json
-    print(f"\n🔥 REQUEST BODY: {data}", file=sys.stderr, flush=True)
-    print(f"🔥 REQUEST BODY TYPE: {type(data)}", file=sys.stderr, flush=True)
+    print(f"\nREQUEST BODY: {data}", file=sys.stderr, flush=True)
+    print(f"REQUEST BODY TYPE: {type(data)}", file=sys.stderr, flush=True)
     print(f"[Batch Reports] Request body: {data}", flush=True)
     
     assessment_ids = data.get('assessment_ids', []) if data else []
-    print(f"🔥 ASSESSMENT IDS: {assessment_ids}", file=sys.stderr, flush=True)
+    print(f"ASSESSMENT IDS: {assessment_ids}", file=sys.stderr, flush=True)
     print(f"[Batch Reports] Assessment IDs: {assessment_ids}", flush=True)
     
     if not assessment_ids:
-        print("❌ ERROR: No assessment_ids provided", file=sys.stderr, flush=True)
+        print("ERROR: No assessment_ids provided", file=sys.stderr, flush=True)
         print("[Batch Reports] ERROR: No assessment_ids provided", flush=True)
         return err('MISSING_FIELD', 'assessment_ids is required', 400, field='assessment_ids')
     
@@ -114,7 +114,7 @@ def get_batch_reports():
             asmt_id = report_data.get('assessment_id')
         
         print(f"[Batch Reports] Report {idx + 1} assessment_id: {asmt_id}", flush=True)
-        print(f"🔥 DEBUG: Top-level assessment_id: {report_data.get('assessment_id')}, Nested assessment_id: {inner.get('assessment_id')}", file=sys.stderr, flush=True)
+        print(f"DEBUG: Top-level assessment_id: {report_data.get('assessment_id')}, Nested assessment_id: {inner.get('assessment_id')}", file=sys.stderr, flush=True)
         
         if not asmt_id:
             print(f"[Batch Reports] WARNING: Skipping report without assessment_id", flush=True)
@@ -173,7 +173,7 @@ def get_batch_reports():
         formatted_reports.append(formatted_report)
         print(f"[Batch Reports] Report {idx + 1} formatted with {len(formatted_traits)} traits", flush=True)
     
-    print(f"[Batch Reports] ✅ Returning {len(formatted_reports)} formatted reports", flush=True)
+    print(f"[Batch Reports] Returning {len(formatted_reports)} formatted reports", flush=True)
     print("[Batch Reports] ========== End Processing ==========", flush=True)
     print("=" * 60, flush=True)
 

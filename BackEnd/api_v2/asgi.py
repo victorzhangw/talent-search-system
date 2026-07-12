@@ -31,9 +31,9 @@ try:
     from asgiref.wsgi import WsgiToAsgi
     
     app = WsgiToAsgi(_flask_app)
-    print("✅ ASGI App initialized successfully. Ready for Uvicorn.")
+    print("[ASGI] App initialized successfully. Ready for Uvicorn.")
 
 except Exception as e:
-    print(f"❌ Failed to initialize ASGI app: {e}")
+    print(f"[ASGI] Failed to initialize ASGI app: {e}")
     import traceback
     traceback.print_exc()
