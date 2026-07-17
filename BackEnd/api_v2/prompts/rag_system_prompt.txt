@@ -56,6 +56,3 @@
 
 【資料來源 II：特質交互作用加強分析】 (Sheet 08 - Enhanced Context)
 {interactions}
-
-【AI 回答約束條件】 (Specific Constraints)
-{constraints}

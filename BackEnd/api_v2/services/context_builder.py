@@ -196,12 +196,8 @@ class ContextBuilder:
                         f"score={score} | display_name={display_name!r}"
                     )
             
-            # A. Base Traits Semantics
+            # A. Base Traits Semantics + Constraints (merged into one block per trait)
             for trait_id, score, band_row in processed_traits:
-                # Fetch Name (kept for internal constraint/interaction lookup only)
-                trait_def = db_session.query(TraitDefinition).filter_by(trait_id=trait_id).first()
-                t_name_zh = trait_def.name_zh if trait_def else trait_id
-                
                 # --- 安全輸出：不向 LLM 暴露 trait_id / name_zh / score / band ---
                 # 統一使用 semantic_label + description，讓 LLM 無法引用原始特質名稱
                 semantic = band_row.semantic_label or '行為傾向'
@@ -209,21 +205,20 @@ class ContextBuilder:
                     wording = band_row.report_wording_friendly or band_row.description or '無描述'
                 else:
                     wording = band_row.description or '無描述'
-                
-                components["base_analysis"] += f"  * 行為面向 — {semantic}:\n"
+
+                components["base_analysis"] += f"  [{cand_name} - {semantic}]:\n"
+                components["base_analysis"] += f"   * 行為面向 — {semantic}:\n"
                 components["base_analysis"] += f"    - {wording}\n"
                 if band_row.management_focus:
                     components["base_analysis"] += f"    - 管理重點: {band_row.management_focus}\n"
-                
-                # B. Constraints (Do/Dont)
+
+                # Constraints (Do/Dont), nested under the same trait block
                 if band_row.ai_guidance:
                     guidance = self._parse_json(band_row.ai_guidance)
-                    if guidance.get('do') or guidance.get('dont'):
-                        components["constraints"] += f"  [{cand_name} - {band_row.semantic_label or '行為傾向'}]:\n"
-                        if guidance.get('do'):
-                            components["constraints"] += f"    - MUST DO: {guidance['do']}\n"
-                        if guidance.get('dont'):
-                            components["constraints"] += f"    - DONT: {guidance['dont']}\n"
+                    if guidance.get('do'):
+                        components["base_analysis"] += f"    - MUST DO: {guidance['do']}\n"
+                    if guidance.get('dont'):
+                        components["base_analysis"] += f"    - DONT: {guidance['dont']}\n"
 
             # C. Interactions
             # Check interaction database for pairs present in this candidate

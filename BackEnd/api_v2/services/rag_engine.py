@@ -377,13 +377,12 @@ class RAGService:
                 try:
                     sys_prompt = module_prompt.format(
                         base_analysis=rag_context.get('base_analysis', ''),
-                        interactions=rag_context.get('interactions') if rag_context.get('interactions') else '(無顯著交互作用)',
-                        constraints=rag_context.get('constraints', '')
+                        interactions=rag_context.get('interactions') if rag_context.get('interactions') else '(無顯著交互作用)'
                     )
                 except KeyError as e:
                     # 部分模組 Prompt 可能不含所有佔位符，直接拼接
                     rag_logger.warning(f"Module prompt format partial match: {e}. Appending data as suffix.")
-                    sys_prompt = module_prompt + f"\n\n【基礎特質分析資料】\n{rag_context.get('base_analysis', '')}\n\n【特質交互作用加強分析】\n{rag_context.get('interactions', '(無顯著交互作用)')}\n\n【約束條件】\n{rag_context.get('constraints', '')}"
+                    sys_prompt = module_prompt + f"\n\n【基礎特質分析資料】\n{rag_context.get('base_analysis', '')}\n\n【特質交互作用加強分析】\n{rag_context.get('interactions', '(無顯著交互作用)')}"
                 
                 return self._call_llm(sys_prompt, query, uc_id, session_id)
         
@@ -475,8 +474,7 @@ class RAGService:
                 style_ref=style_ref,
                 risk_notes=risk_notes,
                 base_analysis=rag_context.get('base_analysis', ''),
-                interactions=rag_context.get('interactions') if rag_context.get('interactions') else "(無顯著交互作用)",
-                constraints=rag_context.get('constraints', '')
+                interactions=rag_context.get('interactions') if rag_context.get('interactions') else "(無顯著交互作用)"
             )
             return sys_prompt
         except KeyError as e:
