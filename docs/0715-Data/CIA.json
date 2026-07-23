@@ -1,0 +1,219 @@
+{
+  "80": {
+    "assessment_date": "N/A",
+    "assessment_id": 84,
+    "project_name_abbreviation": "CIA",
+    "traits": [
+      {
+        "band": "",
+        "name": "Social Desirability",
+        "score": 77,
+        "trait_id": "68b"
+      },
+      {
+        "band": "",
+        "name": "Modesty",
+        "score": 75,
+        "trait_id": "254f"
+      },
+      {
+        "band": "",
+        "name": "Gratitude",
+        "score": 73,
+        "trait_id": "147b"
+      },
+      {
+        "band": "",
+        "name": "Materialism Avoidance",
+        "score": 71,
+        "trait_id": "252f"
+      },
+      {
+        "band": "",
+        "name": "Personal Accountability",
+        "score": 67,
+        "trait_id": "130b"
+      },
+      {
+        "band": "",
+        "name": "Psychological Entitlement",
+        "score": 65,
+        "trait_id": "112b"
+      },
+      {
+        "band": "",
+        "name": "Collective Orientation",
+        "score": 62,
+        "trait_id": "118b"
+      },
+      {
+        "band": "",
+        "name": "Dutifulness",
+        "score": 60,
+        "trait_id": "487f"
+      },
+      {
+        "band": "",
+        "name": "Achievement Striving",
+        "score": 57,
+        "trait_id": "482f"
+      },
+      {
+        "band": "",
+        "name": "Honesty-Humility",
+        "score": 56,
+        "trait_id": "95b"
+      },
+      {
+        "band": "",
+        "name": "Empathy",
+        "score": 54,
+        "trait_id": "143b"
+      },
+      {
+        "band": "",
+        "name": "Deliberation",
+        "score": 52,
+        "trait_id": "486f"
+      },
+      {
+        "band": "",
+        "name": "Conscientiousness",
+        "score": 51,
+        "trait_id": "213b"
+      },
+      {
+        "band": "",
+        "name": "Sincerity",
+        "score": 50,
+        "trait_id": "251f"
+      },
+      {
+        "band": "",
+        "name": "Resilience",
+        "score": 50,
+        "trait_id": "100f"
+      },
+      {
+        "band": "",
+        "name": "Orderliness",
+        "score": 50,
+        "trait_id": "484f"
+      },
+      {
+        "band": "",
+        "name": "Perfectionism",
+        "score": 50,
+        "trait_id": "483f"
+      },
+      {
+        "band": "",
+        "name": "Impulse Control",
+        "score": 50,
+        "trait_id": "485f"
+      },
+      {
+        "band": "",
+        "name": "Authenticity",
+        "score": 48,
+        "trait_id": "192b"
+      },
+      {
+        "band": "",
+        "name": "Zest",
+        "score": 46,
+        "trait_id": "190b"
+      },
+      {
+        "band": "",
+        "name": "Self Competence",
+        "score": 45,
+        "trait_id": "488f"
+      },
+      {
+        "band": "",
+        "name": "Efficacy",
+        "score": 44,
+        "trait_id": "215f"
+      },
+      {
+        "band": "",
+        "name": "Approach to Efficiency",
+        "score": 44,
+        "trait_id": "238f"
+      },
+      {
+        "band": "",
+        "name": "Self Discipline",
+        "score": 40,
+        "trait_id": "489f"
+      },
+      {
+        "band": "",
+        "name": "Work Passion",
+        "score": 38,
+        "trait_id": "219b"
+      },
+      {
+        "band": "",
+        "name": "Psychological Capital",
+        "score": 36,
+        "trait_id": "20b"
+      },
+      {
+        "band": "",
+        "name": "Innovativeness",
+        "score": 33,
+        "trait_id": "79b"
+      },
+      {
+        "band": "",
+        "name": "Sufficiency of Originality",
+        "score": 33,
+        "trait_id": "236f"
+      },
+      {
+        "band": "",
+        "name": "Personal Growth Initiative",
+        "score": 32,
+        "trait_id": "191b"
+      },
+      {
+        "band": "",
+        "name": "Interpersonal Versatility",
+        "score": 31,
+        "trait_id": "52b"
+      },
+      {
+        "band": "",
+        "name": "Fairness",
+        "score": 29,
+        "trait_id": "253f"
+      },
+      {
+        "band": "",
+        "name": "Hope",
+        "score": 28,
+        "trait_id": "99f"
+      },
+      {
+        "band": "",
+        "name": "Optimism",
+        "score": 22,
+        "trait_id": "101f"
+      },
+      {
+        "band": "",
+        "name": "Rule Governance",
+        "score": 22,
+        "trait_id": "237f"
+      },
+      {
+        "band": "",
+        "name": "Equity Perception",
+        "score": 20,
+        "trait_id": "59b"
+      }
+    ]
+  }
+}

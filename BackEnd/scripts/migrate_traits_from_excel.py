@@ -167,7 +167,10 @@ def parse_interaction_sheet(ws):
         primary_trait_id = _cell(row, 0)
         if not primary_trait_id:
             continue
-        primary_band = _cell(row, 2)
+        raw_primary_band = _cell(row, 2)
+        # Strip Chinese descriptor suffix, e.g. 'A (高)' -> 'A', so it matches
+        # trait_bands.band and trigger_band's plain A/B/C format.
+        primary_band = raw_primary_band.split('(')[0].strip() if raw_primary_band else raw_primary_band
         interaction_json_str = _cell(row, 4)
         narrative = _cell(row, 5)
 

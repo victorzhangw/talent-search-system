@@ -29,6 +29,7 @@ httpcore==1.0.9
 httpx-sse==0.4.3
 jiter==0.12.0
 tiktoken==0.12.0
+opencc-python-reimplemented==0.1.7
 
 # --- Database ---
 SQLAlchemy==2.0.45

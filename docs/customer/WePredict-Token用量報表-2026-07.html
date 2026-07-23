@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WePredict — AI 人才解析服務 Token 用量報表</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  /* ── Header ── */
+  .report-header {
+    background: #1d1d1f;
+    color: #f5f5f7;
+    padding: 40px 48px 32px;
+    border-bottom: 4px solid #6a25f4;
+  }
+  .report-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .report-header .meta {
+    font-size: 13px;
+    color: #a1a1a6;
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+  }
+  .report-header .meta span { display: flex; align-items: center; gap: 6px; }
+  .badge {
+    display: inline-block;
+    background: #6a25f4;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 18px 28px;
+    border-bottom: 1px solid #e5e5ea;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-header h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1d1d1f;
+  }
+  .card-header .icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .icon-purple { background: #f2ecff; }
+  .icon-gray   { background: #f0f0f5; }
+  .icon-blue   { background: #e8f4ff; }
+  .card-body { padding: 24px 28px; }
+
+  /* ── Summary table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead tr { background: #f5f5f7; }
+  thead th {
+    text-align: left; padding: 12px 16px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.4px; color: #888;
+    border-bottom: 2px solid #e5e5ea;
+  }
+  thead th.num, tbody td.num { text-align: right; }
+  tbody td { padding: 14px 16px; border-bottom: 1px solid #f0f0f5; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr.total-row { background: #f8f5ff; }
+  tbody tr.total-row td { font-weight: 700; border-top: 2px solid #6a25f4; padding-top: 16px; padding-bottom: 16px; }
+  tbody tr.excluded-row { color: #999; }
+  .period { font-weight: 600; color: #1d1d1f; }
+  .tag {
+    display: inline-block;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 5px;
+    letter-spacing: 0.3px;
+  }
+  .tag-billed   { background: #f2ecff; color: #6a25f4; }
+  .tag-excluded { background: #f0f0f5; color: #777; }
+  .tag-estimate { background: #fff4e0; color: #b4650a; }
+  .mono { font-family: "SF Mono", "Fira Code", Consolas, monospace; }
+  .note-inline { font-size: 12.5px; color: #999; margin-top: 4px; }
+
+  .grand-total-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding: 18px 22px;
+    background: #1d1d1f;
+    border-radius: 10px;
+    color: #fff;
+  }
+  .grand-total-strip .label { font-size: 13px; color: #a1a1a6; margin-bottom: 4px; }
+  .grand-total-strip .value { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+  .grand-total-strip .value small { font-size: 14px; font-weight: 500; color: #c9b8fb; margin-left: 4px; }
+
+  /* ── Chart ── */
+  .chart-legend {
+    display: flex; gap: 20px; align-items: center;
+    margin-bottom: 18px; font-size: 13px; color: #555;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; }
+  .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+  .swatch-billed   { background: #6a25f4; }
+  .swatch-excluded { background: #c7c7cc; }
+
+  #chartWrap { width: 100%; overflow-x: auto; }
+  .bar {
+    fill: #6a25f4;
+  }
+  .bar.excluded {
+    fill: #c7c7cc;
+  }
+  .bar:hover { opacity: 0.8; cursor: default; }
+  .axis-label { font-size: 10px; fill: #999; font-family: -apple-system, "Segoe UI", sans-serif; }
+  .value-label { font-size: 10.5px; fill: #1d1d1f; font-weight: 700; font-family: -apple-system, "Segoe UI", sans-serif; }
+  .excluded-band {
+    fill: #fafaea;
+    stroke: #ffe58f;
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+  .excluded-band-label { font-size: 11px; fill: #a16207; font-weight: 700; }
+  .gridline { stroke: #ececf0; stroke-width: 1; }
+
+  .chart-note {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #666;
+    background: #fafafa;
+    border: 1px solid #e5e5ea;
+    border-radius: 10px;
+    padding: 14px 18px;
+    line-height: 1.7;
+  }
+  .chart-note strong { color: #1d1d1f; }
+
+  /* ── Data source note ── */
+  .source-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .source-list li {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 16px;
+    background: #fafafa;
+    border: 1px solid #e5e5ea;
+    border-radius: 10px;
+    font-size: 13.5px;
+    color: #444;
+  }
+  .source-list li strong { color: #1d1d1f; }
+  .source-list .src-icon { font-size: 16px; flex-shrink: 0; }
+
+  /* ── Footer ── */
+  .report-footer {
+    text-align: center;
+    font-size: 12px;
+    color: #aaa;
+    padding: 24px 0 40px;
+  }
+</style>
+</head>
+<body>
+
+<div class="report-header">
+  <h1>Token 用量報表</h1>
+  <div class="meta">
+    <span>&#127970; 客戶：WePredict</span>
+    <span>&#128197; 統計期間：2026/06/01 – 2026/07/03</span>
+    <span>&#128203; 產出日期：2026/07/12</span>
+    <span><span class="badge">DeepSeek API</span></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════════ 1. SUMMARY ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-purple">&#128202;</div>
+      <h2>用量與費用摘要</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr>
+            <th>期間</th>
+            <th class="num">Token 數</th>
+            <th class="num">約當文字量</th>
+            <th class="num">費用</th>
+            <th>性質</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="period">2026/06/01 – 2026/06/26</td>
+            <td class="num mono">104,830,787</td>
+            <td class="num mono">≈ 153,262,611 字</td>
+            <td class="num mono">$6.75 USD</td>
+            <td><span class="tag tag-billed">正式計費</span></td>
+          </tr>
+          <tr class="excluded-row">
+            <td class="period">2026/06/26 – 2026/06/30</td>
+            <td class="num mono">—</td>
+            <td class="num mono">—</td>
+            <td class="num mono">—</td>
+            <td>
+              <span class="tag tag-excluded">不列入計費</span>
+              <div class="note-inline">內部大量自動化測試造成異常流量，非客戶實際使用</div>
+            </td>
+          </tr>
+          <tr>
+            <td class="period">2026/07/01 – 2026/07/03</td>
+            <td class="num mono">82,093</td>
+            <td class="num mono">≈ 120,020 字</td>
+            <td class="num mono">≈ $0.0053 USD</td>
+            <td>
+              <span class="tag tag-estimate">估算費用</span>
+              <div class="note-inline">供應商報表僅提供 Token 數，費用按 6/1-6/26 同期費率換算</div>
+            </td>
+          </tr>
+          <tr class="total-row">
+            <td class="period">合計（計費部分）</td>
+            <td class="num mono">104,912,880</td>
+            <td class="num mono">≈ 153,382,631 字</td>
+            <td class="num mono">≈ $6.76 USD</td>
+            <td><span class="tag tag-billed">6/1-6/26 + 7/1-7/3</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note-inline" style="margin-top:10px;">換算依據：約 1.46 個中文字 / Token（依系統實際對話文字資料實測平均值）</div>
+
+      <div class="grand-total-strip">
+        <div>
+          <div class="label">本期應付總額（不含排除區間）</div>
+          <div class="value">$6.7553<small>USD（約合 104,912,880 tokens ≈ 153,382,631 字）</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 2. DAILY ACTIVITY CHART ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-gray">&#128201;</div>
+      <h2>每日系統活動量（輔助參考）</h2>
+    </div>
+    <div class="card-body">
+      <div class="chart-legend">
+        <div class="legend-item"><span class="legend-swatch swatch-billed"></span>計費區間</div>
+        <div class="legend-item"><span class="legend-swatch swatch-excluded"></span>測試期間（不列入計費）</div>
+      </div>
+      <div id="chartWrap">
+        <svg id="usageChart" width="1000" height="300"></svg>
+      </div>
+      <div class="chart-note">
+        <strong>觀察：</strong>6/26 單日系統記錄的對話 Token 量（414,563）明顯高於其他任何一天（次高約 6-8 萬），與同一時間出現的大量自動化測試流量吻合，是排除 6/26-6/30 這段區間計費的主要依據。此圖表數字來自內部資料庫稽核紀錄，僅反映「對話訊息」這一條路徑的用量，<strong>不等於</strong>上方 API 供應商官方計費的 Token 數字（供應商報表涵蓋所有實際 API 呼叫，範圍更廣），兩者用途不同、不可互相替代。
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ 3. DATA SOURCES ═══════════════════ -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon icon-blue">&#128161;</div>
+      <h2>資料來源說明</h2>
+    </div>
+    <div class="card-body">
+      <ul class="source-list">
+        <li>
+          <span class="src-icon">&#128181;</span>
+          <div><strong>Token 用量與費用</strong>：DeepSeek API 供應商官方用量報表（本報表計費數字之唯一依據）</div>
+        </li>
+        <li>
+          <span class="src-icon">&#128202;</span>
+          <div><strong>每日系統活動量</strong>：內部資料庫稽核紀錄（PostgreSQL，ai_chatbot_v2 / ai_chatbot_v2_prd 兩個環境，chat_messages 資料表），僅供用量趨勢參考，非計費依據</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<div class="report-footer">
+  本報表由 800AdPlus 提供 &nbsp;|&nbsp; 產出時間：2026-07-12
+</div>
+
+<script>
+  const data = [
+    {"date":"2026-06-01","tokens":14277,"excluded":false},
+    {"date":"2026-06-02","tokens":0,"excluded":false},
+    {"date":"2026-06-03","tokens":49098,"excluded":false},
+    {"date":"2026-06-04","tokens":32377,"excluded":false},
+    {"date":"2026-06-05","tokens":0,"excluded":false},
+    {"date":"2026-06-06","tokens":0,"excluded":false},
+    {"date":"2026-06-07","tokens":0,"excluded":false},
+    {"date":"2026-06-08","tokens":0,"excluded":false},
+    {"date":"2026-06-09","tokens":0,"excluded":false},
+    {"date":"2026-06-10","tokens":0,"excluded":false},
+    {"date":"2026-06-11","tokens":0,"excluded":false},
+    {"date":"2026-06-12","tokens":0,"excluded":false},
+    {"date":"2026-06-13","tokens":0,"excluded":false},
+    {"date":"2026-06-14","tokens":0,"excluded":false},
+    {"date":"2026-06-15","tokens":64404,"excluded":false},
+    {"date":"2026-06-16","tokens":17560,"excluded":false},
+    {"date":"2026-06-17","tokens":18704,"excluded":false},
+    {"date":"2026-06-18","tokens":33560,"excluded":false},
+    {"date":"2026-06-19","tokens":0,"excluded":false},
+    {"date":"2026-06-20","tokens":0,"excluded":false},
+    {"date":"2026-06-21","tokens":0,"excluded":false},
+    {"date":"2026-06-22","tokens":0,"excluded":false},
+    {"date":"2026-06-23","tokens":0,"excluded":false},
+    {"date":"2026-06-24","tokens":0,"excluded":false},
+    {"date":"2026-06-25","tokens":83193,"excluded":false},
+    {"date":"2026-06-26","tokens":414563,"excluded":true},
+    {"date":"2026-06-27","tokens":0,"excluded":true},
+    {"date":"2026-06-28","tokens":0,"excluded":true},
+    {"date":"2026-06-29","tokens":0,"excluded":true},
+    {"date":"2026-06-30","tokens":0,"excluded":true},
+    {"date":"2026-07-01","tokens":0,"excluded":false},
+    {"date":"2026-07-02","tokens":0,"excluded":false},
+    {"date":"2026-07-03","tokens":59502,"excluded":false}
+  ];
+
+  const svg = document.getElementById('usageChart');
+  const W = 1000, H = 300;
+  const padL = 60, padR = 16, padT = 30, padB = 40;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const maxVal = Math.max(...data.map(d => d.tokens));
+  const barGap = 3;
+  const barW = (chartW / data.length) - barGap;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs) {
+    const e = document.createElementNS(ns, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  // gridlines (0, 25%, 50%, 75%, 100% of maxVal)
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + chartH - (chartH * i / 4);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: y, y2: y, class: 'gridline' }));
+    const label = el('text', { x: padL - 10, y: y + 4, class: 'axis-label', 'text-anchor': 'end' });
+    label.textContent = Math.round(maxVal * i / 4).toLocaleString();
+    svg.appendChild(label);
+  }
+
+  // excluded band background
+  const firstExcludedIdx = data.findIndex(d => d.excluded);
+  const lastExcludedIdx = data.map(d => d.excluded).lastIndexOf(true);
+  if (firstExcludedIdx !== -1) {
+    const bx = padL + firstExcludedIdx * (barW + barGap) - barGap / 2;
+    const bw = (lastExcludedIdx - firstExcludedIdx + 1) * (barW + barGap);
+    svg.appendChild(el('rect', { x: bx, y: padT, width: bw, height: chartH, class: 'excluded-band', rx: 4 }));
+    const lbl = el('text', { x: bx + bw / 2, y: padT + 16, class: 'excluded-band-label', 'text-anchor': 'middle' });
+    lbl.textContent = '測試期間';
+    svg.appendChild(lbl);
+  }
+
+  data.forEach((d, i) => {
+    const x = padL + i * (barW + barGap);
+    const h = maxVal > 0 ? (d.tokens / maxVal) * chartH : 0;
+    const y = padT + chartH - h;
+    const bar = el('rect', {
+      x, y, width: Math.max(barW, 2), height: Math.max(h, 0),
+      class: 'bar' + (d.excluded ? ' excluded' : ''),
+      rx: 2
+    });
+    svg.appendChild(bar);
+
+    // Native tooltip on hover — attach directly to the bar we just created,
+    // not svg.lastChild (which would be whichever label got appended after it).
+    const title = el('title', {});
+    title.textContent = `${d.date}\nToken: ${d.tokens.toLocaleString()}${d.excluded ? '\n（測試期間，不列入計費）' : ''}`;
+    bar.appendChild(title);
+
+    // Direct label on the peak bar only (selective labeling)
+    if (d.tokens === maxVal && maxVal > 0) {
+      const vlabel = el('text', { x: x + barW / 2, y: y - 8, class: 'value-label', 'text-anchor': 'middle' });
+      vlabel.textContent = d.tokens.toLocaleString();
+      svg.appendChild(vlabel);
+    }
+
+    // Sparse x-axis date labels (every ~3 days to avoid crowding)
+    if (i % 3 === 0 || i === data.length - 1) {
+      const day = d.date.slice(5).replace('-', '/');
+      const tlabel = el('text', { x: x + barW / 2, y: H - padB + 16, class: 'axis-label', 'text-anchor': 'middle' });
+      tlabel.textContent = day;
+      svg.appendChild(tlabel);
+    }
+  });
+</script>
+
+</body>
+</html>

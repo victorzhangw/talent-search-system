@@ -29,6 +29,9 @@ env/
 .env.local
 .env.*.local
 
+# 資料庫帳密（明文憑證，勿提交）
+docs/db.csv
+
 # SSH 私鑰（重要！）
 *.pem
 *.key

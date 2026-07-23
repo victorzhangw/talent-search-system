@@ -5,6 +5,7 @@ import threading
 import os
 import time
 import jwt as pyjwt
+from opencc import OpenCC
 from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
@@ -21,6 +22,12 @@ conv_logger = get_conversation_logger()
 bp = Blueprint('chat', __name__, url_prefix='/chat')
 
 rag_service = None
+
+# Simplified -> Traditional (Taiwan) conversion, applied as a safety net on
+# LLM-generated titles: the prompt asks for 繁體中文 but reasoning models
+# (e.g. deepseek-v4-flash) don't reliably honor that, so titles occasionally
+# come back in Simplified Chinese without this.
+_title_cc = OpenCC('s2twp')
 
 def background_generate_title(session_id, user_query, candidate_names):
     try:
@@ -54,6 +61,7 @@ def background_generate_title(session_id, user_query, candidate_names):
             temperature=0.3
         )
         title = response.choices[0].message.content.strip().strip('"\'')
+        title = _title_cc.convert(title)
         if len(title) > 20:
             title = title[:20]
         if not title:

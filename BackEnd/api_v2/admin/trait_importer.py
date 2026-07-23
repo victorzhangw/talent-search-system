@@ -152,9 +152,12 @@ def _parse_interaction_sheet(ws):
                 trigger_band = t[0].get('band')
         except (json.JSONDecodeError, AttributeError):
             pass
+        raw_primary_band = _cell(row, 2)
         interactions.append({
             'primary_trait_id': primary_trait_id,
-            'primary_band':     _cell(row, 2),
+            # Strip Chinese descriptor suffix, e.g. 'A (高)' -> 'A', so it matches
+            # trait_bands.band and trigger_band's plain A/B/C format.
+            'primary_band':     raw_primary_band.split('(')[0].strip() if raw_primary_band else raw_primary_band,
             'trigger_trait_id': trigger_trait_id,
             'trigger_band':     trigger_band,
             'narrative':        _cell(row, 5),
