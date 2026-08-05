@@ -215,10 +215,18 @@ class ContextBuilder:
                 # Constraints (Do/Dont), nested under the same trait block
                 if band_row.ai_guidance:
                     guidance = self._parse_json(band_row.ai_guidance)
-                    if guidance.get('do'):
-                        components["base_analysis"] += f"    - MUST DO: {guidance['do']}\n"
-                    if guidance.get('dont'):
-                        components["base_analysis"] += f"    - DONT: {guidance['dont']}\n"
+                    # Use the verbatim cell text. Interpolating the split list rendered
+                    # its Python repr into the prompt ("MUST DO: ['可用於：…']"), which is
+                    # the `['` that b §6 unit check 3 forbids -- and the reason the client's
+                    # regex_pack carries a strip_python_list_wrapper rule as a workaround.
+                    # `*_raw` is written by both importers; fall back for rows imported
+                    # before that change.
+                    do = guidance.get('do_raw') or '；'.join(guidance.get('do') or [])
+                    dont = guidance.get('dont_raw') or '；'.join(guidance.get('dont') or [])
+                    if do:
+                        components["base_analysis"] += f"    - MUST DO: {do}\n"
+                    if dont:
+                        components["base_analysis"] += f"    - DONT: {dont}\n"
 
             # C. Interactions
             # Check interaction database for pairs present in this candidate

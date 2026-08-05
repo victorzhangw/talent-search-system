@@ -140,6 +140,11 @@ def parse_band_sheet(ws):
 
         min_score, max_score = _parse_band_range(_cell(row, COL['band_range']))
 
+        # `do_raw`/`dont_raw` are the verbatim cell text and are what the LOG packer
+        # injects -- the spec requires the four columns to be copied unchanged. The
+        # split lists are kept for existing callers, but they are lossy: 24 of the 339
+        # rows use a "• …\n• …" bullet layout, and splitting on newlines cannot be
+        # undone. Never rebuild the injected text from them.
         ai_do_raw = _cell(row, COL['ai_do']) or ''
         ai_dont_raw = _cell(row, COL['ai_dont']) or ''
         ai_do_list = [s.strip() for s in re.split(r'[;\n]+', ai_do_raw) if s.strip()]
@@ -157,7 +162,8 @@ def parse_band_sheet(ws):
             'trait_interaction_guide': _cell(row, COL['trait_interaction_guide']),
             'report_wording':         _cell(row, COL['report_wording_zh']),
             'report_wording_friendly': _cell(row, COL['report_wording_friendly']),
-            'ai_guidance':            {'do': ai_do_list, 'dont': ai_dont_list},
+            'ai_guidance':            {'do': ai_do_list, 'dont': ai_dont_list,
+                                       'do_raw': ai_do_raw, 'dont_raw': ai_dont_raw},
             'version':                _cell(row, COL['version']),
             'trait_project':          _extract_project(trait_id),
         })

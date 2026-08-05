@@ -109,8 +109,13 @@ def _parse_band_sheet(ws):
                 'hidden_anchor': _cell(row, COL['hidden_anchor']),
             }
         min_score, max_score = _parse_band_range(_cell(row, COL['band_range']))
-        ai_do = [s.strip() for s in re.split(r'[;\n]+', _cell(row, COL['ai_do']) or '') if s.strip()]
-        ai_dont = [s.strip() for s in re.split(r'[;\n]+', _cell(row, COL['ai_dont']) or '') if s.strip()]
+        # Keep the verbatim cell text alongside the split lists -- splitting on newlines
+        # is lossy for the bullet-style rows and the LOG packer must inject the原文
+        # unchanged. Mirrors scripts/migrate_traits_from_excel.py.
+        ai_do_raw = _cell(row, COL['ai_do']) or ''
+        ai_dont_raw = _cell(row, COL['ai_dont']) or ''
+        ai_do = [s.strip() for s in re.split(r'[;\n]+', ai_do_raw) if s.strip()]
+        ai_dont = [s.strip() for s in re.split(r'[;\n]+', ai_dont_raw) if s.strip()]
         bands.append({
             'trait_id':               trait_id,
             'band':                   band,
@@ -123,7 +128,8 @@ def _parse_band_sheet(ws):
             'trait_interaction_guide': _cell(row, COL['trait_interaction_guide']),
             'report_wording':         _cell(row, COL['report_wording_zh']),
             'report_wording_friendly': _cell(row, COL['report_wording_friendly']),
-            'ai_guidance':            {'do': ai_do, 'dont': ai_dont},
+            'ai_guidance':            {'do': ai_do, 'dont': ai_dont,
+                                       'do_raw': ai_do_raw, 'dont_raw': ai_dont_raw},
             'version':                _cell(row, COL['version']),
             'trait_project':          _extract_project(trait_id),
         })
