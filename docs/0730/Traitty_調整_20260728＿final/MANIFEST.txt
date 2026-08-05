@@ -1,0 +1,27 @@
+Traitty LOG 交付 定版快照  2026-07-28
+來源: C:\Users\Devin\Downloads\Traitty_LOG最終交付_20260727
+本快照為不可變定版；下方 sha256 供交付校驗。
+定版前複檢: c_v9 匡列 == 權威 JSON (True)；無殘留錯版引用。
+
+檔案                                                   位元組  sha256
+00_外包交接說明.md                                        7655  bde32255f7014617ad303e9802df76dc6cdb11be8397da49412d235daca29271
+01_設計總說明與決策定案_v2_20260728.md                        8129  7e3c3e5bc96f8550df80da95895411ecc254196894ca8cc54e6cd48766309332
+02_參考程式碼_打包器骨架.py                                  26664  58667d19dfa4564b358a30a9030ac2c8d45d3be4d57c4eebd91d9b1cf629e5ea
+03_API對接說明_TalentChatV2.md                          5258  4e0e7285d95ce9afdf9284e61a97200aab289ea38cd26aaadb23f949b462b233
+0722 02_08 V6.2 spec_.xlsx                       1042942  3c72b7fef9f0aa4fb360eb64a9f0007c6c04cb132f98cb0accc58d5457ea267a
+LOG檔版式區塊說明_v2_20260728.docx                        20281  4a44aa517d8a2015feb73c5fda5b76061e818214318fb0f243b801aeb3970bfe
+README_最終交付.md                                      5723  e0f4e82bbf70787f62d8b8fce7b30abec2a780d6a85563ae3052a31b4d811641
+a_LOG完成版模板_v2_20260727.md                           8527  bf2e9c35e393b1757fd69402c31f6dc009308b29fd0dcd8a17286b9b615f7042
+b_打包規則_v2_20260727.md                              10262  87dd464b713bf0d8542e555622c0b2c98b6cdaccab0aeb61c378f73e870e8a54
+c_快速提問重構版_v9_20260728.xlsx                         49441  732adf11d6b65534fff7ed62cd33e816e5ad77d294174e3eba4ae087def5bcf8
+construct_families_v1.json                          2986  baffca1c8aeb72d7b6e5a897235ad3fc71eeb235d5a6a17e81855f2b320920b7
+exit_scanner_wordlist_v6_2.json                    11555  c95672bb5e892ff872bf0a633f19ae4eb939b67e3718ee241d701d10bf75dd85
+question_injection_table_v9.json                  151367  11cfc3ed7cd14af51fbc80a5eaffb09bec1b5e86eb0a42a72860bf59412adda6
+regex_pack_v6_2.json                                1655  ef9a5d3eb21aea7161730683009793f9d6861b7f1f01d4937fc976c2d05edf39
+traits_113_v6_2.json                               19513  896785ad827f55da3ef53a1d02e1c7e72653a6af29c8c7819499be4b1f606f6d
+新版LOG範例_全人型_雙測驗_v7.txt                            139748  3aea5ac4b5184d55e5849922f7529801ac3745df8ac65e4bfed3d5b972544b45
+新版LOG範例_匡列型_壓力題_v7.txt                             46537  ffc35ee37b024e57c67b9ca95c1999b7642bd8019cf8f786c538956d0f3d0a2b
+新版LOG範例_多人型_會議團隊_v7.txt                           159353  26f8db804e7a2fde970fd2691d31beb16657201cf04f05ad162002f55ef92ee3
+風險端點表_定案_20260727.md                               12030  67c892cc152b5e9564cdd1e161c6828733a1175923a6cb4fada4c900975323d5
+
+檔數: 19  總位元組: 1729626

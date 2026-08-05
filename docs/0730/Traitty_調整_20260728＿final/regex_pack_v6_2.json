@@ -1,0 +1,42 @@
+{
+ "version": "V6.2-20260726",
+ "usage": "匯出打包時對敘事本文做確定性剝除／改寫；順序照 rules 列表執行。全部為 Python/PCRE 相容語法。",
+ "rules": [
+  {
+   "id": "strip_opening_clause",
+   "purpose": "剝除 08 敘事開頭配對句（配對資訊已上移到交互塊標頭 §3.2）",
+   "pattern": "^與 ?[A-Z]{3}_\\d+ ?[（(][^)）]+[)）] ?(高分|低分|[ABC]) ?聯動[：:]\\s*",
+   "replace": "",
+   "example_in": "與 CIA_22 (紀律遵循度) A聯動：表現為「…」。他在…",
+   "example_out": "表現為「…」。他在…"
+  },
+  {
+   "id": "strip_paren_codes",
+   "purpose": "清除本文殘留的括號代號（正本已清 458 列，此為第二道防線）",
+   "pattern": "[（(]\\s*\\d{2}\\s*[ABC]?(\\s*[,，、]\\s*\\d{2}\\s*[ABC]?)*\\s*[）)]",
+   "replace": "",
+   "example_in": "渴望成長（31）的同時…",
+   "example_out": "渴望成長的同時…"
+  },
+  {
+   "id": "strip_trait_id_refs",
+   "purpose": "本文內裸露的內部 ID（正常不應存在，防禦性）",
+   "pattern": "[A-Z]{3}_\\d+_?[ABC]?",
+   "replace": "",
+   "note": "只適用於敘事本文欄；標頭欄位的 ID 必須保留（程式匡列用）。"
+  },
+  {
+   "id": "strip_python_list_wrapper",
+   "purpose": "去除 MUST DO 欄位的 Python list 字串包裝（D4）",
+   "pattern": "^\\[?'?|'?\\]?$",
+   "replace": "",
+   "note": "建議改為直接讀原欄位文字而非 repr；此 regex 僅為救急。"
+  },
+  {
+   "id": "strip_empty_parens",
+   "purpose": "人名後空括號（D4）",
+   "pattern": "\\s*[（(]\\s*[)）]",
+   "replace": ""
+  }
+ ]
+}

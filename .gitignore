@@ -80,3 +80,9 @@ htmlcov/
 *.tmp
 *.bak
 *.swp
+
+# Office 開檔時產生的鎖定檔
+~$*
+
+# DB 匯入前的自動備份（可由 spec 重建，勿提交）
+BackEnd/scripts/backups/
