@@ -5,7 +5,9 @@ from .models import (
     AdminUser, 
     ChatSession, 
     ChatMessage, 
-    TraitDefinition, 
-    TraitBand, 
-    TraitInteraction
+    TraitDefinition,
+    TraitBand,
+    TraitInteraction,
+    TraitEndpoint,
+    EndpointBlock
 )

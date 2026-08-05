@@ -1,5 +1,6 @@
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean
+from sqlalchemy import (Column, Integer, SmallInteger, String, Text, DateTime, JSON,
+                        ForeignKey, Boolean, CheckConstraint, UniqueConstraint)
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
@@ -84,13 +85,49 @@ class TraitBand(Base):
 
 class TraitInteraction(Base):
     __tablename__ = 'trait_interactions'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     primary_trait_id = Column(String(50), ForeignKey('trait_definitions.trait_id'))
-    primary_band = Column(String(10)) 
+    primary_band = Column(String(10))
     trigger_trait_id = Column(String(50))
     trigger_band = Column(String(10))
     narrative = Column(Text)
+
+# --- Endpoints (spec V6.3 sheets 09_endpoints / 10_endpoint_blocks) ---
+# Kept in sync with scripts/migrations/2026-08-05_add_endpoint_tables.sql; the
+# constraints are declared here too so Base.metadata.create_all() on a fresh DB
+# produces the same schema as the migration file.
+class EndpointBlock(Base):
+    __tablename__ = 'endpoint_blocks'
+
+    block_key = Column(String(32), primary_key=True)
+    question_type = Column(String(16), nullable=False)  # scoped | whole_person | both
+    header_text = Column(Text, nullable=False)          # verbatim, never rewritten
+    sort_order = Column(SmallInteger, nullable=False)   # output order within a LOG
+    priority = Column(SmallInteger, nullable=False)     # lower wins when an interaction matches several
+    footnote_rule = Column(Text)
+
+    __table_args__ = (
+        CheckConstraint("question_type IN ('scoped', 'whole_person', 'both')",
+                        name='ck_endpoint_blocks_qtype'),
+    )
+
+class TraitEndpoint(Base):
+    __tablename__ = 'trait_endpoints'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trait_id = Column(String(50), ForeignKey('trait_definitions.trait_id', ondelete='CASCADE'),
+                      nullable=False)
+    band = Column(String(10), nullable=False)           # A/B/C, or '*' for trait-level endpoints
+    endpoint_type = Column(String(32), nullable=False)  # risk | calibration | future types
+    endpoint_level = Column(String(32))                 # record only; never a branch condition
+    block_key = Column(String(32), ForeignKey('endpoint_blocks.block_key'), nullable=False)
+    note = Column(Text)
+
+    __table_args__ = (
+        UniqueConstraint('trait_id', 'band', 'endpoint_type', name='uq_trait_endpoints'),
+        CheckConstraint("band IN ('A', 'B', 'C', '*')", name='ck_trait_endpoints_band'),
+    )
 
 # --- API Usage & Settlement ---
 class DailySettlementRecord(Base):
