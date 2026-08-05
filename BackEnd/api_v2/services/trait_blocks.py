@@ -72,6 +72,12 @@ class TraitBlockRenderer:
             self._names[trait_id] = row.name_zh if row else trait_id
         return self._names[trait_id]
 
+    def semantic_label(self, trait_id: str, band: str) -> str:
+        """The short band label, e.g. 情境波動. Used in both the trait block header and
+        the two ends of an interaction header."""
+        row = self._band_row(trait_id, band)
+        return row.semantic_label if row else ''
+
     def render_full_block(self, trait_id: str, band: str) -> Optional[str]:
         row = self._band_row(trait_id, band)
         if row is None:
