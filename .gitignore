@@ -86,3 +86,5 @@ htmlcov/
 
 # DB 匯入前的自動備份（可由 spec 重建，勿提交）
 BackEnd/scripts/backups/
+BackEnd/scripts/redteam_run.log
+BackEnd/scripts/redteam_result.json
