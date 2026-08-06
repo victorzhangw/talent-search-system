@@ -65,6 +65,11 @@ class TraitBlockRenderer:
                                 .first())
         return self._bands[key]
 
+    def name_zh(self, trait_id: str) -> str:
+        """Chinese trait name. Public because the exit scanner needs the set of names
+        that actually went into a payload (b §7 per-request narrowing)."""
+        return self._name_zh(trait_id)
+
     def _name_zh(self, trait_id: str) -> str:
         if trait_id not in self._names:
             row = (db_session.query(TraitDefinition)

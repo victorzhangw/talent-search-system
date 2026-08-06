@@ -70,12 +70,17 @@ class Respondent:
 
 
 class AssembledLog:
-    __slots__ = ('body', 'instruction', 'audit')
+    __slots__ = ('body', 'instruction', 'audit', 'injected_names', 'injected_labels')
 
-    def __init__(self, body: str, instruction: str, audit: dict):
+    def __init__(self, body: str, instruction: str, audit: dict,
+                 injected_names=None, injected_labels=None):
         self.body = body                  # [SYSTEM PROMPT] … 【輸入數據】 …
         self.instruction = instruction    # [任務指令]\n…
         self.audit = audit
+        # What the exit scanner narrows itself to for this request (b §7 per-request
+        # 動態縮小): only names and labels that actually made it into the payload.
+        self.injected_names = injected_names or set()
+        self.injected_labels = injected_labels or set()
 
     def to_log_text(self) -> str:
         return f'{self.body}\n\n{SEPARATOR}\n\n{self.instruction}'
@@ -165,11 +170,15 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
     renderer = renderer or TraitBlockRenderer()
     blocks, audits = [], []
     scoped_by_id = {}
+    names, labels = set(), set()
     for r in respondents:
         text, audit = _respondent_block(r, question, renderer)
         blocks.append(text)
         audits.append(audit)
         scoped_by_id[r.respondent_id] = split_traits(r.scores, question).scoped_ids
+        for trait_id, band in r.scores.items():
+            names.add(renderer.name_zh(trait_id))
+            labels.add(renderer.semantic_label(trait_id, band))
 
     body = '\n\n'.join([SYSTEM_MARKER, load_system_prompt().rstrip('\n'),
                         SEPARATOR, DATA_HEADER] + blocks)
@@ -188,7 +197,9 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
         'audience': 'multi' if len(respondents) > 1 else 'single',
         'respondents': audits,
     }
-    log = AssembledLog(body, f'{INSTRUCTION_MARKER}\n{instruction_text}', audit)
+    log = AssembledLog(body, f'{INSTRUCTION_MARKER}\n{instruction_text}', audit,
+                       injected_names={n for n in names if n},
+                       injected_labels={l for l in labels if l})
 
     if run_checks:
         from .unit_check import run_unit_checks
