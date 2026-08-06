@@ -1,0 +1,168 @@
+"""Acceptance for the b §8 completeness checks.
+
+Usage:
+    python scripts/verify_completeness_check.py
+
+The heading cases come from the acceptance table in `_ LOG 實作補充說明 for victor.txt`;
+the rest cover the empty-sections logging rule, the multi-person name rule, free-form
+length, calibration evidence, and the incremental (segment-by-segment) path.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), encoding='utf-8-sig')
+
+from api_v2.services.question_table import table  # noqa: E402
+from api_v2.services.log_assembler import Respondent  # noqa: E402
+from api_v2.services.completeness_check import (  # noqa: E402
+    CompletenessChecker, check_answer, normalize_heading, expected_sections_for,
+    SKIP_LOG, UNSPLIT_LOG, EVIDENCE_TERMS, FREE_FORM_MAX_CHARS)
+
+CALIB = table.calibration_traits
+failures = []
+
+
+def check(label, condition, detail=''):
+    print(f"  [{'OK' if condition else 'FAIL'}] {label}{(' -- ' + str(detail)) if detail else ''}")
+    if not condition:
+        failures.append(label)
+
+
+def sections_answer(q, headings, extra_body=''):
+    return '\n\n'.join(headings) + ('\n\n' + extra_body if extra_body else '')
+
+
+def main():
+    q5 = table.get('如何面對困難、壓力、挑戰')
+    r1 = [Respondent('王智弘', 'R1', {'CIA_05': 'B'})]
+
+    print('\n[1] Heading matching -- the spec acceptance table')
+    cases = [
+        ('4. 主管使用提醒', '主管使用提醒', True),
+        ('四、主管使用提醒：', '主管使用提醒', True),
+        ('以下提供主管使用提醒', '主管使用提醒', False),
+        ('主管注意事項', '主管使用提醒', False),
+        ('## 主管使用提醒', '主管使用提醒', True),
+        ('**主管使用提醒**', '主管使用提醒', True),
+        ('第四部分，主管使用提醒', '主管使用提醒', True),
+    ]
+    for line, expected, should_match in cases:
+        got = normalize_heading(line) == normalize_heading(expected)
+        check(f'{line!r} vs {expected!r} -> {"match" if should_match else "no match"}',
+              got == should_match, f'normalized to {normalize_heading(line)!r}')
+
+    print('\n[2] Subset test on a real question')
+    full = sections_answer(q5, q5['expected_sections'])
+    res = check_answer(full, r1, q5, CALIB)
+    check('all expected headings present -> passed', res.status == 'passed', res.missing_sections)
+    res = check_answer(full + '\n\n額外補充\n\n內容', r1, q5, CALIB)
+    check('extra headings are allowed', res.status == 'passed', res.missing_sections)
+    res = check_answer(sections_answer(q5, q5['expected_sections'][:-1]), r1, q5, CALIB)
+    check('a missing heading -> failed', res.status == 'failed'
+          and res.missing_sections == [q5['expected_sections'][-1]], res.missing_sections)
+    check('reason() names what is missing', '缺少段落' in res.reason(), res.reason())
+    res = check_answer('本文提到 ' + ' 和 '.join(q5['expected_sections']), r1, q5, CALIB)
+    check('expected text in running prose does NOT count', res.status == 'failed',
+          res.missing_sections)
+
+    print('\n[3] Empty expected_sections must be logged, never silently passed')
+    for idx in (14, 15, 22):
+        q = table.get(idx)
+        n = 2 if q['audience'] == 'multi_only' else 1
+        rs = [Respondent(f'受測者{i}', f'R{i}', {'CIA_05': 'B'}) for i in range(1, n + 1)]
+        res = check_answer('任意回答', rs, q, CALIB)
+        check(f'idx {idx}: skipped and logged', res.status in ('skipped', 'failed')
+              and SKIP_LOG in res.log_lines, res.log_lines)
+    check('the log line is the spec wording verbatim',
+          SKIP_LOG == '本題未做段落齊全檢查（原因：指令未定義固定段落標題）')
+
+    print('\n[4] 事項 13: single/multi split with a reported fallback')
+    single, note = expected_sections_for(q5, 1)
+    multi, note_m = expected_sections_for(q5, 2)
+    check('no question has the split fields yet -> fallback used',
+          note == UNSPLIT_LOG and single == multi == q5['expected_sections'])
+    check('the fallback is recorded in the result log',
+          UNSPLIT_LOG in check_answer(full, r1, q5, CALIB).log_lines)
+    split_q = dict(q5, expected_sections_single=['甲'], expected_sections_multi=['乙', '丙'])
+    check('split fields are preferred when present',
+          expected_sections_for(split_q, 1)[0] == ['甲']
+          and expected_sections_for(split_q, 2)[0] == ['乙', '丙'])
+    check('no fallback note once the data is split', expected_sections_for(split_q, 1)[1] is None)
+
+    print('\n[5] Multi-person: each respondent needs their own heading')
+    two = [Respondent('王智弘', 'R1', {'CIA_05': 'B'}),
+           Respondent('林孟德', 'R2', {'CIA_05': 'B'})]
+    body = sections_answer(q5, q5['expected_sections'])
+    res = check_answer('## 王智弘\n\n' + body + '\n\n## 林孟德\n\n' + body, two, q5, CALIB)
+    check('both names present as headings -> passed', res.status == 'passed',
+          res.missing_respondents)
+    res = check_answer('## 王智弘\n\n' + body, two, q5, CALIB)
+    check('a missing respondent -> failed', res.status == 'failed'
+          and res.missing_respondents == ['林孟德'], res.missing_respondents)
+    res = check_answer(body + '\n\n關於林孟德的部分寫在內文', two, q5, CALIB)
+    check('a name only in running prose does not count',
+          '林孟德' in res.missing_respondents, res.missing_respondents)
+    check('single-person answers are not name-checked',
+          not check_answer(body, r1, q5, CALIB).missing_respondents)
+
+    print('\n[6] Free-form: length only')
+    res = check_answer('短短的回答。', r1, None, CALIB)
+    check('short free-form answer passes', res.status == 'passed', res.char_count)
+    res = check_answer('字' * (FREE_FORM_MAX_CHARS + 1), r1, None, CALIB)
+    check(f'over {FREE_FORM_MAX_CHARS} chars -> failed', res.status == 'failed', res.char_count)
+    res = check_answer('字' * 500 + ' \n' * 800, r1, None, CALIB)
+    check('whitespace is not counted', res.status == 'passed', res.char_count)
+    check('free-form is not section-checked', not check_answer('x', r1, None, CALIB).missing_sections)
+
+    print('\n[7] Calibration evidence (社會期望反應 A 段)')
+    calib_r = [Respondent('王智弘', 'R1', {'CIA_05': 'B', 'CIA_33': 'A'})]
+    res = check_answer(body, calib_r, q5, CALIB)
+    check('A-band calibration without evidence wording -> failed',
+          res.calibration_evidence == 'failed' and res.status == 'failed')
+    check('reason() asks for the evidence wording', '佐證' in res.reason(), res.reason())
+    for term in EVIDENCE_TERMS:
+        res = check_answer(body + f'\n\n建議以{term}進一步確認。', calib_r, q5, CALIB)
+        check(f'evidence term 「{term}」 satisfies the check',
+              res.calibration_evidence == 'passed')
+    res = check_answer(body, [Respondent('王智弘', 'R1', {'CIA_05': 'B', 'CIA_33': 'B'})],
+                       q5, CALIB)
+    check('B-band calibration does not require evidence', res.calibration_evidence == 'n/a')
+
+    print('\n[8] Incremental accumulation (客戶裁定丙-1)')
+    checker = CompletenessChecker(r1, q5, CALIB)
+    for i, sec in enumerate(q5['expected_sections']):
+        checker.observe(f'{i + 1}. {sec}\n內容內容。\n')
+        if i < len(q5['expected_sections']) - 1:
+            check(f'no verdict is possible mid-answer (after section {i + 1})',
+                  checker.finalize().status == 'failed')
+    check('passes once every segment has arrived', checker.finalize().status == 'passed',
+          checker.finalize().missing_sections)
+    one_shot = check_answer(''.join(f'{i + 1}. {s}\n內容內容。\n'
+                                    for i, s in enumerate(q5['expected_sections'])), r1, q5, CALIB)
+    check('segment-by-segment and one-shot agree',
+          one_shot.status == checker.finalize().status)
+
+    print('\n[9] Data risk scan (informational)')
+    stale = []
+    for q in table.all():
+        for sec in q.get('expected_sections') or []:
+            key = 'instruction_multi' if q['audience'] == 'multi_only' else 'instruction_single'
+            if sec not in (q.get(key) or ''):
+                stale.append((q['idx'], sec))
+    print(f'  {len(stale)} expected_sections entries do not appear verbatim in their instruction:')
+    for idx, sec in stale[:8]:
+        print(f'    idx {idx}: {sec!r}')
+    print('  These will be reported as missing even from a compliant answer. b §8 treats a')
+    print('  miss as a soft failure (one regeneration, then manual), so this degrades')
+    print('  gracefully -- but the wording needs aligning content-side.')
+
+    print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
+    return 1 if failures else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
