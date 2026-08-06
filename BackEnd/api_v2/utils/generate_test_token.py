@@ -24,19 +24,19 @@ def main():
 
     try:
         token = generate_upstream_token(email)
-        print("\n✅ Token Generated Successfully:")
+        print("\n[OK] Token Generated Successfully:")
         print("-" * 60)
         print(token)
         print("-" * 60)
         print(f"User: {email}")
         print("Validity: 15 minutes")
     except Exception as e:
-        print(f"\n❌ Error generating token: {e}")
+        print(f"\nERROR: Error generating token: {e}")
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"\n❌ 未預期的錯誤: {e}")
+        print(f"\nERROR: 未預期的錯誤: {e}")
     finally:
         input("\n請按 Enter 鍵離開...")

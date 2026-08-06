@@ -17,7 +17,7 @@ from backend.api_v2.database.models import (
 from backend.api_v2.admin.auth import get_password_hash
 
 def migrate_sqlite_to_pg():
-    print("🚀 Starting Migration: SQLite -> Local PostgreSQL")
+    print("Starting Migration: SQLite -> Local PostgreSQL")
     
     # 1. Setup PG Connection
     pg_session = get_db_session()
@@ -34,14 +34,14 @@ def migrate_sqlite_to_pg():
         hashed_pw = get_password_hash('admin123')
         new_admin = AdminUser(username='admin', password_hash=hashed_pw)
         pg_session.add(new_admin)
-        print("   ✅ Created default admin: admin / admin123")
+        print("   [OK] Created default admin: admin / admin123")
     else:
-        print("   ℹ️ Admin user already exists.")
+        print("   [INFO] Admin user already exists.")
     
     # 3. Connect to SQLite (app.db)
     sqlite_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'app.db')
     if not os.path.exists(sqlite_path):
-        print(f"   ⚠️ SQLite DB not found at {sqlite_path}. Skipping data migration.")
+        print(f"   WARNING: SQLite DB not found at {sqlite_path}. Skipping data migration.")
         pg_session.commit()
         return
 
@@ -93,7 +93,7 @@ def migrate_sqlite_to_pg():
             )
             pg_session.add(inter)
     else:
-        print("   ℹ️ Traits already populate in PG. Skipping trait migration.")
+        print("   [INFO] Traits already populate in PG. Skipping trait migration.")
 
     # 5. Migrate Chat Logs (Optional: Map old ChatLog to new Session/Message?)
     # Old ChatLog: id, session_id, meta_info, timestamp
@@ -128,15 +128,15 @@ def migrate_sqlite_to_pg():
             # For now, simplistic migration of session record.
             
     except Exception as e:
-        print(f"   ⚠️ Could not migrate some chat logs: {e}")
+        print(f"   WARNING: Could not migrate some chat logs: {e}")
 
     # Commit all changes
     try:
         pg_session.commit()
-        print("✅ Migration Complete!")
+        print("[OK] Migration Complete!")
     except Exception as e:
         pg_session.rollback()
-        print(f"❌ Migration Failed: {e}")
+        print(f"ERROR: Migration Failed: {e}")
     finally:
         pg_session.close()
         conn.close()

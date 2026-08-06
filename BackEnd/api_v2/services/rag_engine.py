@@ -235,7 +235,7 @@ class RAGService:
             # C. Detailed Assessments (Batch)
             # NEW: Check if trait_reports are provided from frontend
             if trait_reports:
-                rag_logger.info(f"✅ Using trait reports from frontend for {len(trait_reports)} candidates")
+                rag_logger.info(f"[OK] Using trait reports from frontend for {len(trait_reports)} candidates")
 
                 # [方案 A] 以 trait_reports 為迴圈主體 (而非 candidates_basic)
                 # 確保每位有報告資料的候選人都會被處理，不受 candidates_basic 的 ID 型別或順序影響
