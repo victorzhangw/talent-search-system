@@ -50,6 +50,10 @@ class AudienceMismatch(ValueError):
     """b §1.1: 人數與 audience 不符必須拒絕請求，不可繼續組裝."""
 
 
+class UnknownTrait(ValueError):
+    """A (trait_id, band) the loaded spec has no row for."""
+
+
 class Respondent:
     __slots__ = ('name', 'respondent_id', 'scores', 'tests')
 
@@ -101,6 +105,15 @@ def check_audience(respondents: List[Respondent], question: Optional[dict]):
 def _respondent_block(respondent: Respondent, question: Optional[dict],
                       renderer: TraitBlockRenderer) -> tuple:
     split = split_traits(respondent.scores, question)
+
+    # A trait_id/band the spec doesn't have would otherwise render as None and surface as
+    # a TypeError from the join, several frames away from the actual cause.
+    unknown = [f'{t}_{b}' for t, b in split.full + split.index
+               if renderer.render_full_block(t, b) is None]
+    if unknown:
+        raise UnknownTrait(f'{respondent.respondent_id}: not in trait_bands: '
+                           f'{", ".join(sorted(unknown))}')
+
     parts = [respondent.header, split.subject_header]
     parts += [renderer.render_full_block(t, b) for t, b in split.full]
 
@@ -128,20 +141,35 @@ def _respondent_block(respondent: Respondent, question: Optional[dict],
     return '\n\n'.join(parts), audit
 
 
+class UnitCheckFailed(RuntimeError):
+    """b §6 checks did not pass; the payload must not be sent."""
+
+    def __init__(self, problems):
+        self.problems = problems
+        super().__init__('; '.join(str(p) for p in problems))
+
+
 def assemble(respondents: List[Respondent], question: Optional[dict],
              user_query: Optional[str] = None,
-             renderer: Optional[TraitBlockRenderer] = None) -> AssembledLog:
-    """question=None means free-form, and then user_query is required (b §1.1)."""
+             renderer: Optional[TraitBlockRenderer] = None,
+             run_checks: bool = True) -> AssembledLog:
+    """question=None means free-form, and then user_query is required (b §1.1).
+
+    b §6 says the unit checks run on every assembly, so they are on by default and raise
+    rather than warn -- an opt-in check is one that eventually stops being called.
+    """
     if question is None and not (user_query or '').strip():
         raise ValueError('free-form mode requires user_query')
     check_audience(respondents, question)
 
     renderer = renderer or TraitBlockRenderer()
     blocks, audits = [], []
+    scoped_by_id = {}
     for r in respondents:
         text, audit = _respondent_block(r, question, renderer)
         blocks.append(text)
         audits.append(audit)
+        scoped_by_id[r.respondent_id] = split_traits(r.scores, question).scoped_ids
 
     body = '\n\n'.join([SYSTEM_MARKER, load_system_prompt().rstrip('\n'),
                         SEPARATOR, DATA_HEADER] + blocks)
@@ -160,4 +188,12 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
         'audience': 'multi' if len(respondents) > 1 else 'single',
         'respondents': audits,
     }
-    return AssembledLog(body, f'{INSTRUCTION_MARKER}\n{instruction_text}', audit)
+    log = AssembledLog(body, f'{INSTRUCTION_MARKER}\n{instruction_text}', audit)
+
+    if run_checks:
+        from .unit_check import run_unit_checks
+        problems = run_unit_checks(log.to_log_text(), respondents, question, scoped_by_id)
+        audit['unit_check'] = 'passed' if not problems else [str(p) for p in problems]
+        if problems:
+            raise UnitCheckFailed(problems)
+    return log
