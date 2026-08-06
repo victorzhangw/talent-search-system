@@ -538,6 +538,37 @@ class RAGService:
             # Use 'yield from' if this was a generator, but here we return the generator object
             return self._mock_stream_fallback(error_msg=str(e)), uc_id
 
+    # --- LOG packer adapters (事項 16) -------------------------------------------------
+    # The packer builds its own messages and needs plain text back, so these bypass the
+    # prompt-template path entirely and just drive the client. Injected into LogPipeline
+    # rather than imported by it, which is what lets the whole pipeline be tested offline.
+
+    def packer_stream(self, messages):
+        """Token strings for a packer-assembled request."""
+        rag_logger.info(f"[Packer] streaming with model '{self.model_name}', "
+                        f"{len(messages)} messages")
+        stream = self.client.chat.completions.create(
+            model=self.model_name, messages=messages, stream=True)
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta:
+                content = chunk.choices[0].delta.content
+                if content:
+                    yield content
+
+    def packer_followup(self, messages, instruction):
+        """One non-streamed turn: segment rewrite or missing-section completion. Returns
+        empty on failure so the gate falls back to blocked/manual_review rather than
+        releasing unverified text."""
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages + [{'role': 'user', 'content': instruction}],
+                stream=False)
+            return (resp.choices[0].message.content or '') if resp.choices else ''
+        except Exception as e:
+            rag_logger.error(f"[Packer] follow-up call failed: {e}", exc_info=True)
+            return ''
+
     def _mock_stream_fallback(self, error_msg=None):
         # Log the raw error server-side; never expose API details to the frontend.
         if error_msg:

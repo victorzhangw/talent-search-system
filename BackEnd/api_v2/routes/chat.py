@@ -389,14 +389,28 @@ def chat():
             conv_logger.info(f"[USER] SessionID: {session_id} | UserID: {user_id} | Content: {query}")
 
             llm_start = time.time()
+
+            # LOG packer path (事項 16). Off by default. try_packed_stream returns None
+            # whenever it cannot serve the request, and then everything below runs
+            # exactly as before -- a request is never served by both paths.
+            packed = None
+            if current_app.config.get('USE_LOG_PACKER') and trait_reports:
+                from ..services.packed_chat import try_packed_stream
+                packed = try_packed_stream(rag_service, module_id, query, mode,
+                                           trait_reports, candidates_info, session_id)
+
             try:
-                response_stream, use_case_id = rag_service.generate_response(
-                    query, candidate_ids, session_id,
-                    candidates_info=candidates_info,
-                    trait_reports=trait_reports,
-                    mode=mode,
-                    module_id=module_id
-                )
+                if packed is not None:
+                    # Chunk-shaped, so the streaming loop below needs no changes.
+                    response_stream, use_case_id = packed, 'log_packer'
+                else:
+                    response_stream, use_case_id = rag_service.generate_response(
+                        query, candidate_ids, session_id,
+                        candidates_info=candidates_info,
+                        trait_reports=trait_reports,
+                        mode=mode,
+                        module_id=module_id
+                    )
             except OperationalError as db_err:
                 print(f"[RAG DB Error] {db_err}", flush=True)
                 yield f"data: {json.dumps({'type': 'error', 'code': 'DB_UNAVAILABLE', 'message': '資料庫暫時無法連線，請通知管理員檢查後端服務。'})}\n\n"
@@ -437,7 +451,15 @@ def chat():
                 traceback.print_exc()
                 has_llm_error = True
                 yield f"data: {json.dumps({'type': 'error', 'code': 'STREAM_INTERRUPTED', 'message': '連線中斷，請稍後再試。'})}\n\n"
-            
+
+            if packed is not None:
+                # Writes the structured audit record; blocked/manual_review means the
+                # answer stopped early or is incomplete, and the user is told so rather
+                # than being left with a truncated reply that looks finished.
+                packer_audit = packed.finish()
+                if packer_audit.get('status') and packer_audit['status'] != 'ok':
+                    yield f"data: {json.dumps({'type': 'notice', 'code': packer_audit['status'], 'message': '本次回覆未通過完整性或安全檢查，已轉人工複核。'})}\n\n"
+
             # Log Assistant Message & Usage
             prompt_tokens = 0
             completion_tokens = 0

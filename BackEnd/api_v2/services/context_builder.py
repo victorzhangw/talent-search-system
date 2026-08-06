@@ -2,6 +2,7 @@ from typing import Dict, List
 import json
 import re
 from ..database import db_session, TraitBand, TraitInteraction, TraitDefinition
+from .respondent_adapter import resolve_traits
 from ..utils.logger import get_daily_logger
 
 trait_match_audit_logger = get_daily_logger('TraitMatchAudit', 'trait_match_audit.log')
@@ -103,99 +104,17 @@ class ContextBuilder:
                 components["base_analysis"] += "  (無詳細測評數據)\n"
                 continue
 
-            # Band Calculation
-            candidate_bands_map = {}
-            processed_traits = []
-            
-            if isinstance(results, dict):
-                results_list = results.values()
-            elif isinstance(results, list):
-                results_list = results
-            else:
-                results_list = []
+            # Band Calculation -- resolution lives in respondent_adapter so the legacy
+            # prompt path and the LOG packer cannot drift apart on which band a score maps to.
+            def _skip(reason, ctx):
+                detail = ' | '.join(f'{k}={v!r}' for k, v in ctx.items())
+                trait_match_audit_logger.warning(
+                    f"reason={reason} | candidate={cand_name} | {detail}")
 
-            from sqlalchemy import func
+            resolved = resolve_traits(cand, on_skip=_skip)
+            candidate_bands_map = {t.trait_id: t.band for t in resolved}
+            processed_traits = [(t.trait_id, t.score, t.band_row) for t in resolved]
 
-            for res in results_list:
-                # 1. Identify Identifiers
-                # 注意：API 的 chinese_name 欄位實際存放的是英文名稱（如 'Hope'、'Gratitude'）
-                # API 的 trait_id（如 '99f'）與 DB 的 trait_id（如 'CIA_16'）格式不同，不使用
-                display_name = res.get('chinese_name') or res.get('trait_name')
-
-                if not display_name:
-                    trait_match_audit_logger.warning(
-                        f"reason=no_name | candidate={cand_name} | raw_res={res}"
-                    )
-                    continue
-
-                # 2. Key Mapping (ID/Name -> DB Trait ID)
-                # [方案 B] 不使用硬編碼預設值 'CIA'，缺失時直接跳過此特質
-                project_abbrev = asmt.get('project_name_abbreviation')
-                if not project_abbrev:
-                    # 無法識別報告類型，跳過整個候選人的此特質（不能亂猜）
-                    trait_match_audit_logger.warning(
-                        f"reason=no_project_abbrev | candidate={cand_name} | display_name={display_name!r}"
-                    )
-                    continue
-                
-                # --- DB 查詢策略 ---
-                # 甲方 API 的 trait_id（如 '99f'、'147b'）與 DB 的 trait_id（如 'CIA_16'）
-                # 格式完全不同，無法直接比對。
-                # 正確做法：用 API 的 chinese_name（實為英文名，如 'Hope'）
-                # 比對 DB 的 name_en，再以 project_abbrev 前綴過濾。
-                trait_def = None
-                
-                if display_name:
-                    # 策略 A：用英文名比對 name_en（主要路徑）
-                    # 格式容錯：比對前雙方都去除空白/連字號等非英數字元並轉小寫，
-                    # 避免廠商端格式差異（如 'Self-Discipline' vs 'Self Discipline'）
-                    # 造成明明是同一個特質卻比對失敗。不處理真正用詞不同的情況。
-                    normalized_input = _normalize_en_name(display_name)
-                    normalized_name_en = func.lower(func.regexp_replace(TraitDefinition.name_en, r'[^a-zA-Z0-9]', '', 'g'))
-                    trait_def = db_session.query(TraitDefinition).filter(
-                        normalized_name_en == normalized_input,
-                        TraitDefinition.trait_id.like(f"{project_abbrev}_%")
-                    ).first()
-                
-                if not trait_def and display_name:
-                    # 策略 B：Fallback 用中文名比對 name_zh（以防規格書 name_en 為中文的情況）
-                    trait_def = db_session.query(TraitDefinition).filter(
-                        func.trim(func.lower(TraitDefinition.name_zh)) == func.trim(func.lower(display_name)),
-                        TraitDefinition.trait_id.like(f"{project_abbrev}_%")
-                    ).first()
-                
-                if not trait_def:
-                    trait_match_audit_logger.warning(
-                        f"reason=no_trait_def_match | candidate={cand_name} | "
-                        f"project_abbrev={project_abbrev} | display_name={display_name!r}"
-                    )
-                    continue
-
-                trait_id = trait_def.trait_id
-                score = res.get('score')
-                if score is None:
-                    trait_match_audit_logger.warning(
-                        f"reason=no_score | candidate={cand_name} | trait_id={trait_id} | "
-                        f"display_name={display_name!r}"
-                    )
-                    continue
-
-                # 4. DB Query for Band
-                band_row = db_session.query(TraitBand).filter(
-                    TraitBand.trait_id == trait_id,
-                    TraitBand.min_score <= score,
-                    TraitBand.max_score >= score
-                ).first()
-
-                if band_row:
-                    candidate_bands_map[trait_id] = band_row.band
-                    processed_traits.append((trait_id, score, band_row))
-                else:
-                    trait_match_audit_logger.warning(
-                        f"reason=no_band_range | candidate={cand_name} | trait_id={trait_id} | "
-                        f"score={score} | display_name={display_name!r}"
-                    )
-            
             # A. Base Traits Semantics + Constraints (merged into one block per trait)
             for trait_id, score, band_row in processed_traits:
                 # --- 安全輸出：不向 LLM 暴露 trait_id / name_zh / score / band ---
