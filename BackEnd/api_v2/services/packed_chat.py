@@ -46,6 +46,7 @@ class PackedStream:
         self._session_id = session_id
         self._question = question
         self.finished = False
+        self.audit: dict = {}
 
     def __iter__(self):
         for segment in self._pipeline.stream(self._stream_fn):
@@ -58,13 +59,20 @@ class PackedStream:
         return result.status if result else 'incomplete'
 
     def finish(self) -> dict:
-        """Write the structured audit record b §8 asks for. Safe to call twice."""
+        """Write the structured audit record b §8 asks for.
+
+        Idempotent, and repeat calls return the same audit rather than an empty dict:
+        iterating the stream finishes it, and the route calls this again afterwards to
+        decide whether to notify the user. Returning {} the second time meant the notice
+        never fired -- found on the first live run.
+        """
         if self.finished:
-            return {}
+            return self.audit
         self.finished = True
         result = self._pipeline.result
         audit = result.audit if result else {'status': 'incomplete'}
         audit['session_id'] = self._session_id
+        self.audit = audit
         packer_logger.info(json.dumps(audit, ensure_ascii=False, default=str))
         if audit.get('status') != 'ok':
             packer_logger.warning(

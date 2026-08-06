@@ -86,7 +86,7 @@ def main():
     check('packer accepts free-form', isinstance(packed, PackedStream))
     list(packed)
     check('audit records a free-form question_id of None',
-          packed.finish() == {} and packed.finished)
+          packed.finish().get('question_id') is None and packed.finished)
 
     print('\n[3] Falls back to the legacy path when it cannot serve')
     rag = FakeRag('x')
@@ -129,7 +129,11 @@ def main():
     first = packed.finished
     second = packed.finish()
     check('already finished after iteration', first)
-    check('a second call is a no-op', second == {})
+    # The route calls finish() after the loop, and iteration has already finished it; a
+    # second call must still hand back the audit or the user is never told about a
+    # blocked/manual_review answer.
+    check('a repeat call returns the same audit, not an empty dict',
+          second and second.get('status') == packed.status, second.get('status') if second else second)
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0

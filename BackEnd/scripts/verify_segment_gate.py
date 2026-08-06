@@ -186,7 +186,29 @@ def main():
           gate.result.retry_count)
     check('status ok', gate.result.status == STATUS_OK)
 
-    print('\n[11] Audit shape for 事項 12')
+    print('\n[11] Segments are released while the model is still producing')
+    # Records how much of the stream had been consumed as each segment came out. Draining
+    # the whole token iterator before gating anything would show every segment at the
+    # final count -- which is what the first live run actually did.
+    src = '第一段內容。\n\n第二段內容。\n\n第三段內容。\n\n'
+    consumed_at = []
+
+    def counting():
+        counting.seen = 0
+        for t in tokens_of(src, 4):
+            counting.seen += len(t)
+            yield t
+
+    gate_t = SegmentGate(scanner)
+    for _ in gate_t.run(counting()):
+        consumed_at.append(counting.seen)
+    check('a segment is released before the whole stream has arrived',
+          consumed_at and consumed_at[0] < len(src), consumed_at)
+    check('release points advance with the stream',
+          consumed_at == sorted(consumed_at) and consumed_at[0] < consumed_at[-1],
+          consumed_at)
+
+    print('\n[12] Audit shape for 事項 12')
     audit = gate.result.as_audit()
     check('carries status / retry_count / per-segment records',
           {'status', 'retry_count', 'segments', 'leakage_hits'} <= set(audit),

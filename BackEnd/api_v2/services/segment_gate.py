@@ -186,22 +186,38 @@ class SegmentGate:
             self.checker.observe(segment)
         return segment
 
-    def run(self, tokens: Iterable[str]) -> Iterator[str]:
-        """Yields display-ready segments. Stops early if one cannot be cleaned."""
-        blocked = False
-        pieces: List[str] = []
-        for token in tokens:
-            pieces.extend(self.segmenter.feed(token))
-        pieces.extend(self.segmenter.flush())
+    def _gate(self, segment: str) -> Optional[str]:
+        record = SegmentRecord(len(self.result.segments))
+        self.result.segments.append(record)
+        cleaned = self._clear(segment, record)
+        return None if cleaned is None else self._release(cleaned, record)
 
-        for segment in pieces:
-            record = SegmentRecord(len(self.result.segments))
-            self.result.segments.append(record)
-            cleaned = self._clear(segment, record)
-            if cleaned is None:
-                blocked = True
+    def run(self, tokens: Iterable[str]) -> Iterator[str]:
+        """Yields display-ready segments. Stops early if one cannot be cleaned.
+
+        Each segment is gated and released the moment its boundary arrives, while the
+        model is still producing the rest. Draining the whole token stream first would
+        make the wait the length of the entire answer instead of one segment -- which is
+        the difference between this design and the whole-answer buffering it replaced.
+        """
+        blocked = False
+        for token in tokens:
+            for segment in self.segmenter.feed(token):
+                released = self._gate(segment)
+                if released is None:
+                    blocked = True
+                    break
+                yield released
+            if blocked:
                 break
-            yield self._release(cleaned, record)
+
+        if not blocked:
+            for segment in self.segmenter.flush():
+                released = self._gate(segment)
+                if released is None:
+                    blocked = True
+                    break
+                yield released
 
         if blocked:
             self.result.status = STATUS_BLOCKED
@@ -226,13 +242,11 @@ class SegmentGate:
                 break
             if not (extra or '').strip():
                 break
-            record = SegmentRecord(len(self.result.segments))
-            self.result.segments.append(record)
-            cleaned = self._clear(extra, record)
-            if cleaned is None:
+            released = self._gate(extra)
+            if released is None:
                 self.result.status = STATUS_BLOCKED
                 return
-            yield self._release(cleaned, record)
+            yield released
             outcome = self.checker.finalize()
             self.result.completeness = outcome
             if outcome.status != 'failed':
