@@ -82,11 +82,16 @@ def expected_sections_for(question: Optional[dict], respondent_count: int):
 
 
 class CompletenessResult:
-    __slots__ = ('status', 'missing_sections', 'missing_respondents', 'char_count',
-                 'calibration_evidence', 'log_lines')
+    __slots__ = ('status', 'sections_check', 'missing_sections', 'missing_respondents',
+                 'char_count', 'calibration_evidence', 'log_lines')
 
     def __init__(self):
+        # `status` is the verdict for the whole answer; the two *_check fields are the
+        # independent sub-results the audit record asks for. Reporting `status` as
+        # `expected_sections_check` would make a calibration miss look like a missing
+        # section, which is what the first version of this did.
         self.status = 'passed'                  # passed | failed | skipped
+        self.sections_check = 'passed'          # passed | failed | skipped | n/a
         self.missing_sections: List[str] = []
         self.missing_respondents: List[str] = []
         self.char_count: Optional[int] = None
@@ -95,7 +100,7 @@ class CompletenessResult:
 
     def as_audit(self) -> dict:
         return {
-            'expected_sections_check': self.status,
+            'expected_sections_check': self.sections_check,
             'missing_sections': self.missing_sections,
             'missing_respondents': self.missing_respondents,
             'char_count': self.char_count,
@@ -158,11 +163,13 @@ class CompletenessChecker:
         heading_set = set(self._headings)
 
         if self.question is None:
+            result.sections_check = 'n/a'       # free-form has no fixed headings
             result.char_count = len(re.sub(r'\s', '', answer))
             if result.char_count > FREE_FORM_MAX_CHARS:
                 result.status = 'failed'
         elif not self.expected:
             result.status = 'skipped'
+            result.sections_check = 'skipped'
             result.log_lines.append(SKIP_LOG)
         else:
             if self._fallback_note:
@@ -171,6 +178,7 @@ class CompletenessChecker:
                                        if normalize_heading(s) not in heading_set]
             if result.missing_sections:
                 result.status = 'failed'
+                result.sections_check = 'failed'
 
         if self.question is not None and len(self.respondents) > 1:
             result.missing_respondents = [
