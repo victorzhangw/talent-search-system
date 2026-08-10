@@ -10,6 +10,7 @@ missing, because the caller then runs the untouched legacy route.
 
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -33,13 +34,19 @@ def check(label, condition, detail=''):
 class FakeRag:
     """Scripted stand-in for RAGService: same two methods the packer uses."""
 
-    def __init__(self, answer, followup=''):
+    def __init__(self, answer, followup='', history=None):
         self.answer = answer
         self.followup = followup
+        self.history = history or []
         self.stream_calls = 0
+        self.last_messages = None
+
+    def load_history(self, session_id):
+        return list(self.history)
 
     def packer_stream(self, messages):
         self.stream_calls += 1
+        self.last_messages = messages
         for i in range(0, len(self.answer), 9):
             yield self.answer[i:i + 9]
 
@@ -134,6 +141,61 @@ def main():
     # blocked/manual_review answer.
     check('a repeat call returns the same audit, not an empty dict',
           second and second.get('status') == packed.status, second.get('status') if second else second)
+
+    print('\n[6] Conversation history reaches the model')
+    # Without this the packer path is stateless: 「那他呢？」 arrives with nothing to
+    # resolve the pronoun against, while the legacy path carries MAX_HISTORY_TURNS turns.
+    prior = [{'role': 'user', 'content': '他抗壓性如何？'},
+             {'role': 'assistant', 'content': '他在高壓情境下傾向維持穩定。'}]
+    rag = FakeRag('內容。\n\n', history=prior)
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S_H')
+    list(packed)
+    sent = rag.last_messages or []
+    check('history is threaded into the messages', len(sent) == 2 + len(prior), len(sent))
+    check('it sits between the system payload and the task instruction',
+          len(sent) > 3 and sent[0]['role'] == 'system'
+          and sent[1:3] == prior and sent[-1]['role'] == 'user')
+
+    rag = FakeRag('內容。\n\n')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S_H2')
+    list(packed)
+    check('an empty history still yields a well-formed 2-message payload',
+          rag.last_messages and len(rag.last_messages) == 2, len(rag.last_messages or []))
+
+    print('\n[7] The assembled LOG is written to prompts.log (事項 07 §3)')
+    # Reading the real log file rather than a mock: the point of this check is that the
+    # audit trail exists on disk after a request, which a captured logger cannot prove.
+    log_path = os.path.join(os.path.dirname(__file__), '..', 'api_v2', 'logs',
+                            datetime.now().strftime('%Y-%m-%d'), 'prompts.log')
+    before = os.path.getsize(log_path) if os.path.exists(log_path) else 0
+
+    rag = FakeRag('內容。\n\n')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S11')
+    check('packer served the request', isinstance(packed, PackedStream))
+    written = ''
+    if os.path.exists(log_path):
+        with open(log_path, encoding='utf-8') as f:
+            f.seek(before)
+            written = f.read()
+    check('prompts.log grew', bool(written.strip()), f'{len(written)} chars appended')
+    check('header names the session and question',
+          'SESSION: S11' in written and 'USE_CASE: log_packer' in written)
+
+    payload = packed._pipeline.log.to_log_text() if packed else ''
+    check('the payload is recorded verbatim (same string DoD 1 diffs)',
+          payload and payload in written, f'{len(payload)} chars')
+    check('三段式結構齊全',
+          all(m in written for m in ('[SYSTEM PROMPT]', '## 【輸入數據】', '[任務指令]')))
+    # The three things that were invisible before this was added.
+    check('特質屬性 blocks present', '[特質 | ' in written,
+          written.count('[特質 | '))
+    check('交互敘事 present', '[交互 | ' in written, written.count('[交互 | '))
+    check('分段（子區塊標頭）present', '#### ' in written, written.count('#### '))
+
+    before = os.path.getsize(log_path) if os.path.exists(log_path) else 0
+    try_packed_stream(rag, 'no_such_module', '', 'expert', reports, basics, 'S12')
+    after = os.path.getsize(log_path) if os.path.exists(log_path) else 0
+    check('a declined request logs no payload', after == before, f'{after - before} bytes')
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0

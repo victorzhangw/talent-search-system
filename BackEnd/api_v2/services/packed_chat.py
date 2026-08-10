@@ -22,13 +22,46 @@ Not served here, deliberately:
 import json
 from typing import Optional
 
-from ..utils.logger import get_daily_logger
+from ..utils.logger import get_daily_logger, get_prompt_logger
 from .log_assembler import AudienceMismatch, UnknownTrait
 from .log_pipeline import LogPipeline
 from .module_map import module_map
 from .respondent_adapter import from_trait_reports
 
 packer_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
+
+
+def log_payload(pipeline: LogPipeline, session_id, module_id, question):
+    """Write the assembled LOG verbatim to prompts.log before anything is sent.
+
+    事項 07 §3: 舊路徑的 `_log_prompt()` 只掛在 `rag_engine._call_llm()` 上，打包器不經過
+    那裡，所以在補上這裡之前 prompts.log 對打包器的請求是完全空白的——log 裡看不到特質
+    屬性、交互敘事與分段內容，只有 log_packer_audit.log 的統計數字。
+
+    記的是 `to_log_text()` 而非 `to_messages()`：前者就是客戶驗收用的三段式 LOG 格式
+    （[SYSTEM PROMPT] / 【輸入數據】 / [任務指令]），與 DoD 第 1 條拿去和三份 v7 範例
+    逐行比對的是同一個字串。歷史訊息只記筆數，因為它夾在 system 與 user 之間、不屬於
+    LOG 本體，記進去會讓檔案與範例格式對不上。
+    """
+    log = pipeline.log
+    audit = log.audit
+    try:
+        header = (f"SESSION: {session_id} | USE_CASE: log_packer | "
+                  f"MODULE: {module_id or '(free-form)'} | "
+                  f"QUESTION: {audit.get('question_id')} | "
+                  f"TYPE: {audit.get('question_type')} | "
+                  f"AUDIENCE: {audit.get('audience')} | "
+                  f"RESPONDENTS: {len(audit.get('respondents') or [])} | "
+                  f"HISTORY_TURNS: {max(0, len(pipeline.messages) - 2)}")
+        get_prompt_logger().info(
+            f"{header}\n"
+            f"============================================================\n"
+            f"{log.to_log_text()}")
+    except Exception as e:
+        # Never let an audit-trail failure take down a request that would otherwise
+        # succeed; the packer audit log records that the payload went unlogged.
+        packer_logger.error(f"session={session_id} failed to write the payload to "
+                            f"prompts.log: {e}")
 
 
 class _Chunk:
@@ -105,6 +138,7 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
 
         pipeline = LogPipeline(respondents, question,
                                user_query=query if question is None else None,
+                               history=rag_service.load_history(session_id),
                                followup_fn=rag_service.packer_followup)
     except AudienceMismatch as e:
         # b §1.1 wants this rejected. The legacy route instead falls back to the other
@@ -116,4 +150,5 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
         packer_logger.warning(f"session={session_id} cannot pack: {e}; legacy path")
         return None
 
+    log_payload(pipeline, session_id, module_id, question)
     return PackedStream(pipeline, rag_service.packer_stream, session_id, question)

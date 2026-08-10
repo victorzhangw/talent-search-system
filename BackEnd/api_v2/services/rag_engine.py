@@ -9,14 +9,10 @@ from .integration_mock import MockIntegrationService
 from .integration_real import RealIntegrationService
 from .context_builder import ContextBuilder 
 from ..utils.token_generator import generate_upstream_token
-from ..utils.logger import get_daily_logger
+from ..utils.logger import get_daily_logger, get_prompt_logger
 
 def get_rag_logger():
     return get_daily_logger("RAG_Logger", "rag_service.log", level=logging.DEBUG)
-
-def get_prompt_logger():
-    formatter_str = "\n============================================================\nTIME: %(asctime)s\n%(message)s\n============================================================"
-    return get_daily_logger("RAG_Prompt_Logger", "prompts.log", level=logging.INFO, formatter_str=formatter_str)
 
 rag_logger = get_rag_logger()
 
@@ -496,27 +492,38 @@ class RAGService:
             rag_logger.error(f"Failed to write prompt log using logger: {e}", exc_info=True)
             print(f"[Log] Failed to write prompt log using logger: {e}")
 
+    def load_history(self, session_id):
+        """Prior turns for this session, oldest first, capped at MAX_HISTORY_TURNS.
+
+        Shared by both paths. It used to be inline here, which meant the LOG packer path
+        (which never reaches `_call_llm`) sent every request with no history at all --
+        follow-ups like 「那他呢？」 arrived at the model with nothing to resolve 「他」 against.
+        """
+        if not session_id or session_id == "unknown":
+            return []
+        try:
+            from .session_store import SqlSessionStore
+            max_turns = current_app.config.get('MAX_HISTORY_TURNS', 6)
+            db_msgs = SqlSessionStore().get_messages(session_id)
+            conv = [m for m in db_msgs if m.role in ('user', 'assistant')]
+            # 排除最後一條：chat.py 在呼叫本函式前已將當前 query 存入 DB
+            if conv and conv[-1].role == 'user':
+                conv = conv[:-1]
+            conv = conv[-(max_turns * 2):]
+            history = [{"role": m.role, "content": m.content} for m in conv]
+            rag_logger.info(f"[History] Loaded {len(history)} msgs for session {session_id}")
+            return history
+        except Exception as e:
+            rag_logger.warning(f"[History] Failed to load history: {e}")
+            return []
+
     def _call_llm(self, sys_prompt, query, uc_id, session_id="unknown"):
         # Log the prompt before calling
         self._log_prompt(session_id, uc_id, sys_prompt, query)
 
         rag_logger.debug(f"--- DEBUG RAG SYSTEM PROMPT ---\n{sys_prompt}\n-------------------------")
 
-        history_messages = []
-        if session_id and session_id != "unknown":
-            try:
-                from .session_store import SqlSessionStore
-                max_turns = current_app.config.get('MAX_HISTORY_TURNS', 6)
-                db_msgs = SqlSessionStore().get_messages(session_id)
-                conv = [m for m in db_msgs if m.role in ('user', 'assistant')]
-                # 排除最後一條：chat.py 在呼叫本函式前已將當前 query 存入 DB
-                if conv and conv[-1].role == 'user':
-                    conv = conv[:-1]
-                conv = conv[-(max_turns * 2):]
-                history_messages = [{"role": m.role, "content": m.content} for m in conv]
-                rag_logger.info(f"[History] Loaded {len(history_messages)} msgs for session {session_id}")
-            except Exception as e:
-                rag_logger.warning(f"[History] Failed to load history: {e}")
+        history_messages = self.load_history(session_id)
 
         messages = [
             {"role": "system", "content": sys_prompt.strip()},

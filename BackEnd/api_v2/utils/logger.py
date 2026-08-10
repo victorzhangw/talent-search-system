@@ -72,3 +72,14 @@ def get_conversation_logger():
     獲取專門紀錄對話歷程的 Logger
     """
     return get_daily_logger("Conversation_Logger", "conversations.log", level=logging.INFO)
+
+def get_prompt_logger():
+    """
+    獲取紀錄「送出前完整 prompt」的 Logger（prompts.log）
+
+    定義放在這裡而非 rag_engine，是因為舊路徑（模組 prompt）與 LOG 打包器路徑都要寫入
+    同一個檔案。get_daily_logger 以 name 快取，兩邊各自定義一次的話，先被呼叫的那份
+    formatter 會生效、另一份被靜默忽略——實際格式取決於哪條路徑先跑，無法預期。
+    """
+    formatter_str = "\n============================================================\nTIME: %(asctime)s\n%(message)s\n============================================================"
+    return get_daily_logger("RAG_Prompt_Logger", "prompts.log", level=logging.INFO, formatter_str=formatter_str)
