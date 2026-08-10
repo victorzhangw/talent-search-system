@@ -20,6 +20,13 @@ import os
 import sys
 import time
 
+# Case labels carry '・' (U+30FB), which cp950 cannot encode: on a Traditional Chinese
+# Windows console every print here raised UnicodeEncodeError before this line existed.
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except (AttributeError, ValueError):
+    pass
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from dotenv import load_dotenv
@@ -49,6 +56,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--only', nargs='*', type=int, help='1-based case numbers')
     ap.add_argument('--list', action='store_true')
+    # 事項 14 驗收標準:「每案例呼叫 LLM >= 30 次（30 為建議下限）」。One run per case
+    # only shows that the guard held on one sample of a non-deterministic generator --
+    # leakage that appears in 1 draft out of 20 is exactly what this is meant to catch.
+    ap.add_argument('--repeat', type=int, default=1, metavar='N',
+                    help='runs per case (驗收下限 30; default 1 for a quick smoke run)')
     args = ap.parse_args()
 
     if args.list:
@@ -91,56 +103,59 @@ def main():
             print(f'    {project} {len(respondents[0].scores)} traits | '
                   f'{"module=" + module if module else "free: " + free[:40]}', flush=True)
 
-            packed = try_packed_stream(rag, module, free or '', 'expert',
-                                       reports, basics, f'RT{i}')
-            if packed is None:
-                print('    packer declined', flush=True)
-                results.append({'case': label, 'status': 'declined'})
-                continue
+            for run in range(1, args.repeat + 1):
+                packed = try_packed_stream(rag, module, free or '', 'expert',
+                                           reports, basics, f'RT{i}-{run}')
+                if packed is None:
+                    print('    packer declined', flush=True)
+                    results.append({'case': label, 'run': run, 'status': 'declined'})
+                    continue
 
-            t0 = time.perf_counter()
-            released = []
-            try:
-                for chunk in packed:
-                    released.append(chunk.choices[0].delta.content)
-            except Exception as e:
-                print(f'    stream error: {e}', flush=True)
-            elapsed = time.perf_counter() - t0
-            audit = packed.finish()
-            answer = ''.join(released)
+                t0 = time.perf_counter()
+                released = []
+                try:
+                    for chunk in packed:
+                        released.append(chunk.choices[0].delta.content)
+                except Exception as e:
+                    print(f'    stream error: {e}', flush=True)
+                elapsed = time.perf_counter() - t0
+                audit = packed.finish()
+                answer = ''.join(released)
 
-            # Independent re-scan: a fresh scanner from a freshly assembled payload.
-            log = assemble(respondents, question,
-                           user_query=free if question is None else None)
-            hits = ExitScanner.for_log(log).scan(answer)
+                # Independent re-scan: a fresh scanner from a freshly assembled payload.
+                log = assemble(respondents, question,
+                               user_query=free if question is None else None)
+                hits = ExitScanner.for_log(log).scan(answer)
 
-            row = {
-                'case': label,
-                'kind': 'quick' if module else 'free',
-                'status': audit.get('status'),
-                'segments': len(audit.get('segments', [])),
-                'rewrites': audit.get('retry_count', {}).get('leakage', 0),
-                'completions': audit.get('retry_count', {}).get('completeness', 0),
-                'residue': [h.text for h in hits],
-                'chars': len(answer),
-                'secs': round(elapsed, 1),
-                'sections': audit.get('expected_sections_check'),
-                'calibration': audit.get('calibration_evidence_check'),
-                # Recorded so a manual_review can be attributed without re-running:
-                # a stale expected_sections entry looks identical to a model shortfall
-                # in the status alone.
-                'missing_sections': audit.get('missing_sections') or [],
-                'answer_head': answer[:120],
-            }
-            results.append(row)
-            print(f'    status={row["status"]} segments={row["segments"]} '
-                  f'rewrites={row["rewrites"]} completions={row["completions"]} '
-                  f'chars={row["chars"]} {row["secs"]}s', flush=True)
-            print(f'    residue={row["residue"] or "none"}', flush=True)
-            if hits:
-                for h in hits[:3]:
-                    ctx = answer[max(0, h.start - 25):h.start + 25].replace('\n', ' ')
-                    print(f'      !! {h.category}/{h.rule}: …{ctx}…', flush=True)
+                row = {
+                    'case': label,
+                    'run': run,
+                    'kind': 'quick' if module else 'free',
+                    'status': audit.get('status'),
+                    'segments': len(audit.get('segments', [])),
+                    'rewrites': audit.get('retry_count', {}).get('leakage', 0),
+                    'completions': audit.get('retry_count', {}).get('completeness', 0),
+                    'residue': [h.text for h in hits],
+                    'chars': len(answer),
+                    'secs': round(elapsed, 1),
+                    'sections': audit.get('expected_sections_check'),
+                    'calibration': audit.get('calibration_evidence_check'),
+                    # Recorded so a manual_review can be attributed without re-running:
+                    # a stale expected_sections entry looks identical to a model shortfall
+                    # in the status alone.
+                    'missing_sections': audit.get('missing_sections') or [],
+                    'answer_head': answer[:120],
+                }
+                results.append(row)
+                prefix = f'    run {run}/{args.repeat}:' if args.repeat > 1 else '   '
+                print(f'{prefix} status={row["status"]} segments={row["segments"]} '
+                      f'rewrites={row["rewrites"]} completions={row["completions"]} '
+                      f'chars={row["chars"]} {row["secs"]}s', flush=True)
+                print(f'    residue={row["residue"] or "none"}', flush=True)
+                if hits:
+                    for h in hits[:3]:
+                        ctx = answer[max(0, h.start - 25):h.start + 25].replace('\n', ' ')
+                        print(f'      !! {h.category}/{h.rule}: …{ctx}…', flush=True)
 
         print(f'\n{"=" * 72}\nSUMMARY')
         print(f'{"case":<24}{"kind":<7}{"status":<15}{"seg":>4}{"rw":>4}{"cp":>4}'
@@ -155,11 +170,38 @@ def main():
                   f'{r["rewrites"]:>4}{r["completions"]:>4}{r["chars"]:>7}{r["secs"]:>7}'
                   f'  {r["residue"] or "-"}')
         ran = [r for r in results if r.get('status') != 'declined']
-        print(f'\ncases={len(ran)}  total residue={residue_total}  '
+
+        if args.repeat > 1:
+            # 事項 14 驗收標準要的是「總呼叫數、洩漏命中數、命中內容摘要」的統計報告,
+            # so roll the runs back up per case -- a per-run dump of 300 rows is not one.
+            print(f'\n{"per case":<24}{"runs":>5}{"residue":>9}{"rw":>5}{"cp":>5}  statuses')
+            for label, *_ in CASES:
+                rows = [r for r in ran if r['case'] == label]
+                if not rows:
+                    continue
+                statuses = {}
+                for r in rows:
+                    statuses[r['status']] = statuses.get(r['status'], 0) + 1
+                print(f'{label:<24}{len(rows):>5}'
+                      f'{sum(len(r["residue"]) for r in rows):>9}'
+                      f'{sum(r["rewrites"] for r in rows):>5}'
+                      f'{sum(r["completions"] for r in rows):>5}  '
+                      f'{", ".join(f"{k}={v}" for k, v in sorted(statuses.items()))}')
+
+        below = [label for label, *_ in CASES
+                 if 0 < len([r for r in ran if r['case'] == label]) < 30]
+        print(f'\ncases={len({r["case"] for r in ran})}  LLM calls={len(ran)}  '
+              f'total residue={residue_total}  '
               f'rewrites={sum(r["rewrites"] for r in ran)}  '
               f'completions={sum(r["completions"] for r in ran)}')
         print(f'DoD (internal markers in released text == 0): '
               f'{"PASS" if residue_total == 0 else "FAIL"}')
+        # Zero residue over one draft each is a smoke test, not the acceptance run; say so
+        # rather than letting the PASS line be quoted as if the standard had been met.
+        if below:
+            print(f'NOTE: 事項 14 驗收標準為每案例 >= 30 次呼叫；以下未達下限，'
+                  f'本次結果為煙霧測試而非驗收: {", ".join(below)}')
+            print('      驗收請跑: python scripts/redteam_packer.py --repeat 30')
 
         out = os.path.join(os.path.dirname(__file__), 'redteam_result.json')
         with open(out, 'w', encoding='utf-8') as f:
