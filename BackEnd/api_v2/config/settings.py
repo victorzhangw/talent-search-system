@@ -53,10 +53,10 @@ class Config:
     LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-v4-flash')
     LLM_API_BASE = os.getenv('LLM_API_BASE', 'https://api.deepseek.com/v1')
 
-    # LOG 打包器（事項 01-16）。預設關閉：新舊路徑並存，關閉時 chat 走既有的
-    # 模組 prompt + context_builder，開啟時走 assemble -> 分段閘門 -> 稽核。
-    # 兩者輸出格式不同，不可同時生效；切換前請先在測試環境驗證。
-    USE_LOG_PACKER = os.getenv('USE_LOG_PACKER', '0').strip().lower() in ('1', 'true', 'yes', 'on')
+    # LOG 打包器（事項 01-16）。預設開啟：chat 走 assemble -> 分段閘門 -> 稽核。
+    # 舊路徑（模組 prompt + context_builder）仍保留為 fallback，兩者輸出格式不同、
+    # 不可同時生效；設 USE_LOG_PACKER=0 可退回舊路徑。
+    USE_LOG_PACKER = os.getenv('USE_LOG_PACKER', '1').strip().lower() in ('1', 'true', 'yes', 'on')
     # Conversation history depth (1 turn = user + assistant pair)
     MAX_HISTORY_TURNS = int(os.getenv('MAX_HISTORY_TURNS', 6))
     # Daily token budget (all users combined); 0 = unlimited
