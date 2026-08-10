@@ -157,6 +157,28 @@
     display: block;
 }
 
+/* 出口掃描／完整性檢查未通過時的提示。刻意做成與內文區隔的橫幅而非附加段落，
+   避免使用者把它讀成 AI 回答的一部分。 */
+.message-notice {
+    font-size: 0.85em;
+    line-height: 1.5;
+    padding: 0.5em 0.7em;
+    border-radius: 8px;
+    border-left: 3px solid #d9822b;
+    background: rgba(217, 130, 43, 0.1);
+    color: var(--glass-text-primary);
+
+    /* 輸出被中止，回答是截斷的——比缺段落更嚴重，用紅色區隔。 */
+    &.blocked {
+        border-left-color: #c0392b;
+        background: rgba(192, 57, 43, 0.1);
+    }
+
+    @media (max-width: 768px) {
+        font-size: 0.8em;
+    }
+}
+
 .message-actions {
     display: flex;
     gap: 0.5em;

@@ -311,6 +311,30 @@ def chat():
         finally:
             db.close()
 
+    # 沒有特質報告就沒有任何判讀依據，不得照答。
+    #
+    # 前端在 batch reports 抓完之前送出（點擊快速提問夠快即可重現）時，trait_reports 是
+    # 空的，但 candidates_info 有姓名與人數。以前這種請求會靜默走舊路徑，LLM 照著題目
+    # 架構寫出一段語氣專業、建議具體、卻毫無資料支撐的回答，使用者無從分辨。出口掃描器
+    # 防不到這一類——它管的是洩漏內部標記，不管無中生有。
+    #
+    # 只擋「有指定受測者」的請求：沒選受測者的一般對話本來就不需要特質資料。
+    if (module_id or candidate_ids) and candidates_info:
+        missing = [c for c in candidates_info
+                   if str(c.get('candidate_id')) not in {str(k) for k in (trait_reports or {})}]
+        if missing:
+            # 從未受測與「報告還沒送到」是兩回事：前者重試永遠不會好，訊息必須不同。
+            no_assessment = [c for c in missing if not c.get('latest_assessment')]
+            names = '、'.join(str(c.get('name') or c.get('candidate_id')) for c in missing)
+            if len(no_assessment) == len(missing):
+                print(f"[Chat] Rejected: no assessment on file for {names}", flush=True)
+                return err('NO_ASSESSMENT_DATA',
+                           f'{names} 尚無評測資料，無法進行特質判讀。', 422)
+            print(f"[Chat] Rejected: trait reports not yet loaded for {names} "
+                  f"(got {len(trait_reports or {})} of {len(candidates_info)})", flush=True)
+            return err('TRAIT_REPORTS_NOT_READY',
+                       '特質資料尚未載入完成，請稍候幾秒後再送出。', 409)
+
     # Capture caller IP for logging (shared into generate() via closure)
     xff = request.headers.get('X-Forwarded-For', '')
     caller_ip = xff.split(',')[0].strip() if xff else (request.remote_addr or 'unknown')

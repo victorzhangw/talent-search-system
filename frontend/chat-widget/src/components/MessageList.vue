@@ -26,6 +26,14 @@
           
           <span v-if="msg.isTyping" class="cursor">|</span>
 
+          <!-- 分段閘門稽核結果。blocked＝某段掃到內部標記、閘門已中止輸出；
+               manual_review＝內容乾淨但段落缺漏補不回來。兩者上方已顯示的內容
+               都收不回來，所以必須明示這份回答不完整，否則被截斷的回答在畫面上
+               與正常結束的回答完全相同。 -->
+          <div v-if="msg.notice" class="message-notice" :class="msg.noticeCode">
+            {{ msg.notice }}
+          </div>
+
           <!-- Message Actions (Copy, placeholder for Good/Bad) -->
           <div v-if="!msg.isTyping && index > 0" class="message-actions">
             <!-- Thumbs up -->

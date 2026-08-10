@@ -53,7 +53,8 @@
         :key="'desktop-'+idx"
         class="quick-btn"
         @click="sendQuick(q)"
-        :disabled="isTyping"
+        :disabled="isTyping || isTraitReportsLoading"
+        :title="isTraitReportsLoading ? '特質資料載入中，請稍候' : null"
       >
         {{ q.label || q }}
       </button>
@@ -75,7 +76,7 @@
           :key="'mobile-'+catName+'-'+idx"
           class="quick-btn rounded-pill"
           @click="sendQuick(q); closeMobile()"
-          :disabled="isTyping"
+          :disabled="isTyping || isTraitReportsLoading"
         >
           {{ q.label || q }}
         </button>
@@ -93,7 +94,10 @@ const props = defineProps({
   quickQuestionCategories: Object,
   selectedQuickQuestionCategory: String,
   quickQuestions: Array,
-  isTyping: Boolean
+  isTyping: Boolean,
+  // 特質報告尚在抓取時不得送出：沒有資料的提問會讓模型憑姓名與人數編出
+  // 一段沒有依據的回答（後端也會擋，這層是讓使用者看得懂為什麼不能點）。
+  isTraitReportsLoading: Boolean
 });
 
 const emit = defineEmits(['update:showMobileQuickQuestions', 'toggleCategory', 'selectCategory', 'sendQuick']);

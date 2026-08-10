@@ -322,6 +322,7 @@
   :selectedQuickQuestionCategory="selectedQuickQuestionCategory"
   :quickQuestions="filteredQuickQuestions"
   :isTyping="isTyping"
+  :isTraitReportsLoading="isTraitReportsLoading"
   @update:showMobileQuickQuestions="showMobileQuickQuestions = $event"
   @selectCategory="selectQuickQuestionCategory"
   @sendQuick="handleSendQuick"
@@ -452,6 +453,7 @@ const {
     quickQuestions,
     filteredQuickQuestions,
     filteredQuickQuestionCategories,
+    isTraitReportsLoading,
     historySessions,
     historyPage,
     historyHasMore,
@@ -533,8 +535,10 @@ const handleInitialSend = async () => {
 const handleSendQuick = async (q) => {
     if (!isSelectionLocked.value) {
         if (selectedCandidateIds.value.length === 0) return;
-        lockSelectionAndStart();
-        await new Promise(r => setTimeout(r, 100)); // wait for lock
+        // 等鎖定流程真正完成，而不是睡 100ms。鎖定裡包含特質報告的批次抓取，網路呼叫
+        // 幾乎不可能在 100ms 內回來——提問因此帶著空的 trait_reports 送出，模型憑姓名
+        // 與人數編出一段沒有資料支撐的回答。這是該 bug 的根因。
+        await lockSelectionAndStart();
     }
     sendQuickMessage(q);
 }
@@ -543,10 +547,11 @@ const handleSendQuick = async (q) => {
 const candidateSelectorRef = ref(null)
 
 // Wrapper for lockSelectionAndStart to handle Template Ref side-effect
+// Returns the promise: 鎖定流程裡包含特質報告的批次抓取，呼叫端必須等得到它。
 const lockSelectionAndStart = () => {
-    logicLockSelection(() => {
+    return logicLockSelection(() => {
         if (candidateSelectorRef.value && candidateSelectorRef.value.clearSelection) {
-            candidateSelectorRef.value.clearSelection() 
+            candidateSelectorRef.value.clearSelection()
         }
     })
 }

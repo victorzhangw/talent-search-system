@@ -236,6 +236,23 @@ export function useChatLogic(emit) {
     }
 
     // Reports
+    //
+    // 特質報告的載入狀態。原本 fetch 失敗只寫 console，呼叫端與 UI 都看不出報告究竟有沒有
+    // 到，於是使用者可以在完全沒有資料的情況下送出快速提問——模型拿著姓名與人數，仍會照
+    // 題目架構編出一段語氣專業卻毫無依據的回答。三態讓 UI 擋得住，pending promise 讓送出
+    // 前 await 得到（使用者在增量抓取途中點快速提問，是實際發生過的情境）。
+    const traitReportsState = ref('idle')   // idle | loading | ready | failed
+    let traitReportsPromise = null
+
+    const isTraitReportsLoading = computed(() => traitReportsState.value === 'loading')
+
+    const trackTraitReportsFetch = (promise) => {
+        traitReportsPromise = promise
+        return promise.finally(() => {
+            if (traitReportsPromise === promise) traitReportsPromise = null
+        })
+    }
+
     const fetchBatchTraitReports = async (selectedCandidates) => {
         const { apiBaseUrl } = getApiConfig()
 
@@ -245,12 +262,15 @@ export function useChatLogic(emit) {
             .filter(id => id != null)
 
         if (assessmentIds.length === 0) {
+            // 沒有任何評測可抓，不是「還沒到」。後端會以 NO_ASSESSMENT_DATA 明確回覆。
+            traitReportsState.value = 'ready'
             return
         }
 
         const apiUrl = `${apiBaseUrl}/reports/batch`
         const payload = { assessment_ids: assessmentIds }
 
+        traitReportsState.value = 'loading'
         try {
             const res = await fetch(apiUrl, {
                 method: 'POST',
@@ -279,9 +299,12 @@ export function useChatLogic(emit) {
             })
 
             sessionStorage.setItem('traitty_batch_reports', JSON.stringify(reportsMap))
+            traitReportsState.value = 'ready'
             console.log('[ChatContainer] ✅ Saved to Session Storage')
 
         } catch (e) {
+            // 失敗必須留下狀態，不能只寫 console：這是使用者拿到無資料回答的其中一條路徑。
+            traitReportsState.value = 'failed'
             console.error('[ChatContainer] ❌ Failed to fetch batch reports:', e)
         }
     }
@@ -294,8 +317,12 @@ export function useChatLogic(emit) {
             .map(c => c.latest_assessment?.assessment_id)
             .filter(id => id != null)
 
-        if (assessmentIds.length === 0) return
+        if (assessmentIds.length === 0) {
+            traitReportsState.value = 'ready'
+            return
+        }
 
+        traitReportsState.value = 'loading'
         try {
             const res = await fetch(`${apiBaseUrl}/reports/batch`, {
                 method: 'POST',
@@ -327,8 +354,10 @@ export function useChatLogic(emit) {
             })
 
             sessionStorage.setItem('traitty_batch_reports', JSON.stringify(existingReports))
+            traitReportsState.value = 'ready'
             console.log('[ChatLogic] ✅ Incremental reports merged to Session Storage')
         } catch (e) {
+            traitReportsState.value = 'failed'
             console.error('[ChatLogic] ❌ Failed to fetch incremental reports:', e)
         }
     }
@@ -460,7 +489,7 @@ export function useChatLogic(emit) {
             let switchMessage = '已為您切換至歷史對話，您可以繼續提問。';
 
             if (restoredCandidates.length > 0) {
-                await fetchBatchTraitReports(restoredCandidates);
+                await trackTraitReportsFetch(fetchBatchTraitReports(restoredCandidates));
                 const restoredIds = restoredCandidates.map(c => c.candidate_id);
                 activeConversationCandidateIds.value = restoredIds;
                 try {
@@ -728,7 +757,7 @@ export function useChatLogic(emit) {
         }
 
         // Batch fetch trait reports
-        await fetchBatchTraitReports(selectedCandidates)
+        await trackTraitReportsFetch(fetchBatchTraitReports(selectedCandidates))
 
         // Update State: Lock Selection and Show AI Message
         isSelectionLocked.value = true
@@ -823,7 +852,7 @@ export function useChatLogic(emit) {
         const mergedIds = [...activeConversationCandidateIds.value, ...realNewIds]
 
         // 僅對新增候選人抓報告（增量）
-        await fetchBatchTraitReportsIncremental(newCandidateObjects)
+        await trackTraitReportsFetch(fetchBatchTraitReportsIncremental(newCandidateObjects))
 
         // 更新 state
         activeConversationCandidateIds.value = mergedIds
@@ -897,11 +926,19 @@ export function useChatLogic(emit) {
             role: 'ai',
             content: '',
             intent: '',
+            notice: '',
+            noticeCode: '',
             isTyping: true,
             _tempId: aiMsgTempId
         })
 
         const { serverRoot } = getApiConfig()
+
+        // 報告若仍在路上就等它落地再讀。使用者在增量抓取途中點快速提問時，這裡原本會讀到
+        // 空的 sessionStorage，送出一個沒有任何特質資料的請求。
+        if (traitReportsPromise) {
+            try { await traitReportsPromise } catch (e) { }
+        }
 
         let traitReports = {}
         try {
@@ -986,6 +1023,22 @@ export function useChatLogic(emit) {
                 if (response.status === 429) {
                     throw new Error("QUOTA_EXCEEDED")
                 }
+                // 後端拒絕了「有選受測者但沒有特質報告」的請求，而不是讓模型憑姓名編答案。
+                // 兩者的處置不同：尚未載入可重試，尚無評測資料重試永遠不會好。
+                if (response.status === 409 || response.status === 422) {
+                    let code = ''
+                    let message = ''
+                    try {
+                        const body = await response.json()
+                        code = body?.error?.code || ''
+                        message = body?.error?.message || ''
+                    } catch (e) { }
+                    if (code === 'TRAIT_REPORTS_NOT_READY' || code === 'NO_ASSESSMENT_DATA') {
+                        const e = new Error(code)
+                        e.userMessage = message
+                        throw e
+                    }
+                }
                 throw new Error(`API Error: ${response.status}`)
             }
 
@@ -1022,6 +1075,13 @@ export function useChatLogic(emit) {
                                     quotaSummary.value = event.quota_summary
                                     isWidgetEnabled.value = (event.quota_summary.remaining > 0)
                                 }
+                            } else if (event.type === 'notice') {
+                                // 分段閘門的終值稽核。blocked＝某段掃到內部標記、閘門停止輸出，
+                                // manual_review＝內容乾淨但段落缺漏補不回來。兩者的共通點是
+                                // 上面已顯示的內容收不回來，所以必須明講這份回答不完整——
+                                // 否則被砍一半的回答在畫面上與正常結束的回答完全相同。
+                                messages.value[aiMsgIndex].notice = event.message
+                                messages.value[aiMsgIndex].noticeCode = event.code
                             } else if (event.type === 'message_id') {
                                 messages.value[aiMsgIndex].id = event.id
                             }
@@ -1035,6 +1095,10 @@ export function useChatLogic(emit) {
             if (aiMsgIndex !== -1) {
                 if (e.message === 'QUOTA_EXCEEDED') {
                     messages.value[aiMsgIndex].content = '今日使用額度已達上限，請明天再試。'
+                } else if (e.message === 'TRAIT_REPORTS_NOT_READY' || e.message === 'NO_ASSESSMENT_DATA') {
+                    // 後端給的訊息已針對兩種情形分別措辭，直接用，不要再包一層「請重試」。
+                    messages.value[aiMsgIndex].content = e.userMessage
+                        || '特質資料尚未載入完成，請稍候幾秒後再送出。'
                 } else {
                     messages.value[aiMsgIndex].content += '\n\n(發生錯誤，請重試)'
                 }
@@ -1127,6 +1191,8 @@ export function useChatLogic(emit) {
         messages,
         inputQuery,
         isTyping,
+        traitReportsState,
+        isTraitReportsLoading,
         candidates,
         selectedCandidateIds,
         activeConversationCandidateIds,
