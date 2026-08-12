@@ -2,6 +2,73 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { getFeatures } from '../config/widgetFeatures.js'
 
+/**
+ * 逐字重播：把收到的文字排進佇列，再定速補進畫面。
+ *
+ * 後端的分段閘門一次釋出一整段（實測 13 段中最長 359 字），原本的 `content += event.content`
+ * 會讓畫面靜止 2-3 秒再整塊跳出來。首字其實只要 2.1 秒——模型佔 2.02 秒、閘門佔 0.08 秒——
+ * 所以慢的是流動感，不是延遲；把分段切小沒有用，實測那 13 段全部由空行切出，沒有一段碰到
+ * 400 字上限。文字送到瀏覽器之前已經通過出口掃描，逐字補上不繞過任何檢查，純粹是呈現層。
+ *
+ * 速度會自適應：待播字數越多播越快，使落後不超過 maxLagMs。沒有這一段的話，後端約
+ * 115 字/秒的產出會把佇列越堆越長，整體反而比不重播還晚結束。
+ *
+ * @param {(text: string) => void} append 把一小段文字接到畫面上
+ */
+export const createTypewriter = (append, { charsPerSecond = 60, maxLagMs = 1200 } = {}) => {
+    const TICK_MS = 33          // 約 30fps；再細看不出差別，只是多做 DOM 更新
+    const perTick = Math.max(1, Math.round(charsPerSecond * TICK_MS / 1000))
+    const catchUpTicks = Math.max(1, Math.round(maxLagMs / TICK_MS))
+
+    let queue = ''
+    let rate = perTick       // 每個 tick 補幾個字；收到文字時重算，播放途中固定
+    let timer = null
+    let ended = false        // 串流已結束，播完佇列就算完成
+    let dead = false         // 已強制傾印，之後的文字直接貼上
+    let resolveDone
+    const done = new Promise(resolve => { resolveDone = resolve })
+
+    const step = () => {
+        if (!queue) {
+            timer = null
+            if (ended) resolveDone()
+            return
+        }
+        append(queue.slice(0, rate))
+        queue = queue.slice(rate)
+        timer = setTimeout(step, TICK_MS)
+    }
+
+    return {
+        push(text) {
+            if (!text) return
+            if (dead) { append(text); return }
+            queue += text
+            // 追趕速度只在收到文字時算一次。若每個 tick 都用「剩餘量 / catchUpTicks」
+            // 重算，速度會隨佇列變短而遞減，變成指數收斂而永遠追不上——實測 400 字要
+            // 2.4 秒才播完，而不是設定的 0.5 秒。
+            rate = Math.max(perTick, Math.ceil(queue.length / catchUpTicks))
+            if (timer === null) timer = setTimeout(step, 0)
+        },
+        /** 串流結束；回傳的 promise 在佇列播完後 resolve。 */
+        end() {
+            ended = true
+            // timer 為 null 只可能發生在佇列已空的時候（push 一定會排程），所以這裡
+            // 直接 resolve 不會漏字。
+            if (timer === null) resolveDone()
+            return done
+        },
+        /** 立刻把剩下的字全部貼上——錯誤處理與元件卸載時用，避免文字停在半途。 */
+        flush() {
+            if (timer !== null) { clearTimeout(timer); timer = null }
+            if (queue) { append(queue); queue = '' }
+            dead = true
+            ended = true
+            resolveDone()
+        }
+    }
+}
+
 export function useChatLogic(emit) {
     // --- 型別安全的 candidate_id 比對輔助函式 ---
     // 上游 API 回傳的 candidate_id 可能是 number 或 string，
@@ -946,6 +1013,16 @@ export function useChatLogic(emit) {
             if (cachedReports) traitReports = JSON.parse(cachedReports)
         } catch (e) { }
 
+        // 宣告在 try 之外：catch 與 finally 都要能把還在佇列裡的字倒完。
+        // 開關由後端 meta 事件帶來（TYPEWRITER_ENABLED / TYPEWRITER_CHARS_PER_SEC）。
+        // meta 一定在任何 token 之前送出，所以第一段到達時已經知道要不要重播；
+        // 舊版後端不帶這個欄位，此時維持預設（重播）。
+        let typewriter = null
+        const appendToMessage = (text) => {
+            const idx = messages.value.findIndex(m => m._tempId === aiMsgTempId)
+            if (idx !== -1) messages.value[idx].content += text
+        }
+
         try {
             const controller = new AbortController()
             const timeoutId = setTimeout(() => controller.abort(), 180000)
@@ -1065,11 +1142,20 @@ export function useChatLogic(emit) {
                             const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
                             if (aiMsgIndex === -1) continue
                             if (event.type === 'error') {
+                                // 先把還在佇列裡的字倒完再接錯誤訊息，否則錯誤會插在
+                                // 尚未播出的內文前面，讀起來像是答到一半才出錯。
+                                if (typewriter) typewriter.flush()
                                 messages.value[aiMsgIndex].content += `\n\n⚠️ ${event.message}`
                             } else if (event.type === 'meta') {
                                 messages.value[aiMsgIndex].intent = event.intent
+                                if (event.typewriter !== false) {
+                                    typewriter = createTypewriter(appendToMessage, {
+                                        charsPerSecond: event.typewriter_cps || 60
+                                    })
+                                }
                             } else if (event.type === 'token') {
-                                messages.value[aiMsgIndex].content += event.content
+                                if (typewriter) typewriter.push(event.content)
+                                else messages.value[aiMsgIndex].content += event.content
                             } else if (event.type === 'quota') {
                                 if (event.quota_summary) {
                                     quotaSummary.value = event.quota_summary
@@ -1089,8 +1175,13 @@ export function useChatLogic(emit) {
                     }
                 }
             }
+
+            // 等重播播完再往下走。少了這一行，finally 會在文字還在打字時就關掉 isTyping，
+            // 而且存進 sessionStorage 的是被截斷的內容——重新整理後那則訊息永久缺字。
+            if (typewriter) await typewriter.end()
         } catch (e) {
             console.error(e)
+            if (typewriter) typewriter.flush()
             const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
             if (aiMsgIndex !== -1) {
                 if (e.message === 'QUOTA_EXCEEDED') {
@@ -1104,6 +1195,9 @@ export function useChatLogic(emit) {
                 }
             }
         } finally {
+            // 保險：正常路徑已經 await 過 end()，這裡只處理提早 return / abort 之類的
+            // 情形，確保計時器不會留在背景繼續改一則已經定案的訊息。
+            if (typewriter) typewriter.flush()
             const aiMsgIndex = messages.value.findIndex(m => m._tempId === aiMsgTempId)
             if (aiMsgIndex !== -1) {
                 messages.value[aiMsgIndex].isTyping = false

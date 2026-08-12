@@ -60,6 +60,19 @@ def main():
     ap.add_argument('--traits', type=int, default=12, help='how many traits to include')
     ap.add_argument('--band', default='mixed', choices=['mixed', 'A', 'C'])
     ap.add_argument('--dry-run', action='store_true', help='assemble only, no API call')
+    # deepseek-v4-flash streams reasoning_content before any answer content, and the
+    # packer discards it -- which is the whole of the 40-330s wait before the first
+    # visible word. This switches reasoning off so the cost of it can be measured
+    # rather than argued about.
+    ap.add_argument('--no-thinking', action='store_true',
+                    help='force thinking.type=disabled for this run')
+    ap.add_argument('--thinking', action='store_true',
+                    help='force reasoning back on, to measure what it costs')
+    # The gate only cuts at max_chars when a paragraph runs past it; a blank line cuts
+    # first. So lowering this helps only for answers whose opening paragraph is long,
+    # and the per-segment sizes printed below are what says whether that is the case.
+    ap.add_argument('--segment-chars', type=int,
+                    help='override SEGMENT_MAX_CHARS for this run')
     ap.add_argument('--list', action='store_true', help='list module ids and exit')
     args = ap.parse_args()
 
@@ -121,11 +134,56 @@ def main():
         from api_v2.services.rag_engine import RAGService
         rag = RAGService()
 
+        # Separate the model's latency from the gate's. `first=` below is time to the
+        # first *released segment*, which bundles both; when the two diverge (a UAT run
+        # showed 330s to first segment while a bare probe to the same endpoint streamed
+        # in 1.5s) the only way to tell which half is at fault is to time the raw token
+        # stream underneath.
+        # Override the configured default so one machine can measure both ways without
+        # editing .env between runs.
+        if args.no_thinking:
+            rag.disable_thinking = True
+        elif args.thinking:
+            rag.disable_thinking = False
+
+        raw = {'first': None, 'tokens': 0, 'chars': 0, 'last': None}
+        _packer_stream = rag.packer_stream
+
+        def timed_stream(messages):
+            """Times the real `packer_stream` rather than reimplementing the call.
+
+            Reasoning volume comes back through `rag.last_stream_stats`, so what is
+            measured here is exactly what production does.
+            """
+            t = time.perf_counter()
+            print(f'    [raw] request: {len(messages)} messages, '
+                  f'{sum(len(m["content"]) for m in messages)} chars, '
+                  f'thinking={"disabled" if rag.disable_thinking else "enabled"}',
+                  flush=True)
+            for token in _packer_stream(messages):
+                raw['tokens'] += 1
+                raw['chars'] += len(token)
+                raw['last'] = time.perf_counter() - t
+                if raw['first'] is None:
+                    raw['first'] = raw['last']
+                    print(f'    [raw] first ANSWER token at +{raw["first"]:.2f}s',
+                          flush=True)
+                yield token
+
+        rag.packer_stream = timed_stream
+
         packed = try_packed_stream(rag, args.module, args.free or '', 'expert',
                                    reports, basics, 'LIVE')
         if packed is None:
             print('\npacker declined this request; the route would use the legacy path.')
             return 1
+
+        # Set on the built gate rather than the module constant: SegmentGate binds
+        # SEGMENT_MAX_CHARS as a default argument at import time, so rebinding the module
+        # name after import would have no effect and would read as if it did.
+        if args.segment_chars:
+            packed._pipeline.gate.segmenter.max_chars = args.segment_chars
+            print(f'segment cap overridden: {args.segment_chars} chars')
 
         print('\n' + '=' * 70)
         print('使用者實際會看到的內容')
@@ -133,18 +191,43 @@ def main():
         t0 = time.perf_counter()
         first_at = None
         n = 0
+        seg_sizes = []
         for chunk in packed:
             content = chunk.choices[0].delta.content
             n += 1
             if first_at is None:
                 first_at = time.perf_counter() - t0
-            print(f'--- 段 {n}  (+{time.perf_counter() - t0:.1f}s)')
+            seg_sizes.append(len(content))
+            print(f'--- 段 {n}  (+{time.perf_counter() - t0:.1f}s)  {len(content)} chars')
             print(content.rstrip())
         total = time.perf_counter() - t0
 
         audit = packed.finish()
         print('\n' + '=' * 70)
         print(f'segments={n}  first={first_at:.1f}s  total={total:.1f}s')
+        if seg_sizes:
+            cap = packed._pipeline.gate.segmenter.max_chars
+            # A first segment well under the cap means it was cut by a blank line, and
+            # lowering the cap would not have released it any sooner.
+            at_cap = sum(1 for s in seg_sizes if s > cap * 0.9)
+            print(f'segment sizes: first={seg_sizes[0]}  '
+                  f'min={min(seg_sizes)}  max={max(seg_sizes)}  '
+                  f'mean={sum(seg_sizes) // len(seg_sizes)}  '
+                  f'(cap={cap}; {at_cap}/{len(seg_sizes)} cut by the cap, '
+                  f'the rest by a blank line)')
+        if raw['first'] is not None:
+            rate = raw['chars'] / raw['last'] if raw['last'] else 0
+            print(f'raw model stream: first_token={raw["first"]:.2f}s  '
+                  f'last_token={raw["last"]:.1f}s  tokens={raw["tokens"]}  '
+                  f'chars={raw["chars"]}  {rate:.1f} chars/s')
+            st = getattr(rag, 'last_stream_stats', {}) or {}
+            print(f'thinking={"enabled" if st.get("thinking") else "disabled"}  '
+                  f'reasoning discarded: {st.get("reasoning_chunks", 0)} chunks / '
+                  f'{st.get("reasoning_chars", 0)} chars')
+            print(f'gate overhead: {total - (raw["last"] or 0):.1f}s '
+                  f'(total minus the model\'s own stream)')
+        else:
+            print('raw model stream: the model yielded nothing')
         print(f'status={audit.get("status")}  retry={audit.get("retry_count")}')
         print(f'sections={audit.get("expected_sections_check")}  '
               f'missing={audit.get("missing_sections")}  '

@@ -52,6 +52,22 @@ class Config:
     LLM_API_KEY = os.getenv('LLM_API_KEY')                                     # 必填，無預設值：key 遺失時 rag_engine 會報錯而非靜默呼叫錯誤服務
     LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-v4-flash')
     LLM_API_BASE = os.getenv('LLM_API_BASE', 'https://api.deepseek.com/v1')
+    # deepseek-v4-flash 是推理模型：它會先串流 reasoning_content，答案要等推理跑完才開始，
+    # 而打包器只取 content，所以那段時間畫面上完全沒有東西。實測同一份 6,014 字 payload：
+    # 推理開啟時模型先產出 9,487 個推理 chunk（13,808 字），第一個答案 token 在 75.5 秒；
+    # 關閉後第一個答案 token 1.1 秒、總時間 80.5 -> 12.9 秒，段落齊全檢查與出口掃描結果不變。
+    # 預設關閉推理。若日後判定分析深度不足，設 LLM_DISABLE_THINKING=0 即可切回，不需改程式。
+    LLM_DISABLE_THINKING = os.getenv('LLM_DISABLE_THINKING', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+
+    # 逐字重播（呈現層）。分段閘門一次釋出一整段——實測 13 段裡最長 359 字——前端若直接
+    # 貼上，畫面就會靜止 2-3 秒再整塊跳出來。首字其實只要 2.1 秒（其中模型佔 2.02 秒、
+    # 閘門佔 0.08 秒），慢的是流動感不是延遲，所以解法在前端而不是把分段切小：實測那 13 段
+    # 全部由空行切出，沒有一段碰到 400 字上限，調低上限不會讓任何一段提早釋出。
+    # 值由 meta 事件送給前端。關閉時前端維持原本的整段貼上。
+    TYPEWRITER_ENABLED = os.getenv('TYPEWRITER_ENABLED', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+    # 重播的「地板」速度。實際速度會自適應加快以免落後於後端（實測產出約 115 字/秒），
+    # 這個值只決定文字稀疏時看起來多快。
+    TYPEWRITER_CHARS_PER_SEC = int(os.getenv('TYPEWRITER_CHARS_PER_SEC', 60))
 
     # LOG 打包器（事項 01-16）。預設開啟：chat 走 assemble -> 分段閘門 -> 稽核。
     # 舊路徑（模組 prompt + context_builder）仍保留為 fallback，兩者輸出格式不同、

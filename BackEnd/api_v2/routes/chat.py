@@ -339,9 +339,15 @@ def chat():
     xff = request.headers.get('X-Forwarded-For', '')
     caller_ip = xff.split(',')[0].strip() if xff else (request.remote_addr or 'unknown')
 
+    # 讀在這裡而不是 generate() 裡：生成器是在請求交給 WSGI 伺服器之後才執行的，
+    # 那時 request/app context 已經彈出，current_app 會拋 RuntimeError。同樣理由，
+    # rag_engine 也是在 __init__ 讀 LLM_DISABLE_THINKING。
+    typewriter = bool(current_app.config.get('TYPEWRITER_ENABLED', True))
+    typewriter_cps = int(current_app.config.get('TYPEWRITER_CHARS_PER_SEC', 60))
+
     print(f">>> [DEBUG] Candidate IDs: {candidate_ids}", flush=True)
     print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}, Mode: {mode}", flush=True)
-    
+
     def generate():
         print(">>> [DEBUG] Generator started", flush=True)
         try:
@@ -449,7 +455,8 @@ def chat():
                 return
             
             # Send thinking/intent meta
-            yield f"data: {json.dumps({'type': 'meta', 'intent': use_case_id})}\n\n"
+            # meta 在任何 token 之前送出，所以前端在第一段到達時就知道要不要重播。
+            yield f"data: {json.dumps({'type': 'meta', 'intent': use_case_id, 'typewriter': typewriter, 'typewriter_cps': typewriter_cps})}\n\n"
             
             full_assistant_content = ""
             total_usage = None

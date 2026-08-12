@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import openai
 import logging
 from typing import List, Dict, Any, Optional
@@ -70,8 +71,14 @@ class RAGService:
              rag_logger.error("CRITICAL: Still no API KEY. Using dummy key to prevent startup crash.", exc_info=False)
              api_key = "sk-dummy-key-for-init"
 
-        rag_logger.info(f"Init LLM - Base: {api_base}, Key: {api_key[:5]}...")
-        
+        # Read here rather than at call time: the SSE generator runs after the request
+        # has been handed to the WSGI server, and this object is a module-level singleton
+        # built inside before_request, where the app context is guaranteed.
+        self.disable_thinking = current_app.config.get('LLM_DISABLE_THINKING', True)
+
+        rag_logger.info(f"Init LLM - Base: {api_base}, Key: {api_key[:5]}..., "
+                        f"thinking={'disabled' if self.disable_thinking else 'enabled'}")
+
         self.client = openai.OpenAI(
             api_key=api_key,
             base_url=api_base
@@ -550,16 +557,62 @@ class RAGService:
     # prompt-template path entirely and just drive the client. Injected into LogPipeline
     # rather than imported by it, which is what lets the whole pipeline be tested offline.
 
+    def _thinking_kwargs(self):
+        """extra_body that switches the model's reasoning off, when configured.
+
+        Passed through `extra_body` because it is not an OpenAI-schema parameter; the
+        client forwards it verbatim to DeepSeek.
+        """
+        if not self.disable_thinking:
+            return {}
+        return {'extra_body': {'thinking': {'type': 'disabled'}}}
+
     def packer_stream(self, messages):
-        """Token strings for a packer-assembled request."""
+        """Token strings for a packer-assembled request.
+
+        Only `content` is yielded. When reasoning is enabled the model streams
+        `reasoning_content` first -- thousands of chunks that are dropped here -- and the
+        user sees nothing at all until it finishes. That is logged rather than left
+        invisible: it was the entire cause of a 330s "hang" on UAT, and from the packer's
+        side it is indistinguishable from a stalled connection.
+        """
         rag_logger.info(f"[Packer] streaming with model '{self.model_name}', "
-                        f"{len(messages)} messages")
+                        f"{len(messages)} messages, "
+                        f"thinking={'disabled' if self.disable_thinking else 'enabled'}")
+        started = time.perf_counter()
+        reasoning_chunks = reasoning_chars = 0
+        first_content_at = None
+        # Readable by callers that want to report where the time went (run_packer_live
+        # prints it); the warning below is what production leaves behind in the log.
+        self.last_stream_stats = stats = {'thinking': not self.disable_thinking,
+                                          'reasoning_chunks': 0, 'reasoning_chars': 0,
+                                          'first_content_at': None}
         stream = self.client.chat.completions.create(
-            model=self.model_name, messages=messages, stream=True)
+            model=self.model_name, messages=messages, stream=True,
+            **self._thinking_kwargs())
         for chunk in stream:
             if chunk.choices and chunk.choices[0].delta:
-                content = chunk.choices[0].delta.content
+                delta = chunk.choices[0].delta
+                reasoning = getattr(delta, 'reasoning_content', None)
+                if reasoning:
+                    reasoning_chunks += 1
+                    reasoning_chars += len(reasoning)
+                    stats['reasoning_chunks'] = reasoning_chunks
+                    stats['reasoning_chars'] = reasoning_chars
+                content = delta.content
                 if content:
+                    if first_content_at is None:
+                        first_content_at = time.perf_counter() - started
+                        stats['first_content_at'] = first_content_at
+                        if reasoning_chunks:
+                            rag_logger.warning(
+                                f"[Packer] first answer token at {first_content_at:.1f}s "
+                                f"after {reasoning_chunks} reasoning chunks "
+                                f"({reasoning_chars} chars) -- the user saw nothing for "
+                                f"that whole time")
+                        else:
+                            rag_logger.info(f"[Packer] first answer token at "
+                                            f"{first_content_at:.2f}s")
                     yield content
 
     def packer_followup(self, messages, instruction):
@@ -570,7 +623,7 @@ class RAGService:
             resp = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages + [{'role': 'user', 'content': instruction}],
-                stream=False)
+                stream=False, **self._thinking_kwargs())
             return (resp.choices[0].message.content or '') if resp.choices else ''
         except Exception as e:
             rag_logger.error(f"[Packer] follow-up call failed: {e}", exc_info=True)
