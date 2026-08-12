@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
+from ..services.segment_gate import STATUS_BLOCKED
 from ..services.session_store import SqlSessionStore
 from ..database.connection import get_db_session
 from ..database.models import ChatSession, ChatMessage
@@ -484,12 +485,20 @@ def chat():
                 yield f"data: {json.dumps({'type': 'error', 'code': 'STREAM_INTERRUPTED', 'message': '連線中斷，請稍後再試。'})}\n\n"
 
             if packed is not None:
-                # Writes the structured audit record; blocked/manual_review means the
-                # answer stopped early or is incomplete, and the user is told so rather
-                # than being left with a truncated reply that looks finished.
+                # Writes the structured audit record. Only `blocked` reaches the reader:
+                # there the gate stopped mid-answer, so what is on screen is truncated and
+                # would otherwise look finished -- the disclosure 丙-3 requires.
+                #
+                # `manual_review` is deliberately not shown. That answer ran to completion
+                # and its text is clean; what failed is a completeness rule (a section the
+                # completion pass could not supply, missing calibration wording, or an
+                # over-length free-form reply). Once 補生成 stopped firing for failures
+                # appending cannot fix, the status became common enough that the banner
+                # was appearing under answers with nothing visibly wrong with them. It
+                # stays in log_packer_audit.log, which is where a reviewer can act on it.
                 packer_audit = packed.finish()
-                if packer_audit.get('status') and packer_audit['status'] != 'ok':
-                    yield f"data: {json.dumps({'type': 'notice', 'code': packer_audit['status'], 'message': '本次回覆未通過完整性或安全檢查，已轉人工複核。'})}\n\n"
+                if packer_audit.get('status') == STATUS_BLOCKED:
+                    yield f"data: {json.dumps({'type': 'notice', 'code': packer_audit['status'], 'message': '本次回覆在輸出中途停止，內容並不完整，請重新提問或聯繫管理員。'})}\n\n"
 
             # Log Assistant Message & Usage
             prompt_tokens = 0

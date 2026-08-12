@@ -143,6 +143,21 @@ def main():
     check('status 是 manual_review', gate.result.status == STATUS_MANUAL_REVIEW,
           gate.result.status)
 
+    print('\n[12] 只有 blocked 會通知使用者；manual_review 只進稽核日誌')
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
+                            'api_v2', 'routes', 'chat.py'), encoding='utf-8').read()
+    # `if packed is not None:` also guards where the stream is obtained, so anchor on
+    # finish() -- the only place the audit status is read.
+    notice = src[src.index('packer_audit = packed.finish()'):]
+    notice = notice[:notice.index('\n\n')]
+    check('條件是 status == STATUS_BLOCKED',
+          "== STATUS_BLOCKED" in notice, notice.splitlines()[-2:])
+    check('不再用「!= ok」（那會把 manual_review 也送出去）',
+          "!= 'ok'" not in notice)
+    check('舊的「已轉人工複核」文案已移除', '已轉人工複核' not in src)
+    check('blocked 的文案講的是「中途停止」而非「未通過檢查」',
+          '中途停止' in notice, notice.splitlines()[-1][:80])
+
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
 

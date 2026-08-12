@@ -1162,10 +1162,12 @@ export function useChatLogic(emit) {
                                     isWidgetEnabled.value = (event.quota_summary.remaining > 0)
                                 }
                             } else if (event.type === 'notice') {
-                                // 分段閘門的終值稽核。blocked＝某段掃到內部標記、閘門停止輸出，
-                                // manual_review＝內容乾淨但段落缺漏補不回來。兩者的共通點是
-                                // 上面已顯示的內容收不回來，所以必須明講這份回答不完整——
-                                // 否則被砍一半的回答在畫面上與正常結束的回答完全相同。
+                                // 分段閘門的終值稽核。實務上只會收到 blocked＝某段掃到
+                                // 內部標記、閘門中止輸出；上面已顯示的內容收不回來，所以
+                                // 必須明講這份回答不完整——否則被砍一半的回答在畫面上與
+                                // 正常結束的回答完全相同。
+                                // manual_review 不再送到前端（後端只寫進稽核日誌）：那種
+                                // 回答本身是完整且乾淨的，掛提示只會讓使用者困惑。
                                 messages.value[aiMsgIndex].notice = event.message
                                 messages.value[aiMsgIndex].noticeCode = event.code
                             } else if (event.type === 'message_id') {
