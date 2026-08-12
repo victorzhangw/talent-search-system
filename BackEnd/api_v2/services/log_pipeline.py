@@ -11,8 +11,10 @@ as 「他的　偏高，在 表現尚可」: clean and useless. So it asks for t
 workplace-behaviour language and names the forbidden terms only as a constraint.
 """
 
+import re
 from typing import Callable, Iterable, Iterator, List, Optional
 
+from ..utils.logger import get_daily_logger
 from .completeness_check import CompletenessChecker
 from .exit_scanner import ExitScanner
 from .log_assembler import AssembledLog, Respondent, assemble
@@ -30,8 +32,49 @@ REWRITE_INSTRUCTION = (
 
 COMPLETION_INSTRUCTION = (
     '你的回答還缺少以下內容：{reason}。\n'
-    '請「只補上」缺少的部分，沿用先前的段落標題格式；不要重寫或重複已經輸出過的段落。'
+    '請「只補上」缺少的部分，沿用先前的段落標題格式；不要重寫或重複已經輸出過的段落。\n'
+    '這是補充內容、不是一份完整回答，文末不要再附上結語句。'
 )
+
+# 補生成是一次全新的模型呼叫，而 system prompt 第 6 條要求「每次回答文末」附上結語句，
+# 所以模型會把已經顯示過的那一句再寫一次——實測 session af4d3e45 就是這樣出現兩句
+# 「本分析旨在提供觀點與輔助…」。上面那行指令只是盡力而為，真正把它擋掉的是
+# `_strip_duplicate_closer`。
+#
+# 那個函式比對的是「補充內容的最後一句是否已經出現在已釋出的文字裡」，而不是寫死結語句
+# 本身：system prompt 是客戶的正本，他們改寫那句話時這段仍然有效。
+_SENTENCE_SPLIT_RE = re.compile(r'(?<=[。！？!?])\s*')
+# 太短的句子可能只是碰巧重複（「以上。」之類），砍掉會是誤刪；結語句有 30 字。
+MIN_DUPLICATE_CLOSER_CHARS = 12
+
+pipeline_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
+
+
+def strip_duplicate_closer(extra: str, released: str) -> str:
+    """Drop `extra`'s last sentence if `released` already showed it.
+
+    Only the trailing sentence, only on an exact match against text already released, and
+    only when it is long enough to be a real duplicate rather than a coincidence.
+
+    What this cannot do is remove the *first* copy: it is already on the user's screen and
+    丙-3 established that released segments are never recalled. So the closing sentence
+    ends up where the first answer ended, with the supplement after it. That reads better
+    than saying it twice, but it is a trade-off, not a cure -- the cure is for the
+    completeness check to stop firing spuriously, which is 乙-6.
+    """
+    body = extra.rstrip()
+    if not body:
+        return extra
+    parts = [p for p in _SENTENCE_SPLIT_RE.split(body) if p.strip()]
+    # 只有一句話時不動：那句就是補充內容本身，砍掉等於整段消失。
+    if len(parts) < 2:
+        return extra
+    last = parts[-1].strip()
+    if len(last) < MIN_DUPLICATE_CLOSER_CHARS or last not in released:
+        return extra
+    pipeline_logger.info(f"[Completion] dropped a closing sentence the answer had already "
+                         f"shown: {last[:40]}")
+    return body[:body.rindex(last)].rstrip()
 
 # stream_fn(messages) -> iterable of token strings
 StreamFn = Callable[[List[dict]], Iterable[str]]
@@ -82,9 +125,10 @@ class LogPipeline:
     def _complete(self, reason: str) -> str:
         if self.followup_fn is None:
             return ''
-        return self.followup_fn(
+        extra = self.followup_fn(
             self.messages + [{'role': 'assistant', 'content': self.checker.text}],
             COMPLETION_INSTRUCTION.format(reason=reason))
+        return strip_duplicate_closer(extra or '', self.checker.text)
 
     def stream(self, stream_fn: StreamFn) -> Iterator[str]:
         """Yields display-ready segments. `self.result` is set once iteration ends."""

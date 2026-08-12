@@ -231,13 +231,19 @@ class SegmentGate:
             return
 
         # 丙-2: ask for the missing part only; what is already on screen stays.
-        if self.completer is None:
+        #
+        # Only run it for a failure appending can actually fix. A calibration-evidence or
+        # over-length failure asked the model to do something an appendix cannot do, and
+        # it responded by re-emitting the whole answer -- which, since released segments
+        # are never recalled, the user read twice. See `appendable_reason`.
+        reason = outcome.appendable_reason()
+        if self.completer is None or not reason:
             self.result.status = STATUS_MANUAL_REVIEW
             return
         for _ in range(MAX_COMPLETION_ATTEMPTS):
             self.result.completion_attempts += 1
             try:
-                extra = self.completer(outcome.reason())
+                extra = self.completer(reason)
             except Exception:
                 break
             if not (extra or '').strip():
@@ -251,4 +257,7 @@ class SegmentGate:
             self.result.completeness = outcome
             if outcome.status != 'failed':
                 return
+            reason = outcome.appendable_reason()
+            if not reason:
+                break
         self.result.status = STATUS_MANUAL_REVIEW

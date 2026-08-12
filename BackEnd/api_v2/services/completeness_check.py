@@ -108,13 +108,35 @@ class CompletenessResult:
             'log': self.log_lines,
         }
 
+    def _appendable_bits(self) -> List[str]:
+        return ([('缺少段落：' + '、'.join(self.missing_sections))] if self.missing_sections else []) \
+             + ([('缺少獨立段落的受測者：' + '、'.join(self.missing_respondents))]
+                if self.missing_respondents else [])
+
+    def appendable_reason(self) -> str:
+        """The part of `reason()` that appending more text could actually fix.
+
+        b §8's completion pass is 丙-2's 「只補上缺少的部分」: it appends, and everything
+        already on screen stays there. That works for a missing section -- it is a new
+        block of text with its own heading. It does not work for the other two failures,
+        and attempting it caused two separate production defects:
+
+          * calibration evidence: the wording has to run through the existing paragraphs,
+            so the model either bolted on a 「佐證類措辭補充」 block (session af4d3e45) or
+            re-emitted the entire answer with the wording woven in -- the user read the
+            whole analysis twice, because released segments cannot be recalled (丙-3).
+          * free-form over 1,000 characters: appending makes it longer. The completion
+            pass is the opposite of the fix.
+
+        Both now report `manual_review` instead, which is what the status is for. The real
+        cure for the first is 乙-6: the evidence wordlist rejects phrasings the client's
+        own examples use, so the check fails more often than it should.
+        """
+        return '；'.join(self._appendable_bits())
+
     def reason(self) -> str:
-        """What to hand back to the model when asking for the missing part."""
-        bits = []
-        if self.missing_sections:
-            bits.append('缺少段落：' + '、'.join(self.missing_sections))
-        if self.missing_respondents:
-            bits.append('缺少獨立段落的受測者：' + '、'.join(self.missing_respondents))
+        """Everything that failed -- for the audit record and the log."""
+        bits = self._appendable_bits()
         if self.calibration_evidence == 'failed':
             bits.append('需加入佐證類措辭（' + '／'.join(EVIDENCE_TERMS) + '）')
         if self.status == 'failed' and self.char_count and self.char_count > FREE_FORM_MAX_CHARS:
