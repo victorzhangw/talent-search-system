@@ -112,17 +112,27 @@ def run_unit_checks(log_text: str, respondents, question: Optional[dict],
     """respondents: the Respondent objects that went in, so P is known independently.
     scoped_ids_by_id: {respondent_id: S}; omit for whole-person/free-form."""
     problems: List[Problem] = []
-    regions = {r.rid: r for r in _parse(log_text)}
+    # Matched by position, not by the header's ID field: that field now carries a position
+    # token (RESP_01) rather than the candidate_id, because the raw id leaked into answers
+    # as 「許品優（55）」. b §5 emits one block per respondent in the order given, so the
+    # nth block belongs to the nth respondent -- and the name on it is then verified,
+    # which is a stronger check than the id lookup it replaces: a block emitted under the
+    # wrong person's name used to pass as long as some block carried the right id.
+    parsed = _parse(log_text)
     whole = question is None or question.get('type') == 'whole_person'
 
-    if len(regions) != len(respondents):
+    if len(parsed) != len(respondents):
         problems.append(Problem('respondent_count',
-                                f'{len(regions)} blocks parsed for {len(respondents)} respondents'))
+                                f'{len(parsed)} blocks parsed for {len(respondents)} respondents'))
 
-    for r in respondents:
-        reg = regions.get(r.respondent_id)
+    for i, r in enumerate(respondents):
+        reg = parsed[i] if i < len(parsed) else None
         if reg is None:
             problems.append(Problem('missing_respondent', f'no block for {r.respondent_id}'))
+            continue
+        if reg.name != r.name:
+            problems.append(Problem('respondent_mismatch',
+                                    f'block {i + 1} is 「{reg.name}」, expected 「{r.name}」'))
             continue
         S = (scoped_ids_by_id or {}).get(r.respondent_id, set())
         P = r.scores
@@ -159,7 +169,7 @@ def run_unit_checks(log_text: str, respondents, question: Optional[dict],
         problems.append(Problem('python_list_repr', "payload contains \"['\""))
     if EMPTY_PARENS_RE.search(log_text):
         problems.append(Problem('empty_parens', 'payload contains empty parentheses'))
-    for reg in regions.values():
+    for reg in parsed:
         for line in reg.body_lines:
             if PAREN_CODE_RE.search(line):
                 problems.append(Problem('paren_code',

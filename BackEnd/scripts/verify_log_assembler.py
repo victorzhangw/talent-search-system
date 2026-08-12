@@ -34,6 +34,7 @@ CASES = [
 RESPONDENT_RE = re.compile(r'^### \[受測者 \| (.+?) \| (.+?)\]$')
 TRAIT_RE = re.compile(r'^\[特質 \| ([A-Z]{3}_\d+)_([ABC]) \| ')
 INDEX_RE = re.compile(r'^- ([A-Z]{3}_\d+)_([ABC])｜')
+POSITION_LABEL_RE = re.compile(r'RESP_\d{2}')
 
 # Known, documented deviations. Anything outside these must match exactly.
 SPA_PREFIXES = ('可用於：', '禁止：')
@@ -70,6 +71,14 @@ def classify(expected: str, actual: str) -> str:
         return 'example-file annotation after [SYSTEM PROMPT]'
     if expected.startswith('15. 自濾授權') and actual.startswith('15. 自濾授權'):
         return 'a-doc rule 15 clause (examples predate it)'
+    e_head, a_head = RESPONDENT_RE.match(expected), RESPONDENT_RE.match(actual)
+    if e_head and a_head and e_head.group(1) == a_head.group(1) \
+            and POSITION_LABEL_RE.fullmatch(a_head.group(2)):
+        # Same format, same name, different ID token. The examples' own tokens are ad-hoc
+        # placeholders -- RESP_R2, RESP_TEAM_01, RESP_R3_DUAL, one scheme per file -- so
+        # there is nothing here to reproduce. We mint a position token instead, because
+        # filling this field with the real candidate_id put 「許品優（55）」 into answers.
+        return 'respondent ID token (examples use ad-hoc placeholders)'
     return 'UNEXPECTED'
 
 

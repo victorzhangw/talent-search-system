@@ -45,6 +45,21 @@ DATA_HEADER = '## 【輸入數據】'
 INSTRUCTION_MARKER = '[任務指令]'
 SEPARATOR = '---'
 
+# b §5 的受測者標頭是 `### [受測者 | 姓名 | ID]`，而客戶三份 v7 範例的 ID 欄都是
+# RESP_TEAM_01 / RESP_R2 這種一望即知的內部代號。我們原本填的是 Traitty 的 candidate_id，
+# 也就是 55、63 這類兩位數整數——模型看到「許品優 | 55」時把數字當成姓名的一部分，
+# 寫進段落標題變成「許品優（55）」，而出口掃描器抓的是分數形態（數字＋分、band 字母），
+# 括號裡的裸數字不符合任何一條規則，於是原樣送到客戶眼前。
+#
+# 改用位置代號後，模型看不到真實 ID 也就無從輸出，而 LOG 本體反而更貼近 v7 範例。
+# 真實 candidate_id 仍完整保留在稽核記錄的 `respondent_id` 欄，可追溯性不受影響。
+LOG_LABEL_PREFIX = 'RESP_'
+
+
+def log_label_for(index: int) -> str:
+    """位置代號；同一次請求內唯一，跨請求不保證穩定（它只是給模型看的區塊標記）。"""
+    return f'{LOG_LABEL_PREFIX}{index + 1:02d}'
+
 
 class AudienceMismatch(ValueError):
     """b §1.1: 人數與 audience 不符必須拒絕請求，不可繼續組裝."""
@@ -63,17 +78,19 @@ class Respondent:
         self.scores = scores
         self.tests = tests or sorted({t.split('_')[0] for t in scores})
 
-    @property
-    def header(self) -> str:
+    def header(self, log_label: str) -> str:
+        """`log_label` is the position token, not `respondent_id` -- see LOG_LABEL_PREFIX."""
         # The empty parens that used to follow the name are gone; do not reintroduce them.
-        return f'### [受測者 | {self.name} | {self.respondent_id}]'
+        return f'### [受測者 | {self.name} | {log_label}]'
 
 
 class AssembledLog:
-    __slots__ = ('body', 'instruction', 'audit', 'injected_names', 'injected_labels')
+    __slots__ = ('body', 'instruction', 'audit', 'injected_names', 'injected_labels',
+                 'log_labels', 'name_bound_ids')
 
     def __init__(self, body: str, instruction: str, audit: dict,
-                 injected_names=None, injected_labels=None):
+                 injected_names=None, injected_labels=None,
+                 log_labels=None, name_bound_ids=None):
         self.body = body                  # [SYSTEM PROMPT] … 【輸入數據】 …
         self.instruction = instruction    # [任務指令]\n…
         self.audit = audit
@@ -81,6 +98,12 @@ class AssembledLog:
         # 動態縮小): only names and labels that actually made it into the payload.
         self.injected_names = injected_names or set()
         self.injected_labels = injected_labels or set()
+        # Respondent identifiers the answer must not carry. `log_labels` are the RESP_xx
+        # tokens that went into the payload; `name_bound_ids` are (name, candidate_id)
+        # pairs, which the scanner can only match next to the name -- a bare two-digit id
+        # would collide with ordinary numbers.
+        self.log_labels = log_labels or set()
+        self.name_bound_ids = name_bound_ids or set()
 
     def to_log_text(self) -> str:
         return f'{self.body}\n\n{SEPARATOR}\n\n{self.instruction}'
@@ -108,7 +131,7 @@ def check_audience(respondents: List[Respondent], question: Optional[dict]):
 
 
 def _respondent_block(respondent: Respondent, question: Optional[dict],
-                      renderer: TraitBlockRenderer) -> tuple:
+                      renderer: TraitBlockRenderer, log_label: str) -> tuple:
     split = split_traits(respondent.scores, question)
 
     # A trait_id/band the spec doesn't have would otherwise render as None and surface as
@@ -119,7 +142,7 @@ def _respondent_block(respondent: Respondent, question: Optional[dict],
         raise UnknownTrait(f'{respondent.respondent_id}: not in trait_bands: '
                            f'{", ".join(sorted(unknown))}')
 
-    parts = [respondent.header, split.subject_header]
+    parts = [respondent.header(log_label), split.subject_header]
     parts += [renderer.render_full_block(t, b) for t, b in split.full]
 
     if split.has_index_region:
@@ -135,7 +158,9 @@ def _respondent_block(respondent: Respondent, question: Optional[dict],
             parts.append(block.footnote)
 
     audit = {
+        # The real candidate_id stays here; only the payload sees the position token.
         'respondent_id': respondent.respondent_id,
+        'log_label': log_label,
         'traits_total': len(respondent.scores),
         'full_blocks': len(split.full),
         'index_lines': len(split.index),
@@ -171,10 +196,14 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
     blocks, audits = [], []
     scoped_by_id = {}
     names, labels = set(), set()
-    for r in respondents:
-        text, audit = _respondent_block(r, question, renderer)
+    log_labels, name_bound_ids = set(), set()
+    for i, r in enumerate(respondents):
+        label = log_label_for(i)
+        text, audit = _respondent_block(r, question, renderer, label)
         blocks.append(text)
         audits.append(audit)
+        log_labels.add(label)
+        name_bound_ids.add((r.name, str(r.respondent_id)))
         scoped_by_id[r.respondent_id] = split_traits(r.scores, question).scoped_ids
         for trait_id, band in r.scores.items():
             names.add(renderer.name_zh(trait_id))
@@ -199,7 +228,9 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
     }
     log = AssembledLog(body, f'{INSTRUCTION_MARKER}\n{instruction_text}', audit,
                        injected_names={n for n in names if n},
-                       injected_labels={l for l in labels if l})
+                       injected_labels={l for l in labels if l},
+                       log_labels=log_labels,
+                       name_bound_ids=name_bound_ids)
 
     if run_checks:
         from .unit_check import run_unit_checks
