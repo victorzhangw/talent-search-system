@@ -403,29 +403,45 @@ TYPE: quick | AUDIENCE: multi | RESPONDENTS: 2 | HISTORY_MSGS: 4 (2 turns, cap=6
 | V-3 | `HISTORY_MSGS` 的數字與區塊內實際列出的則數一致 | 數字比對 |
 | V-4 | **從 `[SYSTEM PROMPT]` 起算到檔尾的字串，與改造前的輸出完全相同** | 逐字 diff（保證 v7 比對不受影響） |
 | V-5 | `MAX_HISTORY_TURNS` 設為 2 時跑第 5 輪，只剩最後 4 則且丟掉的是最舊的 | 逐字比對 |
-| V-6 | 同一請求的 `REQ` 值在 `prompts.log`、`conversations.log`、`log_packer_audit.log` 三處相同 | 三檔 grep 後比對 |
+| V-6 | 同一請求的 `REQ` 值在 `prompts.log`、`conversations.log`、`log_packer_audit.log` 三處相同 | 前兩者讀檔比對；`conversations.log` 見下方註 |
 | V-7 | `PROMPT_LOG_PER_SESSION=true` 時 per-session 檔內容與彙總檔中該筆逐字相同 | 逐字比對 |
 | V-8 | `PROMPT_LOG_PER_SESSION=false` 時不產生 `prompts/` 目錄 | 路徑不存在 |
 | V-9 | session_id 帶 `../` 等字元時落到 `unknown.log`，不寫出目錄之外 | 路徑檢查 |
-| V-10 | per-session 寫入失敗（目錄設唯讀）時，彙總檔該筆仍完整落地 | 注入失敗後檢查彙總檔 |
-| V-11 | `demo_prompt_log.py` 全綠 | 執行既有腳本 |
+| V-10 | per-session 寫入失敗時彙總檔該筆仍完整落地，**且失敗確實發生** | 注入失敗後檢查兩件事 |
+| V-11 | `demo_prompt_log.py` 全綠 | 以子行程執行既有腳本 |
+
+實作時與上表有兩處出入，記錄如下：
+
+- **V-6 的 `conversations.log` 無法離線驗證。** 那兩行是由 `routes/chat.py` 的串流產生器寫出的，
+  要跑到它得有一個活的 request 與資料庫連線，與「離線、不呼叫模型」的前提衝突。
+  改為在原始碼層面斷言 `REQ: {req_id}` 至少出現在三個呼叫點（`[USER]`／`[AI]`／`[LLM ERROR]`），
+  這擋得住日後有人把欄位改掉；真正的三檔對照留在第八節第 6 條的人工複核。
+- **V-10 多了一條前置斷言。** 原本只檢查「彙總檔仍完整」，但彙總檔本來就寫得成——
+  注入失效時這條會空過、證明不了任何事。現在先確認 per-session 目錄確實沒被建出來，
+  才去看彙總檔。失敗注入的手法是把目錄位置換成一個同名檔案，讓 `os.makedirs` 真的拋例外，
+  走的是產品程式碼自己的 except 分支，而不是測試替身模擬出來的分支。
 
 ---
 
 ## 八、驗收基準（DoD）
 
-以下全數成立才算達標：
+以下全數成立才算達標。第 1–3、8 條為自動化，可在本機重跑；第 4–7 條需要真實後端，
+留給 UAT 人工複核。
 
-1. 第七節 A、B 兩單元的程式改動完成，且**分屬兩個可獨立回溯的提交**。
-2. `verify_prompt_log_history.py` 的 V-1 至 V-10 全數通過，輸出可貼進驗收報告。
-3. `demo_prompt_log.py` 通過（V-11），其中 `HISTORY_TURNS` 斷言已更新為 `HISTORY_MSGS`。
+1. [完成] 第七節 A、B 兩單元的程式改動完成，且**分屬兩個可獨立回溯的提交**
+   （A：`614b09a`；B：`c6cc0d5`）。
+2. [完成] `verify_prompt_log_history.py` 的 V-1 至 V-11 全數通過，輸出可貼進驗收報告。
+   連續執行兩次結果相同（截斷測試會改動 app config，重跑不受前次殘留影響）。
+3. [完成] `demo_prompt_log.py` 通過（V-11），其中 `HISTORY_TURNS` 斷言已更新為 `HISTORY_MSGS`，
+   並補了兩條檢查表頭換算自洽的斷言。
 4. 以真實後端跑一段 **至少 7 輪** 的對話（超過 6 輪上限），取 `prompts.log` 檢查：
    第 7 輪的歷史區塊為 12 則、第 1 輪的問答已被丟棄、`HISTORY_MSGS: 12 (6 turns, cap=6 turns/12 msgs)`。
 5. 同一段對話取 `PROMPT_LOG_PER_SESSION=true` 產生的 per-session 檔，
    確認 7 輪依序落在同一個檔內、無其他 session 交錯。
 6. 取任一筆記錄的 `REQ` 值，能在三份 log 中各找到對應記錄（V-6 的人工複核）。
 7. 拿改造後任一筆記錄的 `[SYSTEM PROMPT]` 以下部分，與 v7 範例逐行 diff，
-   結果與改造前一致。
-8. `.env.example` 補上 `PROMPT_LOG_PER_SESSION=false` 並註明用途。
+   結果與改造前一致。（V-4 已在離線層級證明這段等於 `to_log_text()` 逐位元組相同，
+   本條是拿真實資料再確認一次。）
+8. [完成] `.env.example` 補上 `PROMPT_LOG_PER_SESSION=0` 並註明用途。
 
 **不在本次範圍**：缺口 4（follow-up 呼叫的 log），依第六節 D-4 決策順延。
