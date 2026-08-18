@@ -30,6 +30,22 @@ from .respondent_adapter import from_trait_reports
 
 packer_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
 
+# settings.py 的同名預設值。這裡只在讀不到 app config 時當退路，見 _history_cap_turns()。
+DEFAULT_HISTORY_CAP_TURNS = 6
+
+
+def _history_cap_turns():
+    """MAX_HISTORY_TURNS，取不到就用預設值。
+
+    刻意吞掉所有例外：這個數字只是 header 上的一個註記，為了它讓整筆 prompt 記錄寫不出來
+    是很糟的交換。沒有 app context 時（離線腳本）也走這條退路。
+    """
+    try:
+        from flask import current_app
+        return int(current_app.config.get('MAX_HISTORY_TURNS', DEFAULT_HISTORY_CAP_TURNS))
+    except Exception:
+        return DEFAULT_HISTORY_CAP_TURNS
+
 
 def log_payload(pipeline: LogPipeline, session_id, module_id, question):
     """Write the assembled LOG verbatim to prompts.log before anything is sent.
@@ -46,13 +62,20 @@ def log_payload(pipeline: LogPipeline, session_id, module_id, question):
     log = pipeline.log
     audit = log.audit
     try:
+        # 這個欄位一路到 8/18 都叫 HISTORY_TURNS，算的卻是 `len(messages) - 2`，也就是
+        # 「則數」而不是「輪數」——1 輪 = 使用者一則 + AI 一則。客戶讀 log 時把 2 當成
+        # 兩輪、實際只有一輪，剛好差兩倍。改名並把換算與上限一起印出來，讓驗收人員不必
+        # 回頭查 .env 才知道 12 是吃滿了還是還早。
+        cap_turns = _history_cap_turns()
+        history_msgs = max(0, len(pipeline.messages) - 2)
         header = (f"SESSION: {session_id} | USE_CASE: log_packer | "
                   f"MODULE: {module_id or '(free-form)'} | "
                   f"QUESTION: {audit.get('question_id')} | "
                   f"TYPE: {audit.get('question_type')} | "
                   f"AUDIENCE: {audit.get('audience')} | "
                   f"RESPONDENTS: {len(audit.get('respondents') or [])} | "
-                  f"HISTORY_TURNS: {max(0, len(pipeline.messages) - 2)}")
+                  f"HISTORY_MSGS: {history_msgs} ({history_msgs // 2} turns, "
+                  f"cap={cap_turns} turns/{cap_turns * 2} msgs)")
         get_prompt_logger().info(
             f"{header}\n"
             f"============================================================\n"
