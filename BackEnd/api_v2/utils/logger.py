@@ -95,10 +95,12 @@ def history_text_block(history) -> str:
 
     Not truncated and not summarised. Truncating would defeat the reason it exists: the
     reviewer is deciding whether a weak follow-up answer came from the data or from what
-    the model remembered, and an excerpt cannot settle that. Growth is bounded by
-    MAX_HISTORY_TURNS, and was measured against real logs before this landed -- a full
-    window costs roughly 40% on top of a record that is already 20-39K characters, because
-    the respondent trait blocks dominate it either way.
+    the model remembered, and an excerpt cannot settle that.
+
+    Growth is bounded by MAX_HISTORY_TURNS and is small next to the payload: measured on
+    production records, six messages of history cost 15% on top of a record that is
+    already 42K characters, because the respondent trait blocks dominate it either way.
+    A full twelve-message window extrapolates to roughly 25%.
     """
     if not history:
         return '[CONVERSATION HISTORY]\n(none -- first turn of this session)\n'
