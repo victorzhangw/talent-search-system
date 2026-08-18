@@ -108,6 +108,9 @@ class LogPipeline:
                  followup_fn: Optional[FollowupFn] = None):
         # assemble() runs the b §6 unit checks and raises before anything is sent.
         self.log = assemble(respondents, question, user_query=user_query)
+        # 保留一份給 prompts.log。`messages` 裡的歷史夾在 system 與 user 之間，事後要從
+        # 那裡切回來只能靠位置推算，而位置正是 rewrite/completion 追加訊息時會變的東西。
+        self.history = list(history or [])
         self.messages = self.log.to_messages(history)
         self.checker = CompletenessChecker(respondents, question, table.calibration_traits)
         self.followup_fn = followup_fn

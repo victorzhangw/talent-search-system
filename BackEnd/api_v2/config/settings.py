@@ -75,6 +75,10 @@ class Config:
     USE_LOG_PACKER = os.getenv('USE_LOG_PACKER', '1').strip().lower() in ('1', 'true', 'yes', 'on')
     # Conversation history depth (1 turn = user + assistant pair)
     MAX_HISTORY_TURNS = int(os.getenv('MAX_HISTORY_TURNS', 6))
+    # 除了彙總的 prompts.log，另外把每筆記錄寫一份到 logs/<date>/prompts/<session_id>.log。
+    # 驗收一段對話時可以只讀一個檔、不必在別人的請求之間翻找。預設關閉：一個 session 一個檔，
+    # 檔數沒有上限，上線前要先有清理策略。
+    PROMPT_LOG_PER_SESSION = os.getenv('PROMPT_LOG_PER_SESSION', '0').strip().lower() in ('1', 'true', 'yes', 'on')
     # Daily token budget (all users combined); 0 = unlimited
     DAILY_TOKEN_LIMIT = int(os.getenv('DAILY_TOKEN_LIMIT', 0))
     # IP allowlist for /chat/ and /api/v2/* — comma-separated; empty = disabled

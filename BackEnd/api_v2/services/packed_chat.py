@@ -22,7 +22,7 @@ Not served here, deliberately:
 import json
 from typing import Optional
 
-from ..utils.logger import get_daily_logger, get_prompt_logger
+from ..utils.logger import get_daily_logger, history_text_block, write_prompt_record
 from .log_assembler import AudienceMismatch, UnknownTrait
 from .log_pipeline import LogPipeline
 from .module_map import module_map
@@ -47,7 +47,15 @@ def _history_cap_turns():
         return DEFAULT_HISTORY_CAP_TURNS
 
 
-def log_payload(pipeline: LogPipeline, session_id, module_id, question):
+def _per_session_enabled():
+    try:
+        from flask import current_app
+        return bool(current_app.config.get('PROMPT_LOG_PER_SESSION'))
+    except Exception:
+        return False
+
+
+def log_payload(pipeline: LogPipeline, session_id, module_id, question, req_id=None):
     """Write the assembled LOG verbatim to prompts.log before anything is sent.
 
     事項 07 §3: 舊路徑的 `_log_prompt()` 只掛在 `rag_engine._call_llm()` 上，打包器不經過
@@ -56,8 +64,12 @@ def log_payload(pipeline: LogPipeline, session_id, module_id, question):
 
     記的是 `to_log_text()` 而非 `to_messages()`：前者就是客戶驗收用的三段式 LOG 格式
     （[SYSTEM PROMPT] / 【輸入數據】 / [任務指令]），與 DoD 第 1 條拿去和三份 v7 範例
-    逐行比對的是同一個字串。歷史訊息只記筆數，因為它夾在 system 與 user 之間、不屬於
-    LOG 本體，記進去會讓檔案與範例格式對不上。
+    逐行比對的是同一個字串。
+
+    歷史區塊放在 header 與 `====` 分隔線「之間」，也就是 LOG 本體之外。這個位置是硬性的：
+    從 `[SYSTEM PROMPT]` 往下取到檔尾，字串必須與沒有歷史區塊時逐字相同，v7 逐行比對才不
+    會受影響。原本歷史只記筆數就是為了守住這件事，但那讓驗收看不到模型實際讀到什麼——
+    改放在本體之外，兩個需求就不必互相犧牲。
     """
     log = pipeline.log
     audit = log.audit
@@ -68,7 +80,8 @@ def log_payload(pipeline: LogPipeline, session_id, module_id, question):
         # 回頭查 .env 才知道 12 是吃滿了還是還早。
         cap_turns = _history_cap_turns()
         history_msgs = max(0, len(pipeline.messages) - 2)
-        header = (f"SESSION: {session_id} | USE_CASE: log_packer | "
+        header = (f"REQ: {req_id or '-'} | "
+                  f"SESSION: {session_id} | USE_CASE: log_packer | "
                   f"MODULE: {module_id or '(free-form)'} | "
                   f"QUESTION: {audit.get('question_id')} | "
                   f"TYPE: {audit.get('question_type')} | "
@@ -76,10 +89,13 @@ def log_payload(pipeline: LogPipeline, session_id, module_id, question):
                   f"RESPONDENTS: {len(audit.get('respondents') or [])} | "
                   f"HISTORY_MSGS: {history_msgs} ({history_msgs // 2} turns, "
                   f"cap={cap_turns} turns/{cap_turns * 2} msgs)")
-        get_prompt_logger().info(
+        write_prompt_record(
+            session_id,
             f"{header}\n"
+            f"{history_text_block(pipeline.history)}"
             f"============================================================\n"
-            f"{log.to_log_text()}")
+            f"{log.to_log_text()}",
+            per_session=_per_session_enabled())
     except Exception as e:
         # Never let an audit-trail failure take down a request that would otherwise
         # succeed; the packer audit log records that the payload went unlogged.
@@ -96,11 +112,12 @@ class _Chunk:
 
 
 class PackedStream:
-    def __init__(self, pipeline: LogPipeline, stream_fn, session_id, question):
+    def __init__(self, pipeline: LogPipeline, stream_fn, session_id, question, req_id=None):
         self._pipeline = pipeline
         self._stream_fn = stream_fn
         self._session_id = session_id
         self._question = question
+        self._req_id = req_id
         self.finished = False
         self.audit: dict = {}
 
@@ -128,20 +145,25 @@ class PackedStream:
         result = self._pipeline.result
         audit = result.audit if result else {'status': 'incomplete'}
         audit['session_id'] = self._session_id
+        # 這一輪的 prompt 記在 prompts.log、回覆記在 conversations.log、閘門結果記在這裡。
+        # 三個檔以前只有 session_id 可對，而同一個 session 連續幾輪的 header 長得一模一樣，
+        # 並行請求還會交錯，實務上只能靠秒級時間戳去猜。req_id 就是那個缺掉的鍵。
+        audit['req_id'] = self._req_id or '-'
         self.audit = audit
         packer_logger.info(json.dumps(audit, ensure_ascii=False, default=str))
         if audit.get('status') != 'ok':
             packer_logger.warning(
-                f"session={self._session_id} status={audit.get('status')} "
+                f"req={audit['req_id']} session={self._session_id} "
+                f"status={audit.get('status')} "
                 f"leakage_hits={audit.get('leakage_hits')} "
                 f"missing_sections={audit.get('missing_sections')}")
         for line in (audit.get('log') or []):
-            packer_logger.info(f"session={self._session_id} | {line}")
+            packer_logger.info(f"req={audit['req_id']} | session={self._session_id} | {line}")
         return audit
 
 
 def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: str,
-                      trait_reports: dict, candidates_info, session_id
+                      trait_reports: dict, candidates_info, session_id, req_id=None
                       ) -> Optional[PackedStream]:
     """A PackedStream, or None to let the caller use the legacy path."""
     try:
@@ -173,5 +195,5 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
         packer_logger.warning(f"session={session_id} cannot pack: {e}; legacy path")
         return None
 
-    log_payload(pipeline, session_id, module_id, question)
-    return PackedStream(pipeline, rag_service.packer_stream, session_id, question)
+    log_payload(pipeline, session_id, module_id, question, req_id)
+    return PackedStream(pipeline, rag_service.packer_stream, session_id, question, req_id)

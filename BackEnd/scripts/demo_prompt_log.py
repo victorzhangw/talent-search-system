@@ -174,14 +174,16 @@ def generate():
     return path
 
 
-ENTRY_RE = re.compile(r'^SESSION: ', re.M)
+# Records gained a leading `REQ:` field; `SESSION:` is still accepted so this can also be
+# pointed at a log written before that landed.
+ENTRY_PREFIXES = ('REQ: ', 'SESSION: ')
 
 
 def split_entries(text):
-    """prompts.log entries, keyed by the SESSION header line."""
+    """prompts.log entries, keyed by the header line."""
     entries, cur = [], None
     for line in text.splitlines():
-        if line.startswith('SESSION: '):
+        if line.startswith(ENTRY_PREFIXES):
             cur = {'header': line, 'body': []}
             entries.append(cur)
         elif cur is not None:

@@ -4,6 +4,7 @@ import json
 import threading
 import os
 import time
+import uuid
 import jwt as pyjwt
 from opencc import OpenCC
 from datetime import datetime
@@ -415,9 +416,16 @@ def chat():
                     daemon=True
                 ).start()
 
+            # 這一輪的 prompt 落在 prompts.log、回覆落在 conversations.log、閘門稽核落在
+            # log_packer_audit.log。三者以前只有 session_id 可以對，而同一個 session 連續
+            # 幾輪的表頭長得一模一樣，並行請求還會在檔案裡交錯，實務上只能靠秒級時間戳去猜
+            # 是哪一筆。req_id 就是那個缺掉的鍵，三個檔各寫一次。
+            req_id = uuid.uuid4().hex[:8]
+
             # Log User Message
             session_store.add_message(session_id, 'user', query)
-            conv_logger.info(f"[USER] SessionID: {session_id} | UserID: {user_id} | Content: {query}")
+            conv_logger.info(f"[USER] REQ: {req_id} | SessionID: {session_id} | "
+                             f"UserID: {user_id} | Content: {query}")
 
             llm_start = time.time()
 
@@ -428,7 +436,7 @@ def chat():
             if current_app.config.get('USE_LOG_PACKER') and trait_reports:
                 from ..services.packed_chat import try_packed_stream
                 packed = try_packed_stream(rag_service, module_id, query, mode,
-                                           trait_reports, candidates_info, session_id)
+                                           trait_reports, candidates_info, session_id, req_id)
 
             try:
                 if packed is not None:
@@ -440,7 +448,8 @@ def chat():
                         candidates_info=candidates_info,
                         trait_reports=trait_reports,
                         mode=mode,
-                        module_id=module_id
+                        module_id=module_id,
+                        req_id=req_id
                     )
             except OperationalError as db_err:
                 print(f"[RAG DB Error] {db_err}", flush=True)
@@ -524,7 +533,7 @@ def chat():
             # Log Assistant Message to File
             latency_ms = int((time.time() - llm_start) * 1000)
             conv_logger.info(
-                f"[AI] SessionID: {session_id} | UserID: {user_id} | CallerIP: {caller_ip}"
+                f"[AI] REQ: {req_id} | SessionID: {session_id} | UserID: {user_id} | CallerIP: {caller_ip}"
                 f" | UseCase: {use_case_id} | Latency: {latency_ms}ms"
                 f" | Tokens: {prompt_tokens + completion_tokens} (P:{prompt_tokens}, C:{completion_tokens})"
                 f" | Error: {has_llm_error} | Model: {rag_service.model_name}"
@@ -532,7 +541,7 @@ def chat():
             )
             if has_llm_error:
                 conv_logger.error(
-                    f"[LLM ERROR] SessionID: {session_id} | UserID: {user_id}"
+                    f"[LLM ERROR] REQ: {req_id} | SessionID: {session_id} | UserID: {user_id}"
                     f" | CallerIP: {caller_ip} | UseCase: {use_case_id}"
                     f" | Model: {rag_service.model_name} | Detail: {full_assistant_content}"
                 )

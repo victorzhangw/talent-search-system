@@ -10,7 +10,7 @@ from .integration_mock import MockIntegrationService
 from .integration_real import RealIntegrationService
 from .context_builder import ContextBuilder 
 from ..utils.token_generator import generate_upstream_token
-from ..utils.logger import get_daily_logger, get_prompt_logger
+from ..utils.logger import get_daily_logger, history_text_block, write_prompt_record
 
 def get_rag_logger():
     return get_daily_logger("RAG_Logger", "rag_service.log", level=logging.DEBUG)
@@ -158,9 +158,9 @@ class RAGService:
             'timestamp': time.time()
         }
 
-    def generate_response(self, query: str, candidate_ids: List[str], session_id: str, 
+    def generate_response(self, query: str, candidate_ids: List[str], session_id: str,
                          candidates_info: List[Dict] = None, trait_reports: Dict = None, mode: str = 'explanation',
-                         module_id: str = None):
+                         module_id: str = None, req_id: str = None):
         """
         Orchestrates the Full RAG Flow:
         Token -> Data Fetch (Cache/API) -> Context -> LLM
@@ -387,8 +387,8 @@ class RAGService:
                     rag_logger.warning(f"Module prompt format partial match: {e}. Appending data as suffix.")
                     sys_prompt = module_prompt + f"\n\n【基礎特質分析資料】\n{rag_context.get('base_analysis', '')}\n\n【特質交互作用加強分析】\n{rag_context.get('interactions', '(無顯著交互作用)')}"
                 
-                return self._call_llm(sys_prompt, query, uc_id, session_id)
-        
+                return self._call_llm(sys_prompt, query, uc_id, session_id, req_id)
+
         # --- 自由提問路由：沿用既有 use_case + unified_rag_prompt ---
         rag_logger.info(f"Free-form route: mode={mode}, Using Unified Intent Prompt")
 
@@ -432,7 +432,7 @@ class RAGService:
         sys_prompt = self._assemble_prompt(uc_config, rag_context, candidate_count)
         
         # 6. Call LLM
-        return self._call_llm(sys_prompt, query, uc_id, session_id)
+        return self._call_llm(sys_prompt, query, uc_id, session_id, req_id)
 
     def _assemble_prompt(self, uc_config, rag_context, candidate_count=1):
         # Retrieve answer guidance safely, default to empty string if missing
@@ -484,17 +484,25 @@ class RAGService:
             rag_logger.error(f"Prompt formatting error: Missing key {e}", exc_info=True)
             return f"System Error: Prompt key error {e}"
 
-    def _log_prompt(self, session_id, uc_id, sys_prompt, user_query):
-        """ Log the prompt using standard logging """
+    def _log_prompt(self, session_id, uc_id, sys_prompt, user_query, history=None, req_id=None):
+        """ Log the prompt using standard logging
+
+        The history block matches the packer path's format so both paths' records read the
+        same way. It needs `history` handed in, which is why the call site moved below
+        `load_history()`: it used to be the first line of `_call_llm`, three lines before
+        the history existed, so this log could not have shown what the model read even if
+        it had wanted to.
+        """
         try:
-            prompt_logger = get_prompt_logger()
             log_message = (
-                f"SESSION: {session_id} | USE_CASE: {uc_id}\n"
+                f"REQ: {req_id or '-'} | SESSION: {session_id} | USE_CASE: {uc_id}\n"
+                f"{history_text_block(history)}"
                 f"============================================================\n"
                 f"[SYSTEM PROMPT]\n{sys_prompt}\n\n"
                 f"[USER QUERY]\n{user_query}"
             )
-            prompt_logger.info(log_message)
+            write_prompt_record(session_id, log_message,
+                                per_session=current_app.config.get('PROMPT_LOG_PER_SESSION'))
         except Exception as e:
             rag_logger.error(f"Failed to write prompt log using logger: {e}", exc_info=True)
             print(f"[Log] Failed to write prompt log using logger: {e}")
@@ -524,13 +532,16 @@ class RAGService:
             rag_logger.warning(f"[History] Failed to load history: {e}")
             return []
 
-    def _call_llm(self, sys_prompt, query, uc_id, session_id="unknown"):
-        # Log the prompt before calling
-        self._log_prompt(session_id, uc_id, sys_prompt, query)
-
+    def _call_llm(self, sys_prompt, query, uc_id, session_id="unknown", req_id=None):
         rag_logger.debug(f"--- DEBUG RAG SYSTEM PROMPT ---\n{sys_prompt}\n-------------------------")
 
         history_messages = self.load_history(session_id)
+
+        # Logged after the history is loaded, not before: the record is supposed to show
+        # what the model is about to read, and until this moved the history did not exist
+        # yet at the point the record was written.
+        self._log_prompt(session_id, uc_id, sys_prompt, query,
+                         history=history_messages, req_id=req_id)
 
         messages = [
             {"role": "system", "content": sys_prompt.strip()},
