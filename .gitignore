@@ -28,6 +28,11 @@ env/
 .env
 .env.local
 .env.*.local
+# 各環境的連線檔（.env.uat / .env.staging …）。上面的 .env.*.local 擋不到這些名字，
+# 而它們裝的是正式環境帳密。樣板檔（.env.example、.env.uat.example）不含真實值，
+# 要進版控才有意義，所以整類排除在外。
+.env.*
+!.env*.example
 
 # 資料庫帳密（明文憑證，勿提交）
 docs/db.csv
