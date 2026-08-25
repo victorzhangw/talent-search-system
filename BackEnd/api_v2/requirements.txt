@@ -113,6 +113,14 @@ colorama==0.4.6
 markdown-it-py==4.0.0
 mdurl==0.1.2
 
+# --- 資料維運工具 (不可移除) ---
+# scripts/migrate_traits_from_excel.py 匯入特質正本時需要。它不是開發工具：
+# UAT 與正式環境的 trait_definitions / trait_bands / trait_interactions /
+# trait_endpoints 都是靠它從 spec 活頁簿載入的。漏裝的後果是靜默的——匯入
+# 跑不起來，於是資料庫停在舊版，而查詢照常成功、只是少了欄位（2026-08-10
+# 客戶 log 缺「可用於／禁止」與整個交互作用區塊，根因就在這裡）。
+openpyxl==3.1.5
+
 # --- Dev / Test (可在正式環境移除) ---
 pytest==9.0.2
 pytest-asyncio==1.3.0

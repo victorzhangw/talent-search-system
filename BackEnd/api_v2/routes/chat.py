@@ -13,6 +13,8 @@ from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
 from ..services.segment_gate import STATUS_BLOCKED
 from ..services.session_store import SqlSessionStore
+from ..services.session_title import (clamp_title, fallback_title, is_placeholder,
+                                      title_for_metadata)
 from ..database.connection import get_db_session
 from ..database.models import ChatSession, ChatMessage
 from ..database import db_session
@@ -59,16 +61,27 @@ def background_generate_title(session_id, user_query, candidate_names):
             # reasoning_content pass before emitting the actual title in content.
             # 30 was too low: the whole budget went to reasoning and content came
             # back empty, so every session's title silently fell back to "新對話".
+            # Raising it to 200 only made that rarer -- in conversations.log every
+            # failure sits at exactly C:200 and every success below it, i.e. the cap
+            # is still the thing being hit. Disabling thinking is the actual fix; the
+            # packer path has done this since 9ad3f47 and this direct client call was
+            # the one place left still paying for a reasoning pass.
             max_tokens=200,
-            temperature=0.3
+            temperature=0.3,
+            **rag_service._thinking_kwargs()
         )
-        title = response.choices[0].message.content.strip().strip('"\'')
-        title = _title_cc.convert(title)
-        if len(title) > 20:
-            title = title[:20]
-        if not title:
-            title = "新對話"
-            
+        raw_title = (response.choices[0].message.content or '').strip().strip('"\'')
+        title = clamp_title(_title_cc.convert(raw_title))
+        # Never persist a placeholder. 「新對話」 as a title suppressed the candidate-name
+        # fallback in get_sessions() below (it only fires when `title` is unset) and, since
+        # `title` was then set, the session could never be retried either.
+        provisional = not title
+        if provisional:
+            title = fallback_title(candidate_names, user_query)
+            print(f"[Background Title] empty content from the model "
+                  f"(finish_reason={getattr(response.choices[0], 'finish_reason', '?')}); "
+                  f"using the deterministic title: {title}")
+
         # 1.5 Record Token Usage
         total_tokens = getattr(response.usage, 'total_tokens', 0) if hasattr(response, 'usage') else 0
         p_tokens = getattr(response.usage, 'prompt_tokens', 0) if hasattr(response, 'usage') else 0
@@ -95,6 +108,13 @@ def background_generate_title(session_id, user_query, candidate_names):
                 meta = dict(session_obj.metadata_ or {})
                 meta['title'] = title
                 meta['title_attempted'] = True
+                # A deterministic title is displayable but still upgradable: the next
+                # message in this session retries the model once (see the generator's
+                # needs_title_generation below). `title_tries` bounds that, so a model
+                # that keeps coming back empty costs two calls per session, not one per
+                # message.
+                meta['title_provisional'] = provisional
+                meta['title_tries'] = int(meta.get('title_tries') or 0) + 1
 
                 # Update candidates info if not present
                 if 'candidates' not in meta and candidate_names:
@@ -116,6 +136,13 @@ def background_generate_title(session_id, user_query, candidate_names):
             if session_obj:
                 meta = dict(session_obj.metadata_ or {})
                 meta['title_attempted'] = True
+                # The model call itself blew up (network, auth, quota). The session still
+                # deserves a readable name, and marking it provisional lets the next
+                # message try again rather than freezing the failure in place.
+                if not meta.get('title'):
+                    meta['title'] = fallback_title(candidate_names, user_query)
+                    meta['title_provisional'] = True
+                meta['title_tries'] = int(meta.get('title_tries') or 0) + 1
                 session_obj.metadata_ = meta
                 db.commit()
             db.close()
@@ -156,18 +183,13 @@ def get_user_history():
         
         # Build candidate info summary if possible
         # metadata_ might have it, or we can just return what we have
-        title = "新對話"
-        if s.metadata_ and isinstance(s.metadata_, dict):
-            # Try to get explicitly saved title
-            saved_title = s.metadata_.get('title')
-            if saved_title:
-                title = saved_title
-            else:
-                # Try to get candidate names or something to act as title
-                cands = s.metadata_.get('candidates', [])
-                if cands:
-                    title = ", ".join([c.get('name', 'Unknown') for c in cands]) + " 分析"
-                
+        # 「新對話」 counts as absent, not as a title: sessions written before the
+        # deterministic fallback existed still carry it, and 117 of the 228 sessions on
+        # the dev box have no metadata at all -- both groups used to land on the literal
+        # placeholder here, which is the version of this bug the user actually sees in
+        # the history list.
+        title = title_for_metadata(s.metadata_)
+
         # If no explicit metadata candidates, maybe fallback or the frontend handles it
         # Actually in Traitty, session has metadata_? Let's check when we create session.
         # Currently we don't save candidates to session metadata. Let's return basic info for now.
@@ -367,15 +389,35 @@ def chat():
                     print(f"[Chat] Creating new session {session_id} with user_id: '{user_id}'", flush=True)
                     session_store.create_session(session_id=session_id, user_id=user_id)
                     needs_title_generation = True
+                    # Name it now, synchronously and for free, so the history list never
+                    # shows a placeholder while the background thread is still running.
+                    # The model call below overwrites this when it produces something.
+                    provisional_names = [c.get('name') for c in candidates_info if c.get('name')]
+                    session_store.update_session_metadata(session_id, {
+                        'title': fallback_title(provisional_names, query),
+                        'title_provisional': True,
+                    })
                 else:
                     # Check if we need to update user_id
                     current_db_user_id = existing_session.user_id
                     print(f"[Chat] Found existing session {session_id}. DB user_id: '{current_db_user_id}'. Request user_id: '{user_id}'", flush=True)
                      
-                    # 檢查現有 Session 是否缺少 title
+                    # 檢查現有 Session 是否缺少 title，或目前掛著的只是確定性備援。
+                    # 備援可讀但不精緻，所以再給模型一次機會；title_tries 設上限，
+                    # 免得模型持續回空字串時每則訊息都燒一次 token。
                     meta = existing_session.metadata_ or {}
-                    if not meta.get('title') and not meta.get('title_attempted'):
+                    if is_placeholder(meta.get('title')) and not meta.get('title_attempted'):
                         print(f"[Chat] Existing session {session_id} is missing a title. Will generate one.", flush=True)
+                        needs_title_generation = True
+                    elif is_placeholder(meta.get('title')):
+                        # 舊資料把「新對話」當成標題存了下來，title_attempted 也是真，
+                        # 於是永遠不會被重試。這裡把它視同沒有標題，讓它有機會被升級。
+                        print(f"[Chat] Session {session_id} carries the legacy placeholder. "
+                              f"Will regenerate.", flush=True)
+                        needs_title_generation = True
+                    elif meta.get('title_provisional') and int(meta.get('title_tries') or 0) < 2:
+                        print(f"[Chat] Session {session_id} has a provisional title "
+                              f"(tries={meta.get('title_tries') or 0}). Will retry.", flush=True)
                         needs_title_generation = True
                         
                     if user_id and current_db_user_id != user_id:
