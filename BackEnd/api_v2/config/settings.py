@@ -73,6 +73,17 @@ class Config:
     # 舊路徑（模組 prompt + context_builder）仍保留為 fallback，兩者輸出格式不同、
     # 不可同時生效；設 USE_LOG_PACKER=0 可退回舊路徑。
     USE_LOG_PACKER = os.getenv('USE_LOG_PACKER', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+    # 歷史標題的 OpenCC 簡->繁安全網。預設關閉。
+    # 簡->繁是一對多映射，所以它套在「本來就正確的繁體標題」上不是不動，而是改寫：
+    # 游淑芬->遊淑芬、余明哲->餘明哲、范先生->範先生、干預->幹預、公布->公佈、了解->瞭解。
+    # 游/余/范 都是常見姓氏，2026-08-24 客訴「受試者名字被改成錯字」就是這樣來的——
+    # 為了少數真的回簡體的標題，對 100% 的標題動手。
+    # 現在改為由 prompt 約束模型直接輸出繁體，姓名則由後端用勾選的候選人名單填入
+    # （services/session_title.compose_title），模型不參與命名，所以這層通常不需要。
+    # 要開啟設 TITLE_OPENCC_ENABLED=1；即使開啟，也只轉換真的含簡體字的標題，
+    # 且轉換後會把姓名還原成資料庫的寫法（services/title_zh.py）。
+    TITLE_OPENCC_ENABLED = os.getenv('TITLE_OPENCC_ENABLED', '0').strip().lower() in ('1', 'true', 'yes', 'on')
+
     # Conversation history depth (1 turn = user + assistant pair)
     MAX_HISTORY_TURNS = int(os.getenv('MAX_HISTORY_TURNS', 6))
     # 除了彙總的 prompts.log，另外把每筆記錄寫一份到 logs/<date>/prompts/<session_id>.log。

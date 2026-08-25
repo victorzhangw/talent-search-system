@@ -6,15 +6,16 @@ import os
 import time
 import uuid
 import jwt as pyjwt
-from opencc import OpenCC
 from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
 from ..services.segment_gate import STATUS_BLOCKED
 from ..services.session_store import SqlSessionStore
-from ..services.session_title import (clamp_title, fallback_title, is_placeholder,
+from ..services.session_title import (clamp_title, compose_title, fallback_title,
+                                      is_placeholder, strip_model_names,
                                       title_for_metadata)
+from ..services.title_zh import normalize_title
 from ..database.connection import get_db_session
 from ..database.models import ChatSession, ChatMessage
 from ..database import db_session
@@ -27,11 +28,6 @@ bp = Blueprint('chat', __name__, url_prefix='/chat')
 
 rag_service = None
 
-# Simplified -> Traditional (Taiwan) conversion, applied as a safety net on
-# LLM-generated titles: the prompt asks for 繁體中文 but reasoning models
-# (e.g. deepseek-v4-flash) don't reliably honor that, so titles occasionally
-# come back in Simplified Chinese without this.
-_title_cc = OpenCC('s2twp')
 
 def background_generate_title(session_id, user_query, candidate_names):
     try:
@@ -71,16 +67,25 @@ def background_generate_title(session_id, user_query, candidate_names):
             **rag_service._thinking_kwargs()
         )
         raw_title = (response.choices[0].message.content or '').strip().strip('"\'')
-        title = clamp_title(_title_cc.convert(raw_title))
+        # The model supplies the theme only; the names are the backend's, taken from the
+        # candidates the user actually checked. That is what stops a respondent's name from
+        # being re-spelled -- 游淑芬 came back as 遊淑芬 in the 2026-08-24 client report,
+        # from an unconditional OpenCC('s2twp').convert() that has since been made
+        # opt-in (Config.TITLE_OPENCC_ENABLED, default off). strip_model_names covers the
+        # model ignoring instruction 1 and writing a name anyway.
+        theme = strip_model_names(normalize_title(raw_title, candidate_names),
+                                  candidate_names)
         # Never persist a placeholder. 「新對話」 as a title suppressed the candidate-name
         # fallback in get_sessions() below (it only fires when `title` is unset) and, since
         # `title` was then set, the session could never be retried either.
-        provisional = not title
+        provisional = not theme
         if provisional:
             title = fallback_title(candidate_names, user_query)
-            print(f"[Background Title] empty content from the model "
+            print(f"[Background Title] no usable theme from the model "
                   f"(finish_reason={getattr(response.choices[0], 'finish_reason', '?')}); "
                   f"using the deterministic title: {title}")
+        else:
+            title = clamp_title(compose_title(candidate_names, theme))
 
         # 1.5 Record Token Usage
         total_tokens = getattr(response.usage, 'total_tokens', 0) if hasattr(response, 'usage') else 0

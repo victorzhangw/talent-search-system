@@ -275,9 +275,89 @@ def verify_flow():
     meta, _ = run_title('模型後來成功了', TWO, '高潛人才識別要點',
                         existing_meta={'title': '林孟德, 陳亭羽：高潛人才識別要點',
                                        'title_provisional': True, 'title_tries': 1})
+    # 姓名前綴由 compose_title 補上，所以模型交回的主題會被包在勾選的候選人名字後面。
     check('重試成功會覆蓋備援並解除 provisional',
-          meta.get('title') == '模型後來成功了' and meta.get('title_provisional') is False,
+          meta.get('title') == '林孟德, 陳亭羽：模型後來成功了'
+          and meta.get('title_provisional') is False,
           f"{meta.get('title')} provisional={meta.get('title_provisional')}")
+
+    verify_zh_normalisation()
+
+
+# --------------------------------------------------------------------------------------
+# [9] The 2026-08-24 client report, driven end to end through the real route function.
+#
+# services/title_zh.py has its own boundary checks in verify_zh_title.py; what is verified
+# here is that the route actually uses it -- the defect was one call in chat.py, and a
+# green title_zh does not by itself prove that call was changed.
+# --------------------------------------------------------------------------------------
+
+YU = ['游淑芬']          # 游 was the surname the client reported as misspelled
+YU_FAN = ['余明哲', '范姜偉']
+
+
+def verify_zh_normalisation():
+    print('\n[9] 繁體標題安全網（客訴：歷史紀錄的姓名被改錯字）')
+
+    meta, _ = run_title('抗壓性與情緒穩定度', YU, '抗壓性如何？')
+    check('姓名由勾選的候選人填入，不是模型寫的',
+          meta.get('title') == '游淑芬：抗壓性與情緒穩定度', meta.get('title'))
+
+    # 模型不理會「只輸出主題」時：它寫的姓名要被丟掉，改用資料庫的寫法。
+    meta, _ = run_title('遊淑芬：抗壓性與情緒穩定度', YU, '抗壓性如何？')
+    check('模型自己寫成「遊淑芬」時被換回「游淑芬」',
+          meta.get('title') == '游淑芬：抗壓性與情緒穩定度', meta.get('title'))
+    meta, _ = run_title('遊淑芬的抗壓性分析', YU, '抗壓性如何？')
+    check('沒有冒號、姓名黏在開頭時也換得掉',
+          meta.get('title') == '游淑芬：抗壓性分析', meta.get('title'))
+
+    meta, _ = run_title('餘明哲、範姜偉：跨部門協作', YU_FAN, '協作狀況？')
+    check('余 / 范 被模型改壞時同樣換回', meta.get('title') == '余明哲, 范姜偉：跨部門協作',
+          meta.get('title'))
+
+    # 主題本身是正確繁體時，一個字都不該被動到。
+    for theme in ('主管干預時機評估', '公布考核方式', '了解學習節奏', '台北團隊溝通落差'):
+        meta, _ = run_title(theme, YU, '提問')
+        check(f'正確繁體主題原樣保留：{theme}',
+              meta.get('title') == f'游淑芬：{theme}', meta.get('title'))
+
+    meta, _ = run_title('如何麵對衝突', YU, '衝突處理？')
+    check('模型自己的誤字「麵對」被修回「面對」',
+          meta.get('title') == '游淑芬：如何面對衝突', meta.get('title'))
+
+    # 預設 TITLE_OPENCC_ENABLED=0，所以簡體不再被轉譯；姓名仍然是後端填的。
+    import api_v2.services.title_zh as tz
+    check('CC 預設關閉', tz.CONVERT_ENABLED is False, tz.CONVERT_ENABLED)
+    meta, _ = run_title('沟通风格评估', YU, '溝通風格？')
+    check('CC 關閉時主題原樣、姓名仍由後端填',
+          meta.get('title') == '游淑芬：沟通风格评估', meta.get('title'))
+    tz.CONVERT_ENABLED = True
+    try:
+        meta, _ = run_title('沟通风格评估', YU, '溝通風格？')
+        check('CC 開啟時主題轉為繁體，姓名維持「游」',
+              meta.get('title') == '游淑芬：溝通風格評估', meta.get('title'))
+    finally:
+        tz.CONVERT_ENABLED = False
+
+    meta, _ = run_title('游淑芬', YU, '抗壓性如何？')
+    check('模型只回姓名時視為沒有主題，改用確定性備援',
+          meta.get('title') == fallback_title(YU, '抗壓性如何？')
+          and meta.get('title_provisional') is True, meta.get('title'))
+
+    meta, _ = run_title('A' * 30, TWO, '提問')
+    check('正規化之後仍受 20 字上限約束', len(meta.get('title', '')) == TITLE_MAX,
+          meta.get('title'))
+
+    # 模型端的第一道防線。這裡驗的是 prompts/conversation_title_prompt.txt 真的被載入並
+    # 帶著新規則送出 -- background_generate_title 讀檔失敗時會靜默改用簡化版 prompt，
+    # 那條路徑不含姓名與異體字規則，只看標題結果是看不出來的。
+    _, calls = run_title('游淑芬：抗壓性分析', YU, '抗壓性如何？')
+    sent = calls[0]['messages'][0]['content'] if calls else ''
+    check('prompt 檔案有載入（不是讀檔失敗的簡化版）', '關鍵指令' in sent, sent[:40])
+    check('prompt 帶入候選人姓名', '游淑芬' in sent)
+    check('prompt 要求只輸出主題、不得寫人名', '嚴禁輸出任何人名' in sent)
+    check('prompt 約束繁體中文（台灣用語）', '繁體中文（台灣用語）' in sent)
+    check('prompt 含「面／麵」規則', '「麵」只用於麵食' in sent)
 
 
 if __name__ == '__main__':
