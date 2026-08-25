@@ -138,8 +138,13 @@ def main():
     print('\n[4] 事項 13: single/multi split with a reported fallback')
     single, note = expected_sections_for(q5, 1)
     multi, note_m = expected_sections_for(q5, 2)
-    check('no question has the split fields yet -> fallback used',
-          note == UNSPLIT_LOG and single == multi == q5['expected_sections'])
+    # expected_sections_multi 已補齊，所以多人不再退回單人清單——這正是 req f1d36fbb
+    # 六段全滅的根因。單人版尚未拆分（expected_sections_single 仍是 None），還是走退路，
+    # 而那條退路必須繼續被記錄下來。
+    check('多人已拆分 -> 用多人清單、不記退回', note_m is None and multi == q5['expected_sections_multi'],
+          f'{note_m!r} {multi}')
+    check('多人清單確實與單人不同', multi != single, f'{multi} vs {single}')
+    check('單人尚未拆分 -> 仍走退路並記錄', note == UNSPLIT_LOG and single == q5['expected_sections'])
     check('the fallback is recorded in the result log',
           UNSPLIT_LOG in check_answer(full, r1, q5, CALIB).log_lines)
     split_q = dict(q5, expected_sections_single=['甲'], expected_sections_multi=['乙', '丙'])
@@ -151,7 +156,9 @@ def main():
     print('\n[5] Multi-person: each respondent needs their own heading')
     two = [Respondent('王智弘', 'R1', {'CIA_05': 'B'}),
            Respondent('林孟德', 'R2', {'CIA_05': 'B'})]
-    body = sections_answer(q5, q5['expected_sections'])
+    # 這一區驗的是「人名有沒有自己的標題」，所以段落本身必須先是齊的——兩人回答要用
+    # 多人清單的段落名，拿單人清單來組會先卡在段落齊全檢查，測不到人名這件事。
+    body = sections_answer(q5, expected_sections_for(q5, 2)[0])
     res = check_answer('## 王智弘\n\n' + body + '\n\n## 林孟德\n\n' + body, two, q5, CALIB)
     check('both names present as headings -> passed', res.status == 'passed',
           res.missing_respondents)
@@ -201,19 +208,34 @@ def main():
     check('segment-by-segment and one-shot agree',
           one_shot.status == checker.finalize().status)
 
-    print('\n[9] Data risk scan (informational)')
+    print('\n[9] 段落名必須逐字出現在自己的指令裡，否則永遠不可能命中')
+    # 從 informational 升級為會紅的檢查。這正是「（2項）」那一類缺陷的形狀：段落名帶了
+    # 設定檔作者寫的註記，模型再聽話也寫不出來，於是每一次請求都判缺少、觸發一次補生成、
+    # 補完仍然不命中，最後標 manual_review。2026-08-25 question 13 的兩次請求就是這樣。
+    # 多人清單一併掃，避免補 expected_sections_multi 時重蹈覆轍。
     stale = []
     for q in table.all():
-        for sec in q.get('expected_sections') or []:
-            key = 'instruction_multi' if q['audience'] == 'multi_only' else 'instruction_single'
-            if sec not in (q.get(key) or ''):
-                stale.append((q['idx'], sec))
-    print(f'  {len(stale)} expected_sections entries do not appear verbatim in their instruction:')
-    for idx, sec in stale[:8]:
-        print(f'    idx {idx}: {sec!r}')
-    print('  These will be reported as missing even from a compliant answer. b §8 treats a')
-    print('  miss as a soft failure (one regeneration, then manual), so this degrades')
-    print('  gracefully -- but the wording needs aligning content-side.')
+        single_key = 'instruction_multi' if q['audience'] == 'multi_only' else 'instruction_single'
+        for field, key in (('expected_sections', single_key),
+                           ('expected_sections_multi', 'instruction_multi')):
+            for sec in q.get(field) or []:
+                if sec not in (q.get(key) or ''):
+                    stale.append((q['idx'], field, sec))
+    for idx, field, sec in stale:
+        print(f'    idx {idx} {field}: {sec!r}')
+    check('沒有任何段落名在指令中找不到', not stale, f'{len(stale)} 條')
+
+    print('\n[10] 多人版清單的涵蓋率')
+    # None 代表「尚未拆分」，會退回單人清單比對——多人回答因此可能被判成每一段都缺少。
+    # [] 是明確宣告「多人版指令沒有固定標題」，檢查會跳過，這是不同的意思。
+    unsplit = [q['idx'] for q in table.all()
+               if (q.get('expected_sections') or []) and (q.get('instruction_multi') or '').strip()
+               and q.get('expected_sections_multi') is None]
+    check('有多人版指令且有段落清單的題目都已拆分', not unsplit, f'尚未拆分: {unsplit}')
+    for q in table.all():
+        for sec in q.get('expected_sections_multi') or []:
+            check(f"idx {q['idx']} 的多人段落名可被正規化命中：{sec[:16]}",
+                  normalize_heading('## ' + sec) == normalize_heading(sec))
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
