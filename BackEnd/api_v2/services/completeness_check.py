@@ -43,6 +43,13 @@ _HEADING_PREFIX_RE = re.compile(
 )
 _HEADING_SUFFIX_RE = re.compile(r'[\s:：。]*$')
 _BOLD_RE = re.compile(r'\*\*|__')
+# Separates a heading from the text that shares its line. See `heading_candidates`.
+_COLON_SPLIT_RE = re.compile(r'[:：]')
+# 斜線兩側的空白與全形／半形差異不是段落名的一部分。指令裡寫的是
+# 「4. 同組織 / 專案角色分配建議」與「管理 Do / Don't」，模型輸出常見的是全形無空格的
+# 「同組織／專案角色分配建議」——不收斂的話，這種條目就跟「（2項）」一樣永遠不會命中。
+_SLASH_RE = re.compile(r'\s*[/／]\s*')
+_WHITESPACE_RE = re.compile(r'\s+')
 
 # A line carrying an explicit heading marker: markdown hash, bold wrapper, bullet, or an
 # ordinal prefix. The section test can afford to look at every line because it demands an
@@ -59,10 +66,44 @@ def is_marked_heading(line: str) -> bool:
 
 
 def normalize_heading(line: str) -> str:
-    """Strip numbering, bullets, markdown emphasis and trailing colons."""
+    """Strip numbering, bullets, markdown emphasis and trailing colons.
+
+    Also collapses runs of whitespace and the spacing/width of a slash, so that
+    「同組織 / 專案角色分配建議」 and 「同組織／專案角色分配建議」 are the same heading.
+    Applied to both sides of the comparison, so the expected list and the answer meet in
+    the middle rather than the data having to guess which form the model will emit.
+    """
     text = _BOLD_RE.sub('', line).strip()
     text = _HEADING_PREFIX_RE.sub('', text, count=1)
-    return _HEADING_SUFFIX_RE.sub('', text).strip()
+    text = _HEADING_SUFFIX_RE.sub('', text)
+    text = _WHITESPACE_RE.sub(' ', text)
+    return _SLASH_RE.sub('/', text).strip()
+
+
+def heading_candidates(line: str) -> List[str]:
+    """Every form of `line` that could be the section heading it carries.
+
+    A heading does not always sit on a line of its own. The instructions teach
+    「2. 主要風險：列出 3 項」 and the models answer 「- **主要領導風格**：推進驅動型」 --
+    label and value on one line. `normalize_heading` only strips a *trailing* colon, so the
+    value stays attached and an exact-match test against 「主要領導風格」 never fires. The
+    section is then reported missing while it is plainly on screen: 2026-08-25 req
+    f1d36fbb lost all six sections that way, and the completion pass it triggered wrote
+    them again in the same format, so they were still missing afterwards.
+
+    Only marked lines are split, and only on the first colon -- an ordinary sentence that
+    happens to contain a colon is not offering a heading. A candidate that is not a section
+    name is inert anyway, because the test is equality against the expected list.
+    """
+    norm = normalize_heading(line)
+    if not norm:
+        return []
+    candidates = [norm]
+    if is_marked_heading(line):
+        label = _COLON_SPLIT_RE.split(norm, 1)[0].strip()
+        if label and label != norm:
+            candidates.append(label)
+    return candidates
 
 
 def expected_sections_for(question: Optional[dict], respondent_count: int):
@@ -167,7 +208,10 @@ class CompletenessChecker:
             norm = normalize_heading(line)
             if not norm:
                 continue
-            self._headings.append(norm)
+            # Section matching takes every candidate form of the line; the respondent-name
+            # test keeps the whole normalized line, because it matches on substring and a
+            # shorter candidate cannot make a name appear that was not already there.
+            self._headings.extend(heading_candidates(line))
             if is_marked_heading(line):
                 self._marked_headings.append(norm)
 

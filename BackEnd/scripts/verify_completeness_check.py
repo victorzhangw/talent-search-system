@@ -11,6 +11,10 @@ length, calibration evidence, and the incremental (segment-by-segment) path.
 import os
 import sys
 
+# Windows consoles default to cp950 here, which cannot encode the Chinese in the section
+# names this script prints -- without this the whole report comes out mojibake.
+sys.stdout.reconfigure(encoding='utf-8')
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from dotenv import load_dotenv
@@ -19,8 +23,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), enc
 from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.log_assembler import Respondent  # noqa: E402
 from api_v2.services.completeness_check import (  # noqa: E402
-    CompletenessChecker, check_answer, normalize_heading, expected_sections_for,
-    SKIP_LOG, UNSPLIT_LOG, EVIDENCE_TERMS, FREE_FORM_MAX_CHARS)
+    CompletenessChecker, check_answer, heading_candidates, normalize_heading,
+    expected_sections_for, SKIP_LOG, UNSPLIT_LOG, EVIDENCE_TERMS, FREE_FORM_MAX_CHARS)
 
 CALIB = table.calibration_traits
 failures = []
@@ -54,6 +58,41 @@ def main():
         got = normalize_heading(line) == normalize_heading(expected)
         check(f'{line!r} vs {expected!r} -> {"match" if should_match else "no match"}',
               got == should_match, f'normalized to {normalize_heading(line)!r}')
+
+    print('\n[1b] 標題與內文同一行（2026-08-25 req f1d36fbb 的六段全滅）')
+    # 指令教的就是這個寫法，所以這不是模型不聽話，是比對方式對不上格式。
+    inline = [
+        ('- **主要領導風格**：推進驅動型', '主要領導風格', True),
+        ('2. 主要風險：列出 3 項，每項都要包含', '主要風險', True),
+        ('第三部分，需要避免的溝通方式：列出2項', '需要避免的溝通方式', True),
+        ('## 溝通風格摘要', '溝通風格摘要', True),
+        # 沒有標記的散文不提供標題，即使裡面有冒號
+        ('他在壓力下的反應是：話會變少', '他在壓力下的反應是', False),
+        # 標籤對不上就是對不上，切分不會放寬這件事
+        ('- **主要領導風格**：推進驅動型', '次要領導風格', False),
+    ]
+    for line, expected, should_match in inline:
+        got = normalize_heading(expected) in heading_candidates(line)
+        check(f'{line[:26]!r} -> {expected!r} {"命中" if should_match else "不該命中"}',
+              got == should_match, heading_candidates(line))
+
+    print('\n[1c] 斜線的空白與全形半形不算差異')
+    slash = [
+        ('## 四、同組織／專案角色分配建議', '同組織 / 專案角色分配建議', True),
+        ('## 四、同組織 / 專案角色分配建議', '同組織／專案角色分配建議', True),
+        ('## 同組織/專案角色分配建議', '同組織 / 專案角色分配建議', True),
+        ("## 管理 Do / Don't", "管理 Do/Don't", True),
+        ("## 管理 Do/Don't", "管理 Do / Don't", True),
+        # Do 與 Don't 之間的空白可以收，中英之間的不能——收掉就變成另一個詞了
+        ("## 管理Do / Don't", "管理 Do / Don't", False),
+        # 收斂不等於放寬：不同的段落名還是不同
+        ('## 同組織／團隊角色分配建議', '同組織 / 專案角色分配建議', False),
+    ]
+    for line, expected, should_match in slash:
+        got = normalize_heading(line) == normalize_heading(expected)
+        check(f'{line[:24]!r} vs {expected[:20]!r} -> {"命中" if should_match else "不該命中"}',
+              got == should_match,
+              f'{normalize_heading(line)!r} vs {normalize_heading(expected)!r}')
 
     print('\n[2] Subset test on a real question')
     full = sections_answer(q5, q5['expected_sections'])
