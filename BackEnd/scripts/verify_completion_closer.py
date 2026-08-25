@@ -24,8 +24,8 @@ from api_v2.services.completeness_check import CompletenessChecker  # noqa: E402
 from api_v2.services.exit_scanner import ExitScanner  # noqa: E402
 from api_v2.services.log_assembler import Respondent  # noqa: E402
 from api_v2.services.log_pipeline import (  # noqa: E402
-    COMPLETION_INSTRUCTION, LogPipeline, MIN_DUPLICATE_CLOSER_CHARS,
-    strip_duplicate_closer)
+    COMPLETION_INSTRUCTION, COMPLETION_SEPARATOR, LogPipeline,
+    MIN_DUPLICATE_CLOSER_CHARS, strip_completion_preamble, strip_duplicate_closer)
 from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.segment_gate import (  # noqa: E402
     SegmentGate, STATUS_MANUAL_REVIEW)
@@ -36,6 +36,59 @@ ANSWER = ('1. 團隊合作價值\n\n他習慣憑當下判斷把事情快速兜�
           '4. 共同合作策略\n\n分工建議：讓他負責需要快速反應的環節。\n\n' + CLOSER)
 
 failures = []
+
+
+def verify_preamble_and_separator():
+    """2026-08-25 的兩個現場：補生成的寒暄開場，以及補充內容黏在結語句後面。
+
+    req f1d36fbb 顯示給使用者的是
+      「…與後續面談綜合判斷。好的，補上各候選人領導摘要中缺少的段落。」
+    req 030c09f8 是
+      「…最終決策請結合多方資訊綜合考量。## 溝通風格摘要」
+    兩者都擠在同一行，看起來像輸出壞掉而不像補充。
+    """
+    print('\n[13] 補生成的寒暄開場要被剝掉')
+    cases = [
+        ('好的，補上各候選人領導摘要中缺少的段落。\n\n## 二、個別候選人領導摘要', True),
+        ('了解，以下補上缺少的部分。\n\n## 需要避免的溝通方式', True),
+        ('以下為補充內容：\n\n## 跨情境溝通提醒', True),
+    ]
+    for text, should_strip in cases:
+        out = strip_completion_preamble(text)
+        first = out.split('\n')[0]
+        check(f'{text.split(chr(10))[0][:20]!r} -> 剝掉', first.startswith('##') == should_strip,
+              repr(first))
+
+    keep = [
+        '## 溝通風格摘要\n\n他偏好結論先行。',              # 標題不是寒暄
+        '- **主要領導風格**：推進驅動型',                    # 條列也不是
+        '好奇心是他最明顯的特徵，這一段補充如下。\n\n## 補充',  # 「好」開頭但是實質內容
+    ]
+    for text in keep:
+        check(f'不該剝：{text.split(chr(10))[0][:22]!r}',
+              strip_completion_preamble(text) == text, repr(strip_completion_preamble(text)[:40]))
+
+    print('\n[14] 補充內容不可黏在結語句後面')
+    p = LogPipeline.__new__(LogPipeline)
+    p.messages = [{'role': 'system', 'content': 'x'}]
+    p.followup_fn = lambda messages, instruction: (
+        '好的，補上缺少的段落。\n\n## 跨情境溝通提醒\n\n一對一時他較願意表達。')
+    p.checker = type('C', (), {'text': ANSWER})()
+    out = p._complete('缺少段落：跨情境溝通提醒')
+    check('開頭是分隔而不是內文', out.startswith(COMPLETION_SEPARATOR), repr(out[:12]))
+    check('寒暄已被剝掉', '好的，補上' not in out, out[:40])
+    check('補充內容保留', '跨情境溝通提醒' in out and '一對一' in out, out[:60])
+    glued = (ANSWER + out).replace(COMPLETION_SEPARATOR, '\n')
+    check('接上去之後結語句自成一行',
+          any(l.strip() == CLOSER for l in glued.split('\n')),
+          [l[-30:] for l in glued.split('\n') if CLOSER[:8] in l])
+
+    print('\n[15] 補生成整段為空時不要留下孤兒分隔線')
+    p.followup_fn = lambda messages, instruction: '好的，補上缺少的段落。'
+    check('只有寒暄 -> 回空字串', p._complete('缺少段落：X') == '',
+          repr(p._complete('缺少段落：X')))
+    p.followup_fn = lambda messages, instruction: '   \n  '
+    check('純空白 -> 回空字串', p._complete('缺少段落：X') == '')
 
 
 def check(label, condition, detail=''):
@@ -91,6 +144,8 @@ def main():
     out = p._complete('需加入佐證類措辭')
     check('_complete 的輸出不含重複結語', CLOSER not in out, out)
     check('_complete 仍帶回佐證措辭', '行為事例' in out and '工作樣本' in out, out)
+
+    verify_preamble_and_separator()
 
     # ---- 補生成該不該啟動 --------------------------------------------------------
     # 上面的字串修正只擋得住「補充區塊尾巴多一句結語」。第二次通報的情形更嚴重：模型把

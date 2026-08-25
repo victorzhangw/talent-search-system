@@ -47,7 +47,46 @@ _SENTENCE_SPLIT_RE = re.compile(r'(?<=[。！？!?])\s*')
 # 太短的句子可能只是碰巧重複（「以上。」之類），砍掉會是誤刪；結語句有 30 字。
 MIN_DUPLICATE_CLOSER_CHARS = 12
 
+# 補生成接在已釋出的文字後面，中間原本沒有任何分隔。實際結果是補充內容直接黏在
+# 結語句尾巴：2026-08-25 req 030c09f8 畫面上就是
+# 「…最終決策請結合多方資訊綜合考量。## 溝通風格摘要」擠在同一行，看起來像壞掉而不像補充。
+COMPLETION_SEPARATOR = '\n\n---\n\n'
+
+# COMPLETION_INSTRUCTION 已經寫了「不要加說明」，但那只是請求。同一天 req f1d36fbb 的
+# 補生成仍然以「好的，補上各候選人領導摘要中缺少的段落。」開頭，而那句話就跟在
+# 「…應搭配職務要求、實際表現、管理觀察與後續面談綜合判斷。」後面直接顯示給使用者。
+# 只砍第一行、只砍寒暄句型、且該行不得是標題——補充內容本身不會長這樣。
+#
+# 開場詞後面一定要接標點或空白。少了這個條件，「好」會匹配到「好奇心是他最明顯的特徵…」
+# 這種真正的內容句，把補充的第一行吃掉——驗收 [13] 就是這樣抓到的。
+_PREAMBLE_RE = re.compile(
+    r'^(?:好的|好|了解|瞭解|明白|收到|沒問題|沒有問題|我來|馬上)'
+    r'(?=[，,。！!？?：:、\s])[^\n]{0,40}$')
+# 「以下為補充內容：」這類引言。限定整行以冒號收尾：內容句不會這樣結束，
+# 而上面那個「…這一段補充如下。」是句號，不會落進來。
+_LEAD_IN_RE = re.compile(r'^(?=.{0,40}$).*(?:補充|補上|以下|如下).*[：:]$')
+_HEADING_LINE_RE = re.compile(r'^\s*(?:#{1,6}\s|[-*•]\s|\*\*)')
+
 pipeline_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
+
+
+def strip_completion_preamble(extra: str) -> str:
+    """Drop a conversational acknowledgement the supplement opens with.
+
+    The completion pass is a fresh model turn, so the model answers it like a request --
+    「好的，補上各候選人領導摘要中缺少的段落。」 -- and that sentence is appended to the
+    answer the user is already reading. Only the first line, only when it matches an
+    acknowledgement opener, and never when it is a heading or bullet: real supplement
+    content starts with the section heading it was asked to supply.
+    """
+    lines = extra.split('\n')
+    first = lines[0].strip()
+    if not first or _HEADING_LINE_RE.match(lines[0]):
+        return extra
+    if not (_PREAMBLE_RE.match(first) or _LEAD_IN_RE.match(first)):
+        return extra
+    pipeline_logger.info(f"[Completion] dropped an acknowledgement opener: {first[:40]}")
+    return '\n'.join(lines[1:]).lstrip('\n')
 
 
 def strip_duplicate_closer(extra: str, released: str) -> str:
@@ -131,7 +170,12 @@ class LogPipeline:
         extra = self.followup_fn(
             self.messages + [{'role': 'assistant', 'content': self.checker.text}],
             COMPLETION_INSTRUCTION.format(reason=reason))
-        return strip_duplicate_closer(extra or '', self.checker.text)
+        extra = strip_duplicate_closer(
+            strip_completion_preamble(extra or ''), self.checker.text)
+        if not extra.strip():
+            return ''
+        # 分隔只在真的有東西接在後面時才加，否則會在答案尾巴留下一條沒有內容的分隔線。
+        return COMPLETION_SEPARATOR + extra.lstrip('\n') if self.checker.text else extra
 
     def stream(self, stream_fn: StreamFn) -> Iterator[str]:
         """Yields display-ready segments. `self.result` is set once iteration ends."""
