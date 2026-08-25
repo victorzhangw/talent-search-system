@@ -50,6 +50,11 @@ _COLON_SPLIT_RE = re.compile(r'[:：]')
 # 「同組織／專案角色分配建議」——不收斂的話，這種條目就跟「（2項）」一樣永遠不會命中。
 _SLASH_RE = re.compile(r'\s*[/／]\s*')
 _WHITESPACE_RE = re.compile(r'\s+')
+# 同理，標點是全形還是半形也不是段落名的一部分。指令裡寫的是半形——
+# 「2. 需要結構或空間?」「2. 共同或個別?」——而模型在中文句子裡幾乎都會輸出全形「？」。
+# 不收斂的話，這兩段就是下一組「永遠不會命中」的條目。
+# 只收「有對應 ASCII 的」那幾個；、。「」等中文標點沒有等價物，維持原樣。
+_FULLWIDTH_PUNCT = str.maketrans('？！（），；', '?!(),;')
 
 # A line carrying an explicit heading marker: markdown hash, bold wrapper, bullet, or an
 # ordinal prefix. The section test can afford to look at every line because it demands an
@@ -68,16 +73,19 @@ def is_marked_heading(line: str) -> bool:
 def normalize_heading(line: str) -> str:
     """Strip numbering, bullets, markdown emphasis and trailing colons.
 
-    Also collapses runs of whitespace and the spacing/width of a slash, so that
-    「同組織 / 專案角色分配建議」 and 「同組織／專案角色分配建議」 are the same heading.
-    Applied to both sides of the comparison, so the expected list and the answer meet in
-    the middle rather than the data having to guess which form the model will emit.
+    Also collapses runs of whitespace, the spacing/width of a slash, and the width of the
+    punctuation that has an ASCII equivalent -- so 「同組織 / 專案角色分配建議」 and
+    「同組織／專案角色分配建議」 are the same heading, and so are 「共同或個別?」 and
+    「共同或個別？」. Applied to both sides of the comparison, so the expected list and the
+    answer meet in the middle rather than the data having to guess which form the model
+    will emit. Guessing is how 「（2項）」 got into the data.
     """
     text = _BOLD_RE.sub('', line).strip()
     text = _HEADING_PREFIX_RE.sub('', text, count=1)
     text = _HEADING_SUFFIX_RE.sub('', text)
     text = _WHITESPACE_RE.sub(' ', text)
-    return _SLASH_RE.sub('/', text).strip()
+    text = _SLASH_RE.sub('/', text)
+    return text.translate(_FULLWIDTH_PUNCT).strip()
 
 
 def heading_candidates(line: str) -> List[str]:

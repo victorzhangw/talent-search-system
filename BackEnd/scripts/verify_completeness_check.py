@@ -94,6 +94,22 @@ def main():
               got == should_match,
               f'{normalize_heading(line)!r} vs {normalize_heading(expected)!r}')
 
+    print('\n[1d] 全形／半形標點不算差異')
+    width = [
+        # 指令寫半形，模型在中文句子裡幾乎都輸出全形
+        ('## 2. 需要結構或空間？', '需要結構或空間?', True),
+        ('## 2. 共同或個別？', '共同或個別?', True),
+        ('## 錄用後行動與發展建議（僅供參考）', '錄用後行動與發展建議(僅供參考)', True),
+        # 沒有 ASCII 等價物的中文標點維持原樣，不可被當成相同
+        ('## 互補、重疊與高風險組合', '互補,重疊與高風險組合', False),
+        ('## 需要結構或時間？', '需要結構或空間?', False),
+    ]
+    for line, expected, should_match in width:
+        got = normalize_heading(line) == normalize_heading(expected)
+        check(f'{line[:22]!r} vs {expected[:18]!r} -> {"命中" if should_match else "不該命中"}',
+              got == should_match,
+              f'{normalize_heading(line)!r} vs {normalize_heading(expected)!r}')
+
     print('\n[2] Subset test on a real question')
     full = sections_answer(q5, q5['expected_sections'])
     res = check_answer(full, r1, q5, CALIB)
