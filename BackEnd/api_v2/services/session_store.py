@@ -5,12 +5,13 @@ import logging
 import os
 from ..database.connection import get_db_session
 from ..database.models import ChatSession, ChatMessage
-from ..utils.logger import get_daily_logger
+from ..utils.logger import get_daily_logger, get_error_logger
 
 def get_session_logger():
     return get_daily_logger("SessionStore_Logger", "session_store.log", level=logging.INFO)
 
 session_logger = get_session_logger()
+error_logger = get_error_logger()
 
 class SqlSessionStore:
     def __init__(self):
@@ -63,6 +64,18 @@ class SqlSessionStore:
         except Exception as e:
             db.rollback()
             session_logger.error(f"Add Message Failed: {e}", exc_info=True)
+            # The caller gets None and carries on, so the request still returns 200 and the
+            # message is simply lost. That is exactly how PRD dropped a week of
+            # chat_messages (chat_messages_id_seq had fallen behind max(id), so every INSERT
+            # hit a duplicate primary key) without anything reaching the user or the client.
+            # errors.log carries ERROR only, so this is visible instead of being one line in
+            # session_store.log's running commentary. Enough context to identify the lost
+            # message without dumping its whole content into a second file.
+            error_logger.error(
+                f"[SessionStore] add_message dropped a message: session_id={session_id} "
+                f"role={role} content_len={len(content or '')} "
+                f"model={model_name} tokens={token_usage} error={type(e).__name__}: {e}",
+                exc_info=True)
             return None
         finally:
             db.close()

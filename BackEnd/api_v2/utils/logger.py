@@ -74,6 +74,20 @@ def get_conversation_logger():
     """
     return get_daily_logger("Conversation_Logger", "conversations.log", level=logging.INFO)
 
+def get_error_logger():
+    """獲取跨模組的錯誤 Logger（logs/<date>/errors.log）
+
+    存在的理由是「靜默失敗」：吞掉例外、讓請求照常成功的程式碼，只把錯誤寫進自己那支
+    模組 log，就等於沒有人會看到。2026-08-20 PRD 的 chat_messages_id_seq 落後於
+    max(id)，於是每一筆 add_message 都撞主鍵而失敗；例外被 session_store.py 接住、
+    請求回 200，錯誤只留在 session_store.log 的一般流水帳裡，結果整整一週的對話訊息
+    沒有寫入資料庫，直到客戶回報「歷史紀錄點開都是空的」才被發現。
+
+    errors.log 只收 ERROR 以上，所以它是空的就代表沒事，不需要在幾千行裡面撈。
+    """
+    return get_daily_logger("Error_Logger", "errors.log", level=logging.ERROR)
+
+
 def get_prompt_logger():
     """
     獲取紀錄「送出前完整 prompt」的 Logger（prompts.log）
