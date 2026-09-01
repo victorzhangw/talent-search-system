@@ -18,6 +18,7 @@ from ..utils.logger import get_daily_logger
 from .completeness_check import CompletenessChecker
 from .exit_scanner import ExitScanner
 from .log_assembler import AssembledLog, Respondent, assemble
+from .log_system_prompt import load_system_prompt
 from .question_table import table
 from .segment_gate import SegmentGate
 
@@ -67,7 +68,42 @@ _PREAMBLE_RE = re.compile(
 _LEAD_IN_RE = re.compile(r'^(?=.{0,40}$).*(?:補充|補上|以下|如下).*[：:]$')
 _HEADING_LINE_RE = re.compile(r'^\s*(?:#{1,6}\s|[-*•]\s|\*\*)')
 
+# 一次改寫是一次全新的模型輪次，system prompt 第 6 條要求「每次回答文末」附上結語句，
+# 模型照做——但改寫的是答案「中段」的一個段落，所以結語句就出現在答案中間，後面還有幾十段
+# 要輸出。2026-08-31 req f1ea065d 畫面上是
+#   「…較快的檢核節奏。本分析旨在提供觀點與輔助…綜合考量。這份「及早發現」的用心是…」
+# 一個段落被結語句從中間切開。REWRITE_INSTRUCTION 的「只輸出改寫後的該段內容」跟
+# COMPLETION_INSTRUCTION 的「文末不要再附上結語句」一樣是請求，沒有任何東西強制執行。
+#
+# 那句話從 system prompt 本身讀出來，不寫死：它是客戶的正本，改寫那句時這裡仍然有效。
+# 讀不到就不剝除，維持現行行為，不去猜。
+_CLOSER_RULE_RE = re.compile(
+    r'^\s*\d+\.\s*[^\n]*?(?:文末|結尾|最後)[^\n]*?「([^」]{12,})」', re.M)
+
 pipeline_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
+
+
+def closing_sentence() -> Optional[str]:
+    """The sentence the System block's rule 6 asks for, read from the prompt itself."""
+    m = _CLOSER_RULE_RE.search(load_system_prompt())
+    return m.group(1).strip() if m else None
+
+
+def strip_trailing_closer(text: str, closer: Optional[str] = None) -> str:
+    """Drop the closing sentence when it is the last thing a follow-up turn produced.
+
+    `strip_duplicate_closer` cannot do this job: it compares against text already
+    released, and a rewrite happens *before* the closing sentence has been shown, so that
+    comparison never fires. Here the sentence is matched against the System block instead.
+    """
+    if closer is None:
+        closer = closing_sentence()
+    body = text.rstrip()
+    if not closer or not body.endswith(closer):
+        return text
+    pipeline_logger.info(f"[Rewrite] dropped the closing sentence from a mid-answer "
+                         f"segment: {closer[:20]}")
+    return body[:-len(closer)].rstrip()
 
 
 def strip_completion_preamble(extra: str) -> str:
@@ -154,15 +190,19 @@ class LogPipeline:
         self.checker = CompletenessChecker(respondents, question, table.calibration_traits)
         self.followup_fn = followup_fn
         self.gate = SegmentGate(ExitScanner.for_log(self.log), checker=self.checker,
-                                rewriter=self._rewrite, completer=self._complete)
+                                rewriter=self._rewrite, completer=self._complete,
+                                closer=closing_sentence())
         self.result: Optional[PipelineResult] = None
 
     def _rewrite(self, segment: str, banned: List[str]) -> str:
         if self.followup_fn is None:
             return segment
-        return self.followup_fn(
+        rewritten = self.followup_fn(
             self.messages + [{'role': 'assistant', 'content': segment}],
             REWRITE_INSTRUCTION.format(terms='、'.join(banned), segment=segment))
+        # 同一組後處理，補生成有、改寫一直沒有——而 0831 的 21 筆請求裡補生成一次都沒跑，
+        # 改寫跑了 63 次。剝完可能整段變空，那由閘門當成一次失敗的嘗試處理。
+        return strip_trailing_closer(strip_completion_preamble(rewritten or ''))
 
     def _complete(self, reason: str) -> str:
         if self.followup_fn is None:

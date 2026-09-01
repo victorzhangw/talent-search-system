@@ -140,7 +140,8 @@ class SegmentGate:
                  completer: Optional[Callable[[str], str]] = None,
                  max_rewrites: int = MAX_SEGMENT_REWRITES,
                  max_chars: int = SEGMENT_MAX_CHARS,
-                 overlap: int = OVERLAP_CHARS):
+                 overlap: int = OVERLAP_CHARS,
+                 closer: Optional[str] = None):
         self.scanner = scanner
         self.checker = checker
         self.rewriter = rewriter
@@ -148,8 +149,10 @@ class SegmentGate:
         self.max_rewrites = max_rewrites
         self.segmenter = Segmenter(max_chars)
         self.overlap = overlap
+        self.closer = closer
         self.result = GateResult()
         self._tail = ''
+        self._held: Optional[str] = None
 
     def _scan(self, segment: str):
         """Scan with the tail of the previous released segment prepended, keeping only
@@ -209,7 +212,39 @@ class SegmentGate:
         cleaned = self._clear(segment, record)
         return None if cleaned is None else self._release(cleaned, record)
 
+    def _hold_closer(self, segment: str) -> bool:
+        """True when the segment is nothing but the closing sentence, so it is held back."""
+        if not self.closer or segment.strip() != self.closer:
+            return False
+        self._held = segment
+        return True
+
     def run(self, tokens: Iterable[str]) -> Iterator[str]:
+        """Yields display-ready segments, with the closing sentence emitted exactly once.
+
+        A long answer makes the model treat each major block as a finished reply, so it
+        obeys rule 6 more than once: 2026-08-31 req 43c1f019 closed the last candidate's
+        section with the sentence, wrote a 總結 section, and closed again. That request
+        made no follow-up calls at all -- both copies came out of a single stream -- so
+        nothing downstream of the model could have caught it.
+
+        A segment that is only that sentence is therefore held rather than released. Later
+        copies replace the held one, and the survivor is emitted after everything else,
+        the completion pass included. Nothing is recalled: a held segment was never shown
+        (丙-3), and the answer still ends with the sentence rule 6 asks for. It also puts
+        a supplement *before* the closing sentence rather than after it, which is the
+        trade-off `strip_duplicate_closer` had to accept when it could only drop the
+        second copy.
+        """
+        self._held = None
+        for segment in self._run(tokens):
+            yield segment
+        if self._held is not None and self.result.status != STATUS_BLOCKED:
+            released = self._gate(self._held)
+            if released is not None:
+                yield released
+
+    def _run(self, tokens: Iterable[str]) -> Iterator[str]:
         """Yields display-ready segments. Stops early if one cannot be cleaned.
 
         Each segment is gated and released the moment its boundary arrives, while the
@@ -220,6 +255,8 @@ class SegmentGate:
         blocked = False
         for token in tokens:
             for segment in self.segmenter.feed(token):
+                if self._hold_closer(segment):
+                    continue
                 released = self._gate(segment)
                 if released is None:
                     blocked = True
@@ -230,6 +267,8 @@ class SegmentGate:
 
         if not blocked:
             for segment in self.segmenter.flush():
+                if self._hold_closer(segment):
+                    continue
                 released = self._gate(segment)
                 if released is None:
                     blocked = True

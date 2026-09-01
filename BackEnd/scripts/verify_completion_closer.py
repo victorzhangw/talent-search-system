@@ -25,7 +25,8 @@ from api_v2.services.exit_scanner import ExitScanner  # noqa: E402
 from api_v2.services.log_assembler import Respondent  # noqa: E402
 from api_v2.services.log_pipeline import (  # noqa: E402
     COMPLETION_INSTRUCTION, COMPLETION_SEPARATOR, LogPipeline,
-    MIN_DUPLICATE_CLOSER_CHARS, strip_completion_preamble, strip_duplicate_closer)
+    MIN_DUPLICATE_CLOSER_CHARS, closing_sentence, strip_completion_preamble,
+    strip_duplicate_closer, strip_trailing_closer)
 from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.segment_gate import (  # noqa: E402
     SegmentGate, STATUS_MANUAL_REVIEW)
@@ -89,6 +90,79 @@ def verify_preamble_and_separator():
           repr(p._complete('缺少段落：X')))
     p.followup_fn = lambda messages, instruction: '   \n  '
     check('純空白 -> 回空字串', p._complete('缺少段落：X') == '')
+
+
+def verify_rewrite_closer():
+    """2026-08-31：結語句改從「改寫」那條路出來，而改寫完全沒有後處理。
+
+    req f1ea065d 的 idx 10 段被改寫後，畫面上是
+      「…較快的檢核節奏。本分析旨在提供觀點與輔助…綜合考量。這份「及早發現」的用心是…」
+    一個段落被結語句從中間切開。同一天 672f08ca 與 f632397b 也是同一個形狀：結語句後面
+    沒有任何換行，下一段文字直接接上。而這 21 筆請求的補生成一次都沒跑（completeness
+    retry 全 0），改寫跑了 63 次——8/25 只修補生成的那次修正因此完全沒被觸發。
+    """
+    print('\n[16] 結語句是從 system prompt 讀出來的，不是寫死的')
+    check('讀得到第 6 條那句', closing_sentence() == CLOSER, repr(closing_sentence()))
+
+    print('\n[17] 改寫輸出尾端的結語句要被剝掉')
+    body = '他在工作上會自我要求、按計畫推進，對品質有清楚的期待。'
+    cases = [
+        (body + CLOSER, body, '黏在句尾'),
+        (body + '\n\n' + CLOSER + '\n', body, '自成一段'),
+        (body, body, '沒有結語句時不動'),
+    ]
+    for text, want, label in cases:
+        check(f'{label}', strip_trailing_closer(text) == want,
+              repr(strip_trailing_closer(text)[-24:]))
+    check('整段只有結語句 -> 回空字串（閘門會當成一次失敗的嘗試）',
+          strip_trailing_closer(CLOSER).strip() == '', repr(strip_trailing_closer(CLOSER)))
+    check('讀不到那句話時什麼都不做（客戶改寫正本的退路）',
+          strip_trailing_closer(body + CLOSER, closer='') == body + CLOSER)
+
+    print('\n[18] _rewrite 串起寒暄剝除與結語句剝除')
+    p = LogPipeline.__new__(LogPipeline)
+    p.messages = [{'role': 'system', 'content': 'x'}]
+    p.followup_fn = lambda messages, instruction: (
+        '好的，以下是改寫後的段落。\n\n' + body + CLOSER)
+    out = p._rewrite('原本的段落。', ['高度自律'])
+    check('寒暄開場被剝掉', not out.startswith('好的'), out[:20])
+    check('結語句被剝掉', CLOSER not in out, out[-24:])
+    check('改寫內容保留', body in out, out[:24])
+
+    p.followup_fn = lambda messages, instruction: CLOSER
+    check('模型只回一句結語句 -> 空字串', not p._rewrite('原本的段落。', ['x']).strip())
+
+    print('\n[19] 模型自己重複的結語句：只釋出最後一次（req 43c1f019）')
+    # 那一筆 retry_count 是 {leakage: 0, completeness: 0}——完全沒有後續模型呼叫，
+    # 兩句結語句都出自同一條串流，所以只能在閘門這一層處理。
+    scanner = ExitScanner(injected_names=set(), injected_labels=set())
+    stream = ('### 第 7 順位｜Bryce-test\n\n適配性相對有限。\n\n' + CLOSER + '\n\n'
+              '---\n\n## 總結\n\n綜合排序：柳宇賸 → 簡玥瀅 → 陳冠享。\n\n' + CLOSER)
+    gate = SegmentGate(scanner, closer=CLOSER)
+    out = ''.join(gate.run([stream]))
+    check('結語句只出現一次', out.count(CLOSER) == 1, out.count(CLOSER))
+    check('而且在最後', out.rstrip().endswith(CLOSER), repr(out[-24:]))
+    check('中段的內容一段都沒少',
+          '適配性相對有限' in out and '## 總結' in out and '綜合排序' in out)
+    check('沒有結語句時行為不變',
+          ''.join(SegmentGate(scanner, closer=CLOSER).run(['一般內容。\n\n第二段。'])) ==
+          '一般內容。\n\n第二段。')
+
+    print('\n[20] 補充內容排在結語句之前，不是之後')
+    # strip_duplicate_closer 的 docstring 記著這個取捨：已釋出的段落不能收回，所以結語句
+    # 必然停在第一輪的結尾、補充落在它後面。延後釋出把這個取捨也解掉了。
+    q = table.get('如何面對困難、壓力、挑戰')
+    sections = q['expected_sections'] or []
+    r = [Respondent('王智弘', 'R1', {'CIA_05': 'B'})]
+    partial = ''.join(f'{i + 1}. {s}\n內容。\n\n' for i, s in enumerate(sections[:-1]))
+    gate = SegmentGate(scanner, checker=CompletenessChecker(r, q, table.calibration_traits),
+                       completer=lambda reason: f'{len(sections)}. {sections[-1]}\n補上的內容。\n\n',
+                       closer=CLOSER)
+    out = ''.join(gate.run([partial + CLOSER]))
+    check('補上的段落有出現', sections[-1] in out, out[-60:])
+    check('結語句在補充內容之後', out.index(CLOSER) > out.index('補上的內容'),
+          repr(out[-40:]))
+    check('結語句仍然只有一次', out.count(CLOSER) == 1, out.count(CLOSER))
 
 
 def check(label, condition, detail=''):
@@ -212,6 +286,8 @@ def main():
     check('舊的「已轉人工複核」文案已移除', '已轉人工複核' not in src)
     check('blocked 的文案講的是「中途停止」而非「未通過檢查」',
           '中途停止' in notice, notice.splitlines()[-1][:80])
+
+    verify_rewrite_closer()
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
