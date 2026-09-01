@@ -276,6 +276,68 @@ def main():
         check(f'{label} -> the attempt is not retried into the cap',
               gate.result.retry_count['leakage'] == 1, gate.result.retry_count)
 
+    print('\n[16] Each rewrite turn is recorded, input and output')
+    # Until this existed the audit held only counts. 2026-08-31 ran 63 rewrites across 21
+    # requests and none of them left a trace, so the first reading of those reports blamed
+    # the completion pass -- the one path that had not run at all.
+    dirty2 = '他的 CIA_05 表現不錯。\n\n第二段沒有問題。\n\n'
+
+    gate = SegmentGate(scanner, rewriter=tidy_rewriter)
+    list(gate.run(tokens_of(dirty2)))
+    rec = next(s for s in gate.result.as_audit()['segments'] if s['rewrites'])
+    check('the rewritten segment carries rewrite_attempts', 'rewrite_attempts' in rec,
+          sorted(rec))
+    att = rec['rewrite_attempts'][0]
+    check('the input is what the model was given',
+          att['before'].startswith('他的 CIA_05'), att['before'][:24])
+    check('the output is what came back', '自制表現不錯' in att['after'], att['after'][:24])
+    check('both exact lengths are kept',
+          att['before_len'] == len('他的 CIA_05 表現不錯。\n\n')
+          and att['after_len'] == len(tidy_rewriter('', [])),
+          (att['before_len'], att['after_len']))
+    check('and what the scan found afterwards', att.get('after_hits') == [], att.get('after_hits'))
+    check('untouched segments carry no attempts key',
+          all('rewrite_attempts' not in s
+              for s in gate.result.as_audit()['segments'] if not s['rewrites']))
+
+    gate = SegmentGate(scanner, rewriter=stubborn)
+    list(gate.run(tokens_of(dirty2)))
+    rec = gate.result.as_audit()['segments'][0]
+    check('a stubborn segment records every attempt',
+          len(rec['rewrite_attempts']) == 2, len(rec['rewrite_attempts']))
+    check('each one shows the term that survived it',
+          all('CIA_05' in a.get('after_hits', []) for a in rec['rewrite_attempts']),
+          [a.get('after_hits') for a in rec['rewrite_attempts']])
+
+    gate = SegmentGate(scanner, rewriter=lambda segment, banned: '')
+    list(gate.run(tokens_of(dirty2)))
+    att = gate.result.as_audit()['segments'][0]['rewrite_attempts'][0]
+    check('an empty reply is recorded rather than looking like a success',
+          att['after_len'] == 0 and att['before_len'] > 0,
+          (att['before_len'], att['after_len']))
+
+    def exploding(segment, banned):
+        raise RuntimeError('upstream 503')
+
+    gate = SegmentGate(scanner, rewriter=exploding)
+    list(gate.run(tokens_of(dirty2)))
+    att = gate.result.as_audit()['segments'][0]['rewrite_attempts'][0]
+    check('a failed call records why', 'upstream 503' in att.get('error', ''),
+          att.get('error'))
+    check('and still blocks', gate.result.status == STATUS_BLOCKED)
+
+    print('\n[17] Long text is elided but the lengths stay exact')
+    long_dirty = '他的 CIA_05 ' + '表現很不錯。' * 120 + '\n\n'
+    gate = SegmentGate(scanner, rewriter=lambda segment, banned: '改寫。' * 200,
+                       max_chars=2000)
+    list(gate.run([long_dirty]))
+    att = gate.result.as_audit()['segments'][0]['rewrite_attempts'][0]
+    check('the recorded text is capped', len(att['before']) < att['before_len'],
+          (len(att['before']), att['before_len']))
+    check('and says how much was cut', 'chars)' in att['before'], att['before'][-24:])
+    check('after_len is the real length', att['after_len'] == len('改寫。' * 200),
+          att['after_len'])
+
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
 

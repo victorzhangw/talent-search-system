@@ -93,8 +93,21 @@ class Segmenter:
         return None
 
 
+# A whole segment fits, so a normal attempt is recorded verbatim and only an outlier is
+# elided. The exact lengths are kept either way -- an `after_len` far below `before_len`
+# is the signal that a rewrite dropped content, and it has to survive the clipping.
+AUDIT_TEXT_MAX = SEGMENT_MAX_CHARS
+
+
+def _clip(text: str) -> str:
+    text = text or ''
+    if len(text) <= AUDIT_TEXT_MAX:
+        return text
+    return f'{text[:AUDIT_TEXT_MAX]} ...(+{len(text) - AUDIT_TEXT_MAX} chars)'
+
+
 class SegmentRecord:
-    __slots__ = ('index', 'released', 'rewrites', 'hits', 'final_hits')
+    __slots__ = ('index', 'released', 'rewrites', 'hits', 'final_hits', 'attempts')
 
     def __init__(self, index):
         self.index = index
@@ -102,10 +115,32 @@ class SegmentRecord:
         self.rewrites = 0
         self.hits: List[str] = []        # terms seen on the first scan
         self.final_hits: List[str] = []  # terms still present when we gave up
+        self.attempts: List[dict] = []   # what each rewrite was given and what came back
+
+    def note_rewrite(self, before: str, after: str, error: Optional[str] = None):
+        """Record one rewrite turn.
+
+        Until this existed the audit held only counts, so what 63 rewrites in one day
+        actually did to the text could not be checked at all -- which is why the first
+        pass at the 2026-08-31 reports blamed the completion pass, the one path that had
+        not run. Both the paragraph break the rewrite ate and the closing sentence it
+        appended are visible in `before`/`after`; so is a reply that came back empty.
+        """
+        attempt = {'attempt': len(self.attempts) + 1,
+                   'before_len': len(before or ''), 'after_len': len(after or ''),
+                   'before': _clip(before), 'after': _clip(after)}
+        if error:
+            attempt['error'] = error
+        self.attempts.append(attempt)
 
     def as_audit(self):
-        return {'index': self.index, 'released': self.released, 'rewrites': self.rewrites,
-                'hits': self.hits, 'final_hits': self.final_hits}
+        audit = {'index': self.index, 'released': self.released, 'rewrites': self.rewrites,
+                 'hits': self.hits, 'final_hits': self.final_hits}
+        # Omitted when empty: most segments are never rewritten, and one request can carry
+        # a hundred of these records.
+        if self.attempts:
+            audit['rewrite_attempts'] = self.attempts
+        return audit
 
 
 class GateResult:
@@ -181,10 +216,13 @@ class SegmentGate:
 
         while record.rewrites < self.max_rewrites and self.rewriter is not None:
             record.rewrites += 1
+            before = segment
             try:
                 rewritten = self.rewriter(segment, self.scanner.banned_terms(hits))
-            except Exception:
+            except Exception as e:
+                record.note_rewrite(before, '', error=f'{type(e).__name__}: {e}'[:200])
                 break
+            record.note_rewrite(before, rewritten)
             # An empty reply is how `packer_followup` reports a failed call, and empty
             # text scans clean -- so accepting it released nothing at all and dropped the
             # paragraph without a trace. Treat it as a failed attempt instead, which is
@@ -193,6 +231,7 @@ class SegmentGate:
                 break
             segment = rewritten
             hits = self._scan(segment)
+            record.attempts[-1]['after_hits'] = self.scanner.banned_terms(hits)
             if not hits:
                 return segment.rstrip() + separator
 
