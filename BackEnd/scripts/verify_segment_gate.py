@@ -216,6 +216,66 @@ def main():
     check('per-segment records include rewrites and release state',
           all({'index', 'released', 'rewrites'} <= set(s) for s in audit['segments']))
 
+    print('\n[13] A rewrite keeps the paragraph break it replaced')
+    # 2026-08-31 req f1ea065d: three consecutive table rows were rewritten, each reply
+    # came back without the trailing blank line the segmenter had attached, and the rows
+    # glued into one line. A GFM renderer drops the cells past the header's column count,
+    # so Eddy and Eva H vanished from the table and the next heading went with them.
+    header = ('| 新人 | 觀察 | 線索 | 判斷 | 其他原因 |\n'
+              '| :--- | :--- | :--- | :--- | :--- |\n')
+    rows = ['| **Roger** | 求快 | 高能量快節奏 | 部分相符 | 訓練設計 |\n\n',
+            '| **Eddy** | 都還好 | 部分包裝 | 部分相符 | 心理安全感 |\n\n',
+            '| **Eva H** | 多留 30 分鐘 | 品質苛求 | 相符線索明顯 | 自我要求 |\n\n']
+    table_text = header + '\n' + ''.join(rows) + '## 二、待驗證的行為假設\n\n'
+    label_scanner = ExitScanner(injected_names=set(),
+                                injected_labels={'高能量快節奏', '部分包裝', '品質苛求'})
+
+    def row_rewriter(segment, banned):
+        # Replies with the row restated and no trailing newline -- what the model does.
+        return segment.strip().replace('高能量快節奏', '步調快、重視效率') \
+                              .replace('部分包裝', '較少主動揭露') \
+                              .replace('品質苛求', '對細節要求高')
+
+    gate = SegmentGate(label_scanner, rewriter=row_rewriter)
+    released = ''.join(gate.run(tokens_of(table_text)))
+    check('all three rewrites happened', gate.result.retry_count['leakage'] == 3,
+          gate.result.retry_count)
+    check('status ok', gate.result.status == STATUS_OK)
+    check('no two table rows share a line', '||' not in released,
+          [ln for ln in released.split('\n') if ln.count('| **') > 1])
+    check('every row is still its own line',
+          all(sum(1 for ln in released.split('\n') if name in ln) == 1
+              for name in ('**Roger**', '**Eddy**', '**Eva H**')),
+          [ln[:28] for ln in released.split('\n') if '| **' in ln])
+    check('the following heading was not swallowed by a row',
+          any(ln.startswith('## 二、') for ln in released.split('\n')),
+          [ln[-24:] for ln in released.split('\n') if '二、' in ln])
+    check('the banned labels are gone', all(t not in released for t in
+          ('高能量快節奏', '部分包裝', '品質苛求')))
+
+    print('\n[14] A reply that already ends in a blank line is not double-spaced')
+    def tidy_rewriter(segment, banned):
+        return '他在壓力下的自制表現不錯。\n\n'
+
+    gate = SegmentGate(scanner, rewriter=tidy_rewriter)
+    released = ''.join(gate.run(tokens_of('他的 CIA_05 表現不錯。\n\n第二段沒有問題。\n\n')))
+    check('exactly one blank line between the two paragraphs',
+          '\n\n\n' not in released, repr(released))
+
+    print('\n[15] An empty rewrite is a failed attempt, not a clean segment')
+    # `packer_followup` returns '' when the call fails, and '' scans clean -- so the gate
+    # used to release nothing at all and drop the paragraph with no trace in the audit.
+    for label, reply in (('empty string', ''), ('whitespace only', '   \n  ')):
+        gate = SegmentGate(scanner, rewriter=lambda segment, banned, r=reply: r)
+        released = ''.join(gate.run(tokens_of('他的 CIA_05 表現不錯。\n\n第二段沒有問題。\n\n')))
+        check(f'{label} -> nothing released', not released.strip(), repr(released[:40]))
+        check(f'{label} -> status blocked', gate.result.status == STATUS_BLOCKED)
+        check(f'{label} -> the surviving term is recorded',
+              'CIA_05' in gate.result.as_audit()['leakage_hits'],
+              gate.result.as_audit()['leakage_hits'])
+        check(f'{label} -> the attempt is not retried into the cap',
+              gate.result.retry_count['leakage'] == 1, gate.result.retry_count)
+
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
 

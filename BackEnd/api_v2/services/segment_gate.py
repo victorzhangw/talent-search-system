@@ -166,15 +166,32 @@ class SegmentGate:
             return segment
         record.hits = self.scanner.banned_terms(hits)
 
+        # The segmenter hands every piece over with its trailing separator attached, so
+        # concatenating what was released reproduces the stream. A rewrite replaces the
+        # whole piece, and the model's reply does not end in a blank line -- so each
+        # rewrite silently ate one paragraph break and the next segment glued onto this
+        # one. 2026-08-31 req f1ea065d lost three table rows and a section heading that
+        # way: three consecutive rows were joined into a single line, and a GFM renderer
+        # drops the cells past the header's column count. That is the "中間有內容缺失"
+        # the reader reported one message later. Carry the original break across.
+        separator = segment[len(segment.rstrip()):]
+
         while record.rewrites < self.max_rewrites and self.rewriter is not None:
             record.rewrites += 1
             try:
-                segment = self.rewriter(segment, self.scanner.banned_terms(hits))
+                rewritten = self.rewriter(segment, self.scanner.banned_terms(hits))
             except Exception:
                 break
+            # An empty reply is how `packer_followup` reports a failed call, and empty
+            # text scans clean -- so accepting it released nothing at all and dropped the
+            # paragraph without a trace. Treat it as a failed attempt instead, which is
+            # what that function's own docstring says should happen.
+            if not (rewritten or '').strip():
+                break
+            segment = rewritten
             hits = self._scan(segment)
             if not hits:
-                return segment
+                return segment.rstrip() + separator
 
         record.final_hits = self.scanner.banned_terms(hits)
         return None
