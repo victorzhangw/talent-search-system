@@ -169,7 +169,22 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(git worktree *)",
       "Bash(grep -nE \"^#{1,3} |^### \")",
-      "Bash(\"D:/python/AI-Character-Chatbot/BackEnd/api_v2/.venv/Scripts/python.exe\" scripts/verify_pipeline.py)"
+      "Bash(\"D:/python/AI-Character-Chatbot/BackEnd/api_v2/.venv/Scripts/python.exe\" scripts/verify_pipeline.py)",
+      "Bash(git fetch *)",
+      "Bash(awk '{print \"  遠端獨有: \"$1\"  本地待推: \"$2}')",
+      "Bash(awk '{print \"遠端獨有: \"$1\"  本地待推: \"$2}')",
+      "Bash(./api_v2/.venv/Scripts/python.exe *)",
+      "Bash(/d/python/AI-Character-Chatbot/BackEnd/api_v2/.venv/Scripts/python.exe -c ' *)",
+      "Bash(/d/python/AI-Character-Chatbot/BackEnd/api_v2/.venv/Scripts/python.exe *)",
+      "Bash(./BackEnd/api_v2/.venv/Scripts/python.exe -c ' *)",
+      "Bash(unzip -p \"docs/customer/PRD-月用量統計-20260825.xlsx\" xl/charts/chart1.xml)",
+      "Bash(./BackEnd/api_v2/.venv/Scripts/python.exe *)",
+      "Bash(awk 'NR==1 || \\(length\\(\\\\$1\\)>=1\\)')",
+      "Bash(/usr/bin/grep -E \"^\\\\s+'.{3}'\")",
+      "Bash(/usr/bin/grep -E \"in 1 session\")",
+      "Bash(/usr/bin/grep -oE \"'[^']{3}'.*\")",
+      "Bash(/usr/bin/grep -E \"total=   1 in 1\")",
+      "Bash(/usr/bin/grep -oE \"'[^']{3}'\")"
     ]
   }
 }
