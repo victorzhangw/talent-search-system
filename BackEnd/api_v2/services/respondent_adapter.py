@@ -64,22 +64,33 @@ def resolve_traits(candidate: dict,
     """Every trait we could place on the spec's scale. Anything unresolvable is skipped
     and reported through `on_skip(reason, context)` -- never guessed at, because guessing
     the assessment or the band would silently attach the wrong narrative."""
+    # Every skip carries the respondent and the vendor's own trait id. Without them a
+    # dropped trait cannot be traced back to a person: on 2026-08-31 one report lost 61
+    # traits, and which of the six respondents it belonged to could only be narrowed down
+    # by subtracting the skip sets of other sessions. `candidate_id` is the same key the
+    # audit record uses for `respondent_id`, so the two join directly.
+    candidate_id = candidate.get('candidate_id')
+
     def skip(reason, **ctx):
         if on_skip:
-            on_skip(reason, ctx)
+            on_skip(reason, {'candidate_id': candidate_id, **ctx})
 
     assessment = candidate.get('assessment', {}) or {}
     out: List[ResolvedTrait] = []
 
     for res in _results_list(assessment, candidate):
+        # Recorded for diagnosis only. Resolution still goes through the name, because the
+        # vendor's id shares no namespace with the spec's: a CIA report numbers its traits
+        # `68b`/`99f`, a CSR report `6`..`81`, and the two sets do not overlap.
+        api_trait_id = res.get('trait_id')
         display_name = res.get('chinese_name') or res.get('trait_name')
         if not display_name:
-            skip('no_name', raw_res=res)
+            skip('no_name', api_trait_id=api_trait_id, raw_res=res)
             continue
 
         project_abbrev = assessment.get('project_name_abbreviation')
         if not project_abbrev:
-            skip('no_project_abbrev', display_name=display_name)
+            skip('no_project_abbrev', api_trait_id=api_trait_id, display_name=display_name)
             continue
 
         normalized_name_en = func.lower(
@@ -95,12 +106,14 @@ def resolve_traits(candidate: dict,
                 TraitDefinition.trait_id.like(f'{project_abbrev}_%')).first()
 
         if not trait_def:
-            skip('no_trait_def_match', project_abbrev=project_abbrev, display_name=display_name)
+            skip('no_trait_def_match', api_trait_id=api_trait_id,
+                 project_abbrev=project_abbrev, display_name=display_name)
             continue
 
         score = res.get('score')
         if score is None:
-            skip('no_score', trait_id=trait_def.trait_id, display_name=display_name)
+            skip('no_score', api_trait_id=api_trait_id, trait_id=trait_def.trait_id,
+                 display_name=display_name)
             continue
 
         band_row = db_session.query(TraitBand).filter(
@@ -109,8 +122,8 @@ def resolve_traits(candidate: dict,
             TraitBand.max_score >= score).first()
 
         if not band_row:
-            skip('no_band_range', trait_id=trait_def.trait_id, score=score,
-                 display_name=display_name)
+            skip('no_band_range', api_trait_id=api_trait_id, trait_id=trait_def.trait_id,
+                 score=score, display_name=display_name)
             continue
 
         out.append(ResolvedTrait(trait_def.trait_id, score, band_row))
@@ -132,6 +145,11 @@ def from_trait_reports(trait_reports: dict, candidates_info: Optional[List[dict]
     upstream-fetch path. A report without `project_name_abbreviation` is skipped rather
     than defaulted -- guessing the assessment would resolve the trait against the wrong
     one of the four.
+
+    `trait_id` is carried through even though nothing matches on it. The frontend has it
+    (`reports.py` puts it in every entry) and dropping it here left the skip records with
+    no handle on the trait the vendor was actually talking about -- the legacy path in
+    `rag_engine` keeps it, so both paths now report the same fields.
     """
     basics = {str(c.get('candidate_id')): c for c in (candidates_info or [])}
     candidates = []
@@ -148,7 +166,8 @@ def from_trait_reports(trait_reports: dict, candidates_info: Optional[List[dict]
             'name': basic.get('name') or f'Candidate-{cand_id}',
             'assessment': {
                 'project_name_abbreviation': project_abbrev,
-                'trait_results': [{'chinese_name': t.get('name'), 'score': t.get('score')}
+                'trait_results': [{'chinese_name': t.get('name'), 'score': t.get('score'),
+                                   'trait_id': t.get('trait_id')}
                                   for t in (report.get('traits') or [])],
             },
         })
