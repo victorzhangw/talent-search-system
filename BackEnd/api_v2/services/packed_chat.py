@@ -55,7 +55,8 @@ def _per_session_enabled():
         return False
 
 
-def log_payload(pipeline: LogPipeline, session_id, module_id, question, req_id=None):
+def log_payload(pipeline: LogPipeline, session_id, module_id, question, req_id=None,
+                dropped=None):
     """Write the assembled LOG verbatim to prompts.log before anything is sent.
 
     事項 07 §3: 舊路徑的 `_log_prompt()` 只掛在 `rag_engine._call_llm()` 上，打包器不經過
@@ -88,7 +89,11 @@ def log_payload(pipeline: LogPipeline, session_id, module_id, question, req_id=N
                   f"AUDIENCE: {audit.get('audience')} | "
                   f"RESPONDENTS: {len(audit.get('respondents') or [])} | "
                   f"HISTORY_MSGS: {history_msgs} ({history_msgs // 2} turns, "
-                  f"cap={cap_turns} turns/{cap_turns * 2} msgs)")
+                  f"cap={cap_turns} turns/{cap_turns * 2} msgs) | "
+                  # 讀 log 的人第一眼就要知道這份 payload 是不是完整的。註記放在 header
+                  # 與 ==== 分隔線之間，也就是 LOG 本體之外——本體從 [SYSTEM PROMPT] 起
+                  # 必須與 v7 範例逐字相同，加一行進去會讓 DoD 1 的比對失效。
+                  f"DROPPED_TRAITS: {len(dropped or ())}")
         write_prompt_record(
             session_id,
             f"{header}\n"
@@ -103,6 +108,35 @@ def log_payload(pipeline: LogPipeline, session_id, module_id, question, req_id=N
                             f"prompts.log: {e}")
 
 
+def dropped_audit(skips, respondents):
+    """Per-respondent drop counts plus the raw list, for the audit record (事項 12).
+
+    A trait the adapter could not place is skipped and the answer is written from what is
+    left, with nothing in the record to say so: 2026-08-31 dropped 235 traits across 21
+    requests -- one report lost 61 of its 79 -- and the reader saw an analysis that looked
+    complete. `traits_total` alone cannot show this, because it counts what arrived, not
+    what was sent.
+
+    Returns (respondents with the two counts added, summary). The respondent dicts are
+    rebuilt rather than mutated: `PipelineResult.audit` copies the outer dict only, so the
+    entries are still the assembler's own.
+    """
+    by_id = {}
+    for reason, ctx in (skips or ()):
+        by_id.setdefault(str(ctx.get('candidate_id')), []).append({
+            'reason': reason,
+            'api_trait_id': ctx.get('api_trait_id'),
+            'display_name': ctx.get('display_name'),
+        })
+    augmented = []
+    for r in (respondents or ()):
+        n = len(by_id.get(str(r.get('respondent_id')), ()))
+        augmented.append({**r, 'traits_dropped': n,
+                          'traits_sent': (r.get('traits_total') or 0) + n})
+    return augmented, {'total': sum(len(v) for v in by_id.values()),
+                       'by_respondent': by_id}
+
+
 class _Chunk:
     """Minimal stand-in for an OpenAI streaming chunk."""
 
@@ -112,12 +146,14 @@ class _Chunk:
 
 
 class PackedStream:
-    def __init__(self, pipeline: LogPipeline, stream_fn, session_id, question, req_id=None):
+    def __init__(self, pipeline: LogPipeline, stream_fn, session_id, question, req_id=None,
+                 dropped=None):
         self._pipeline = pipeline
         self._stream_fn = stream_fn
         self._session_id = session_id
         self._question = question
         self._req_id = req_id
+        self._dropped = list(dropped or ())
         self.finished = False
         self.audit: dict = {}
 
@@ -144,6 +180,10 @@ class PackedStream:
         self.finished = True
         result = self._pipeline.result
         audit = result.audit if result else {'status': 'incomplete'}
+        respondents, dropped = dropped_audit(self._dropped, audit.get('respondents'))
+        if respondents:
+            audit['respondents'] = respondents
+        audit['dropped_traits'] = dropped
         audit['session_id'] = self._session_id
         # 這一輪的 prompt 記在 prompts.log、回覆記在 conversations.log、閘門結果記在這裡。
         # 三個檔以前只有 session_id 可對，而同一個 session 連續幾輪的 header 長得一模一樣，
@@ -151,12 +191,13 @@ class PackedStream:
         audit['req_id'] = self._req_id or '-'
         self.audit = audit
         packer_logger.info(json.dumps(audit, ensure_ascii=False, default=str))
-        if audit.get('status') != 'ok':
+        if audit.get('status') != 'ok' or dropped['total']:
             packer_logger.warning(
                 f"req={audit['req_id']} session={self._session_id} "
                 f"status={audit.get('status')} "
                 f"leakage_hits={audit.get('leakage_hits')} "
-                f"missing_sections={audit.get('missing_sections')}")
+                f"missing_sections={audit.get('missing_sections')} "
+                f"dropped_traits={dropped['total']}")
         for line in (audit.get('log') or []):
             packer_logger.info(f"req={audit['req_id']} | session={self._session_id} | {line}")
         return audit
@@ -173,10 +214,14 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
                                f"falling back to the legacy path")
             return None
 
-        respondents = from_trait_reports(
-            trait_reports, candidates_info,
-            on_skip=lambda reason, ctx: packer_logger.warning(
-                f"session={session_id} skipped trait: reason={reason} | {ctx}"))
+        dropped = []
+
+        def _skip(reason, ctx):
+            dropped.append((reason, ctx))
+            packer_logger.warning(f"session={session_id} skipped trait: "
+                                  f"reason={reason} | {ctx}")
+
+        respondents = from_trait_reports(trait_reports, candidates_info, on_skip=_skip)
         if not respondents:
             packer_logger.info(f"session={session_id} no resolvable respondents; legacy path")
             return None
@@ -195,5 +240,6 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
         packer_logger.warning(f"session={session_id} cannot pack: {e}; legacy path")
         return None
 
-    log_payload(pipeline, session_id, module_id, question, req_id)
-    return PackedStream(pipeline, rag_service.packer_stream, session_id, question, req_id)
+    log_payload(pipeline, session_id, module_id, question, req_id, dropped)
+    return PackedStream(pipeline, rag_service.packer_stream, session_id, question, req_id,
+                        dropped=dropped)

@@ -54,6 +54,12 @@ class FakeRag:
         return self.followup
 
 
+def _clean_dropped_total(rag, reports, basics):
+    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', 'expert', reports, basics, 'S14')
+    list(packed)
+    return packed.finish()['dropped_traits']['total']
+
+
 def trait_report(names_scores, abbrev='CIA'):
     return {'project_name_abbreviation': abbrev,
             'traits': [{'name': n, 'score': s} for n, s in names_scores]}
@@ -196,6 +202,34 @@ def main():
     try_packed_stream(rag, 'no_such_module', '', 'expert', reports, basics, 'S12')
     after = os.path.getsize(log_path) if os.path.exists(log_path) else 0
     check('a declined request logs no payload', after == before, f'{after - before} bytes')
+
+    # ---- 被丟棄的特質要出現在稽核紀錄裡 -------------------------------------------
+    # 2026-08-31：235 個特質被丟棄，其中一份報告 79 個只有 18 個進得了 payload，而稽核
+    # 紀錄裡完全沒有這件事——traits_total 記的是「進來的」，不是「送出的」，所以讀 log
+    # 的人看不出這份分析是用殘缺資料寫的。
+    print('\n[13] Dropped traits are counted, per respondent')
+    mixed = {'C1': trait_report(traits + [('NotARealTrait', 50), ('AlsoNotReal', 60)])}
+    rag = FakeRag('他在指導他人時通常有耐心。\n\n')
+    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', 'expert', mixed, basics, 'S13')
+    check('a report with unresolvable traits is still served',
+          isinstance(packed, PackedStream))
+    list(packed)
+    audit = packed.finish()
+    check('the audit carries a dropped_traits block',
+          audit.get('dropped_traits', {}).get('total') == 2, audit.get('dropped_traits'))
+    dropped_names = {d['display_name']
+                     for d in audit['dropped_traits']['by_respondent'].get('C1', [])}
+    check('attributed to the respondent, by name',
+          dropped_names == {'NotARealTrait', 'AlsoNotReal'}, dropped_names)
+    check('and to the vendor id field even when the payload had none',
+          all('api_trait_id' in d
+              for d in audit['dropped_traits']['by_respondent']['C1']))
+    r0 = audit['respondents'][0]
+    check('the respondent row reports sent vs packed',
+          r0['traits_dropped'] == 2 and r0['traits_sent'] == r0['traits_total'] + 2,
+          {k: r0[k] for k in ('traits_total', 'traits_dropped', 'traits_sent')})
+    check('a clean request reports zero rather than omitting the block',
+          _clean_dropped_total(rag, reports, basics) == 0)
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
