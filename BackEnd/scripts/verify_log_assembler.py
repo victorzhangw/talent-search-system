@@ -20,7 +20,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), enc
 from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.log_assembler import (Respondent, assemble, check_audience,  # noqa: E402
                                            AudienceMismatch, SYSTEM_MARKER,
-                                           INSTRUCTION_MARKER)
+                                           INSTRUCTION_MARKER, ROSTER_MARKER)
 
 PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
                    'Traitty_調整_20260728＿final')
@@ -152,10 +152,27 @@ def main():
     check('free-form without user_query is rejected', _raises(lambda: assemble(one, None)))
     q = '我下週要跟他談年度目標，該怎麼開場？'
     free = assemble(one, None, user_query=q)
+    # 契約寫的是「[任務指令]＝user_query 原文」。名單宣告是它前面的一個平行區塊，
+    # 指令本身一字未改，所以這個子字串必須逐字存在。
     check('task instruction is the user text verbatim, unwrapped',
-          free.instruction == f'{INSTRUCTION_MARKER}\n{q}', repr(free.instruction))
+          free.instruction.endswith(f'{INSTRUCTION_MARKER}\n{q}'), repr(free.instruction))
     check('free-form takes the whole-person path',
           '（全人型＝全部特質）' in free.body and '其他特質索引' not in free.body)
+
+    print('\n[本輪判讀對象 -- 自由提問的名單宣告]')
+    check('free-form carries the roster block before the instruction',
+          free.instruction.startswith(ROSTER_MARKER), repr(free.instruction[:40]))
+    check('single respondent is announced as 共 1 位',
+          '共 1 位：甲。' in free.instruction, repr(free.instruction[:60]))
+    free_multi = assemble(two, None, user_query=q)
+    check('every respondent is named, in payload order',
+          '共 2 位：甲、乙。' in free_multi.instruction, repr(free_multi.instruction[:60]))
+    check('the roster never carries a RESP_xx token',
+          not re.search(r'RESP_\d+', free_multi.instruction.split(INSTRUCTION_MARKER)[0]))
+    check('it tells the model to ignore rosters from earlier turns',
+          '先前對話' in free.instruction)
+    check('題庫題 carries no roster block -- v7 diff must stay at 0 lines',
+          ROSTER_MARKER not in assemble(two, both).instruction)
 
     print('\n[to_messages() vs to_log_text()]')
     log = assemble(one, both)
