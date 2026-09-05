@@ -338,6 +338,37 @@ def main():
     check('after_len is the real length', att['after_len'] == len('改寫。' * 200),
           att['after_len'])
 
+    print('\n[標題段落被改寫成整段（修正計畫 Unit 4a）]')
+    # 實測四次：24->1270、26->779、34->932、35->737 字，全都是只有一行標題的段落。
+    # 那一整段被釋出，接著模型自己原本要寫的內容也串流進來、也被釋出，讀者看到兩次。
+    heading = '## 四、面談時的情境波動評估\n\n'
+    whole_section = '## 四、面談時的評估\n\n' + '模型自己又寫了一整段內容。' * 40
+    gate = SegmentGate(scanner, rewriter=lambda s, b: whole_section, max_chars=2000)
+    out = ''.join(gate.run([heading]))
+    rec = gate.result.as_audit()['segments'][0]
+    check('撐大的改寫被當成失敗的嘗試，不會釋出',
+          whole_section not in out and rec['rewrite_attempts'][0].get('rejected') == 'overgrown',
+          rec['rewrite_attempts'][0].get('rejected'))
+    # 長度相稱的改寫照常接受——這條擋的是「模型另外寫了一段」，不是「改寫比原文長一點」。
+    gate = SegmentGate(scanner, rewriter=lambda s, b: '## 四、面談時的自我節制評估\n\n',
+                       max_chars=2000)
+    out = ''.join(gate.run([heading]))
+    check('長度相稱的標題改寫照常釋出', '自我節制' in out and gate.result.status != STATUS_BLOCKED,
+          (out.strip(), gate.result.status))
+    # 正常長度的段落多寫幾個字不受影響。
+    body = '他在壓力下的情境波動值得留意。' * 8
+    gate = SegmentGate(scanner, rewriter=lambda s, b: body.replace('情境波動', '自我節制') + '補充一句。',
+                       max_chars=2000)
+    out = ''.join(gate.run([body + '\n\n']))
+    check('一般段落的自然增減不受門檻影響', '自我節制' in out and '情境波動' not in out)
+
+    print('\n[標題用專屬的改寫指令]')
+    from api_v2.services.log_pipeline import is_heading_only
+    check('只有標題的一段判為 heading', is_heading_only('## 四、面談時需要確認的能力\n\n'))
+    check('標題加內文不算', not is_heading_only('## 標題\n\n這裡是內文。' * 5))
+    check('沒有標題標記的短句不算', not is_heading_only('這是一句話。\n\n'))
+    check('多行純標題也算', is_heading_only('### 第一優先\n**風險**\n'))
+
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
 

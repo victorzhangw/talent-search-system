@@ -38,6 +38,15 @@ OVERLAP_CHARS = 16               # 丁-2: catches a marker split across a bounda
 MAX_SEGMENT_REWRITES = 2         # 丁-3
 MAX_COMPLETION_ATTEMPTS = 1      # b §8: 補生成一次
 
+# 改寫回來的東西比原段落長太多，就不是這一段的改寫，而是模型又寫了一段新的。實測 4 次：
+# 24->1270、26->779、34->932、35->737 字，全都是「只有一行標題」的段落。那一整段被釋出，
+# 接著模型自己原本要寫的內容也串流進來、也被釋出，使用者讀到同一段兩次。
+#
+# 兩個門檻要同時超過才算：倍數擋掉短段落被撐大，絕對值讓正常段落的自然增減（多幾個字把
+# 話講清楚）不受影響。
+REWRITE_MAX_GROWTH_RATIO = 3
+REWRITE_MAX_GROWTH_CHARS = 150
+
 _SENTENCE_END_RE = re.compile(r'[。！？!?；;]')
 _BLANK_LINE_RE = re.compile(r'\n[ \t]*\n')
 
@@ -97,6 +106,12 @@ class Segmenter:
 # elided. The exact lengths are kept either way -- an `after_len` far below `before_len`
 # is the signal that a rewrite dropped content, and it has to survive the clipping.
 AUDIT_TEXT_MAX = SEGMENT_MAX_CHARS
+
+
+def _overgrown(before: str, after: str) -> bool:
+    """改寫回來的比原段落長太多——這不是改寫，是模型另外寫了一段。"""
+    b, a = len(before or ''), len(after or '')
+    return a > b * REWRITE_MAX_GROWTH_RATIO and a - b > REWRITE_MAX_GROWTH_CHARS
 
 
 def _clip(text: str) -> str:
@@ -228,6 +243,11 @@ class SegmentGate:
             # paragraph without a trace. Treat it as a failed attempt instead, which is
             # what that function's own docstring says should happen.
             if not (rewritten or '').strip():
+                break
+            if _overgrown(before, rewritten):
+                # 當成一次失敗的嘗試，跟回空一樣處理：接受它就是把一份重複的內容送給
+                # 使用者看，而那比少一次改寫機會嚴重得多。
+                record.attempts[-1]['rejected'] = 'overgrown'
                 break
             segment = rewritten
             hits = self._scan(segment)

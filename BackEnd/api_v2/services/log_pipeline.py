@@ -15,7 +15,7 @@ import re
 from typing import Callable, Iterable, Iterator, List, Optional
 
 from ..utils.logger import get_daily_logger
-from .completeness_check import CompletenessChecker
+from .completeness_check import CompletenessChecker, is_marked_heading
 from .exit_scanner import ExitScanner
 from .log_assembler import AssembledLog, Respondent, assemble
 from .log_system_prompt import load_system_prompt
@@ -29,6 +29,27 @@ REWRITE_INSTRUCTION = (
     '不是刪除這些字詞——刪掉會讓句子不完整；請換一種說法把同樣的意思講清楚。\n'
     '只輸出改寫後的該段內容，不要加說明、不要重複其他段落。\n\n'
     '原段落：\n{segment}'
+)
+
+# 只有一行標題的段落要用另一份指令。上面那份說的是「重寫該段，保留原本要表達的判讀與建議」，
+# 而模型手上有整份 payload——拿到一行標題時，它照做的方式是把整個段落寫出來：
+#
+#   110a4d78 seg51   24 字 -> 1270 字
+#   c5e0ef45 seg17   26 字 ->  779 字
+#   fc94296d seg16   34 字 ->  932 字
+#   4de8be30 seg3    35 字 ->  737 字
+#
+# 改寫出來的整段被釋出，接著模型自己原本要寫的那段內容也照常串流進來、也被釋出，使用者
+# 因此讀到同一段兩次（前三筆已在交付的回覆裡實地確認）。第四筆更慘：改寫器自己生出來的
+# 內文帶進了「刻意隱瞞」與「不誠實」，兩次都沒過，整串回覆從那裡截斷。
+#
+# 這四次事件四次全部造成缺陷，觸發詞排行第一的還是「需要確認」——它是 band 語意標籤，
+# 同時也是使用者自己在問題裡寫的字。
+REWRITE_HEADING_INSTRUCTION = (
+    '下面這一行是回答中的一個標題，它用到了不得出現的字詞：{terms}。\n'
+    '請只改寫「這一行標題本身」，換一種說法表達同樣的意思。\n'
+    '不要寫這個段落的內容、不要加任何說明、不要附結語句——只輸出改寫後的那一行。\n\n'
+    '原標題：\n{segment}'
 )
 
 COMPLETION_INSTRUCTION = (
@@ -81,6 +102,18 @@ _CLOSER_RULE_RE = re.compile(
     r'^\s*\d+\.\s*[^\n]*?(?:文末|結尾|最後)[^\n]*?「([^」]{12,})」', re.M)
 
 pipeline_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
+
+
+def is_heading_only(segment: str) -> bool:
+    """整段就是一行（或幾行）標題，沒有內文。
+
+    分段是照空行切的，所以「標題自成一段」是常態而不是例外——模型寫完 `## 四、面談時…`
+    就換行留白，那一行因此獨立成段。這種段落交給一般的改寫指令，模型會把整個段落補完。
+    """
+    lines = [l for l in (segment or '').split('\n') if l.strip()]
+    if not lines or len(''.join(lines)) > 60:
+        return False
+    return all(is_marked_heading(l) for l in lines)
 
 
 def closing_sentence() -> Optional[str]:
@@ -198,9 +231,11 @@ class LogPipeline:
     def _rewrite(self, segment: str, banned: List[str]) -> str:
         if self.followup_fn is None:
             return segment
+        template = (REWRITE_HEADING_INSTRUCTION if is_heading_only(segment)
+                    else REWRITE_INSTRUCTION)
         rewritten = self.followup_fn(
             self.messages + [{'role': 'assistant', 'content': segment}],
-            REWRITE_INSTRUCTION.format(terms='、'.join(banned), segment=segment))
+            template.format(terms='、'.join(banned), segment=segment))
         # 同一組後處理，補生成有、改寫一直沒有——而 0831 的 21 筆請求裡補生成一次都沒跑，
         # 改寫跑了 63 次。剝完可能整段變空，那由閘門當成一次失敗的嘗試處理。
         return strip_trailing_closer(strip_completion_preamble(rewritten or ''))
