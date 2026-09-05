@@ -2,6 +2,7 @@ import httpx
 from datetime import datetime
 from flask import current_app
 from .token_generator import generate_upstream_token
+from .upstream_env import env_from_request, upstream_base
 import logging
 import os
 from .logger import get_daily_logger
@@ -11,12 +12,15 @@ def get_traitty_logger():
 
 api_logger = get_traitty_logger()
 
-def fetch_init_data(email: str):
+def fetch_init_data(email: str, env: str = None):
     """
     獲取目前使用者的 Initiation 資料 (包含配額與可用計畫)
+
+    `env` 由呼叫端指定；auth 登入時 token 還沒發出來，讀不到 token 裡的環境。
     """
-    upstream_token = generate_upstream_token(email)
-    base_url = current_app.config.get('TRAITTY_API_BASE')
+    env = env if env is not None else env_from_request()
+    upstream_token = generate_upstream_token(email, env)
+    base_url = upstream_base(env)
     url = f"{base_url}/v1/init/"
     
     headers = {
@@ -77,8 +81,9 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str, message_i
         pass
 
     # 2. 準備呼叫 API
-    upstream_token = generate_upstream_token(email)
-    base_url = current_app.config.get('TRAITTY_API_BASE')
+    env = env_from_request()
+    upstream_token = generate_upstream_token(email, env)
+    base_url = upstream_base(env)
     url = f"{base_url}/v1/ai/usage/daily-settlement"
     
     headers = {

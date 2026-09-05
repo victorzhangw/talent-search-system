@@ -10,7 +10,9 @@ class RealIntegrationService(IntegrationServiceInterface):
 
     @property
     def base_url(self):
-        return current_app.config.get('TRAITTY_API_BASE')
+        # 本次請求指定的上游（開發端切換 UAT/PRD 用）；沒指定就是 .env 的預設值。
+        from ..utils.upstream_env import env_from_request, upstream_base
+        return upstream_base(env_from_request())
 
     def _get_headers(self, token: str):
         return {

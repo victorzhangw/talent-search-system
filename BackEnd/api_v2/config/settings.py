@@ -97,5 +97,12 @@ class Config:
     
     # External API Settings
     TRAITTY_API_BASE = os.getenv('TRAITTY_API_BASE') # Must be provided in .env
+    # 開發端在同一個後端上切換上游（UAT / PRD）用，見 utils/upstream_env.py。
+    # 預設關閉：沒有明確打開時，前端送什麼環境名都會被收斂回 TRAITTY_API_BASE。
+    # 正式部署不要打開——那等於讓客戶端決定後端要打哪一個上游。
+    ALLOW_UPSTREAM_ENV_SWITCH = os.getenv('ALLOW_UPSTREAM_ENV_SWITCH', '0').strip().lower() in ('1', 'true', 'yes', 'on')
+    TRAITTY_API_BASE_PRD = os.getenv('TRAITTY_API_BASE_PRD')
+    # UAT 與 PRD 不見得共用同一把 shared secret；沒設就沿用 PARTY_A_PLUGIN_SECRET。
+    PARTY_A_PLUGIN_SECRET_PRD = os.getenv('PARTY_A_PLUGIN_SECRET_PRD')
     PARTY_A_API_BASE = os.getenv('PARTY_A_API_BASE')
     PARTY_A_PLUGIN_SECRET = os.getenv('PARTY_A_PLUGIN_SECRET')

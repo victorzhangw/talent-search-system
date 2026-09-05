@@ -20,6 +20,19 @@
 
       <!-- Right: Actions -->
       <div class="header-right">
+        <!-- 上游環境切換：只有後端打開 ALLOW_UPSTREAM_ENV_SWITCH 時才會出現。
+             正式部署不會打開，所以這一段在客戶端是完全不存在的。 -->
+        <div v-if="upstreamEnvEnabled" class="env-switch"
+             :class="{ 'is-prd': upstreamEnv !== 'default' }"
+             :title="`目前上游：${upstreamBaseUrl || '（登入中）'}\n帳號：${currentUserEmail() || '未設定'}`">
+          <span class="env-dot"></span>
+          <select :value="upstreamEnv" :disabled="isSwitchingEnv || isTyping"
+                  @change="onEnvChange($event.target.value)">
+            <option v-for="opt in upstreamEnvOptions" :key="opt.env" :value="opt.env">
+              {{ opt.env === 'default' ? 'UAT' : opt.env.toUpperCase() }}
+            </option>
+          </select>
+        </div>
         <div class="action-pill">
             <!-- Expand -->
             <button v-if="!isFullPage" class="icon-btn desktop-only" @click="toggleExpand" :title="isExpanded ? '恢復緊湊視窗' : '展開完整視窗'">
@@ -462,6 +475,13 @@ const {
 
     // Computed
     currentThemeLabel,
+    upstreamEnv,
+    upstreamEnvOptions,
+    upstreamEnvEnabled,
+    upstreamBaseUrl,
+    isSwitchingEnv,
+    switchUpstreamEnv,
+    currentUserEmail,
     activeConversationCandidatesObjects,
     computedServerRoot,
     
@@ -541,6 +561,23 @@ const handleSendQuick = async (q) => {
         await lockSelectionAndStart();
     }
     sendQuickMessage(q);
+}
+
+// 切到 PRD 之前先確認一次。那不是唯讀的觀察模式——提問會扣線上帳號的真實額度
+// （/v1/ai/usage/daily-settlement），而且對話會寫進該環境的歷史。
+const onEnvChange = async (env) => {
+    if (env !== 'default') {
+        const target = upstreamEnvOptions.value.find(o => o.env === env)
+        const ok = window.confirm(
+            `要把上游切換到 ${env.toUpperCase()}（${target?.base_url || '未設定'}）嗎？
+
+`
+            + `目前的候選人、特質報告與對話都會清空，並改用該環境的帳號重新登入。
+`
+            + `提問會扣該帳號的真實額度。`)
+        if (!ok) return
+    }
+    await switchUpstreamEnv(env)
 }
 
 // Template Ref for CandidateSelector (needed for clearing selection)
@@ -765,4 +802,43 @@ const confirmAddCandidates = async () => {
         }
     }
 }
+/* 上游環境切換（開發端）。刻意做得顯眼——切到 PRD 之後打的是線上資料、扣的是真實額度，
+   不能讓人忘記自己現在在哪一邊。 */
+.env-switch {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px 3px 7px;
+    margin-right: 6px;
+    border: 1px solid var(--border-color, #d8d8e0);
+    border-radius: 999px;
+    background: transparent;
+    font-size: 11px;
+    line-height: 1;
+}
+.env-switch .env-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #16a34a;
+    flex: none;
+}
+.env-switch select {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    cursor: pointer;
+    outline: none;
+    padding: 0;
+}
+.env-switch select:disabled { cursor: not-allowed; opacity: .55; }
+.env-switch.is-prd {
+    border-color: #dc2626;
+    background: rgba(220, 38, 38, .10);
+    color: #dc2626;
+}
+.env-switch.is-prd .env-dot { background: #dc2626; }
 </style>

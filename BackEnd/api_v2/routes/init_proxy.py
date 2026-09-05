@@ -1,5 +1,6 @@
 from flask import Blueprint, request, current_app
 from ..utils.token_generator import generate_upstream_token
+from ..utils.upstream_env import env_from_request, upstream_base, describe
 from ..utils.response_helpers import ok, err
 import jwt
 import httpx
@@ -21,9 +22,10 @@ def get_init_status():
             print(f"Warning: Failed to decode incoming token: {e}")
 
     # Generate FRESH Upstream Token
-    upstream_token = generate_upstream_token(user_email)
-    
-    base_url = current_app.config.get('TRAITTY_API_BASE')
+    env = env_from_request()
+    upstream_token = generate_upstream_token(user_email, env)
+
+    base_url = upstream_base(env)
     url = f"{base_url}/v1/init/"
     
     headers = {

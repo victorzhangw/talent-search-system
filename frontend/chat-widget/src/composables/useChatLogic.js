@@ -85,6 +85,47 @@ export function useChatLogic(emit) {
     const userToken = ref(null)
     const autoLoginError = ref('')
 
+    // --- 上游環境切換（開發端用）---------------------------------------------
+    //
+    // 後端的 TRAITTY_API_BASE 是環境變數，widget 改不到；但重現使用者回報的狀況需要 PRD
+    // 的資料。所以前端只送一個**環境名字**，後端查表換成網址（見 utils/upstream_env.py），
+    // 名字放進登入時簽發的 JWT，後續 12 個呼叫點都不必改。
+    //
+    // 要不要顯示這個切換器由後端說了算（GET /auth/environments）：後端沒打開
+    // ALLOW_UPSTREAM_ENV_SWITCH 就回空清單，前端因此不必自己猜現在是不是開發環境。
+    const UPSTREAM_ENV_KEY = 'traitty_upstream_env'
+    const upstreamEnv = ref(localStorage.getItem(UPSTREAM_ENV_KEY) || 'default')
+    const upstreamEnvOptions = ref([])          // [{ env, base_url }]
+    const upstreamEnvEnabled = ref(false)
+    const upstreamBaseUrl = ref('')             // 目前實際連到的上游，顯示用
+    const isSwitchingEnv = ref(false)
+
+    /** 這個環境要用哪個帳號登入。不同環境是不同的使用者資料庫，帳號不能共用。 */
+    const emailForEnv = (env) => {
+        const cfg = window.TRAITTY_WIDGET_CONFIG || {}
+        return (cfg.envAccounts && cfg.envAccounts[env]) || cfg.userEmail || ''
+    }
+
+    const currentUserEmail = () => emailForEnv(upstreamEnv.value)
+
+    const fetchUpstreamEnvironments = async () => {
+        const { serverRoot } = getApiConfig()
+        try {
+            const res = await fetch(`${serverRoot}/auth/environments`)
+            if (!res.ok) return
+            const resp = await res.json()
+            const data = resp.success ? resp.data : null
+            if (!data) return
+            upstreamEnvEnabled.value = !!data.enabled
+            upstreamEnvOptions.value = data.environments || []
+            // 後端關掉切換之後，localStorage 裡殘留的選擇要跟著失效，否則會拿一個
+            // 後端根本不認的名字去登入。
+            if (!data.enabled) upstreamEnv.value = 'default'
+        } catch (e) {
+            console.warn('[EnvSwitch] Failed to read upstream environments:', e)
+        }
+    }
+
     // Quota and Init State
     const quotaSummary = ref({ total: 0, used: 0, remaining: 0 })
     const remainingDays = ref(null)
@@ -479,7 +520,7 @@ export function useChatLogic(emit) {
         historyIsLoading.value = true;
         try {
             const { serverRoot } = getApiConfig()
-            const userId = window.TRAITTY_WIDGET_CONFIG?.userEmail || 'anonymous'
+            const userId = currentUserEmail() || 'anonymous'
 
             const res = await fetch(`${serverRoot}/chat/history?user_id=${userId}&page=${page}`, {
                 headers: { 'Authorization': `Bearer ${userToken.value}` }
@@ -682,6 +723,10 @@ export function useChatLogic(emit) {
     // Login & Init
     const handleLoginSuccess = async (authData) => {
         userToken.value = authData.token
+        // 後端回報它實際連到哪裡。顯示這個而不是顯示前端選了什麼——選了 prd 但後端沒
+        // 設定 TRAITTY_API_BASE_PRD 時，它會退回 default，畫面必須說實話。
+        upstreamBaseUrl.value = authData.upstream?.base_url || ''
+        if (authData.upstream?.env) upstreamEnv.value = authData.upstream.env
         // Fetch Init Data to check quota and widget status
         await fetchInitData()
         // Fetch candidates after login
@@ -890,6 +935,46 @@ export function useChatLogic(emit) {
         })
     }
 
+    /** 切換上游環境：把上一個環境的東西全部丟掉，用新環境的帳號重新登入。
+     *
+     * 一定要整組清掉。候選人、特質報告、對話歷史、session id 全都是「某一個環境的」——
+     * UAT 的 candidate_id 620 跟 PRD 的 620 是不同的人，混在一起會把某人的特質報告
+     * 掛到另一個人身上，而畫面上完全看不出來。
+     */
+    const switchUpstreamEnv = async (env) => {
+        if (isSwitchingEnv.value || env === upstreamEnv.value) return
+        if (isTyping.value) {
+            messages.value.push({ role: 'ai', content: '請等待目前回覆完成後再切換環境。' })
+            return
+        }
+        isSwitchingEnv.value = true
+        try {
+            upstreamEnv.value = env
+            try { localStorage.setItem(UPSTREAM_ENV_KEY, env) } catch (e) { }
+
+            resetAndReselect()
+            candidates.value = []
+            candidateOffset.value = 0
+            hasMoreCandidates.value = true
+            historySessions.value = { today: [], past_30_days: [] }
+            userToken.value = null
+            autoLoginError.value = ''
+            upstreamBaseUrl.value = ''
+            quotaSummary.value = { total: 0, used: 0, remaining: 0 }
+            currentTab.value = 'login'
+
+            const email = currentUserEmail()
+            if (!email) {
+                autoLoginError.value = `尚未設定 ${env} 環境要用的帳號`
+                                     + `（window.TRAITTY_WIDGET_CONFIG.envAccounts.${env}）`
+                return
+            }
+            await performAutoLogin(email)
+        } finally {
+            isSwitchingEnv.value = false
+        }
+    }
+
     const resetAndReselect = () => {
         // Reset Chat
         messages.value = showWelcomeMessage.value ? [{ role: 'ai', content: '您好！我是Traitty，將為您提供特質分析與建議。' }] : []
@@ -1005,7 +1090,7 @@ export function useChatLogic(emit) {
                 const res = await fetch(`${serverRoot}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: email })
+                    body: JSON.stringify({ email: email, env: upstreamEnv.value })
                 })
 
                 if (res.ok) {
@@ -1094,7 +1179,7 @@ export function useChatLogic(emit) {
 
             // Obtain a fresh short-lived token before every LLM call
             let _chatToken = null
-            const _email = window.TRAITTY_WIDGET_CONFIG?.userEmail || ''
+            const _email = currentUserEmail()
             if (_email) {
                 try {
                     const _tokenRes = await fetch(`${serverRoot}/auth/login`, {
@@ -1138,7 +1223,7 @@ export function useChatLogic(emit) {
                     })),
                     trait_reports: traitReports,
                     session_id: currentSessionId.value,
-                    user_id: window.TRAITTY_WIDGET_CONFIG?.userEmail || 'anonymous',
+                    user_id: currentUserEmail() || 'anonymous',
                     mode: mode // Pass mode to backend
                 }),
                 signal: controller.signal
@@ -1321,8 +1406,9 @@ export function useChatLogic(emit) {
         }
 
         // Normal Flow: Auto Login if needed
-        if (!userToken.value && window.TRAITTY_WIDGET_CONFIG && window.TRAITTY_WIDGET_CONFIG.userEmail) {
-            await performAutoLogin(window.TRAITTY_WIDGET_CONFIG.userEmail)
+        await fetchUpstreamEnvironments()
+        if (!userToken.value && currentUserEmail()) {
+            await performAutoLogin(currentUserEmail())
         }
 
         isInitializing.value = false
@@ -1379,6 +1465,15 @@ export function useChatLogic(emit) {
         // Computed
         currentThemeLabel,
         activeConversationCandidatesObjects,
+
+        // 上游環境切換（開發端）
+        upstreamEnv,
+        upstreamEnvOptions,
+        upstreamEnvEnabled,
+        upstreamBaseUrl,
+        isSwitchingEnv,
+        switchUpstreamEnv,
+        currentUserEmail,
         computedServerRoot,
 
         // Methods

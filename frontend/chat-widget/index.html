@@ -138,7 +138,17 @@
   <!-- Widget Configuration for Local Dev -->
   <script>
     window.TRAITTY_WIDGET_CONFIG = {
-      userEmail: "eva.wepredict@gmail.com"
+      userEmail: "eva.wepredict@gmail.com",
+      // 每個上游環境各自的登入帳號。UAT 與 PRD 是不同的使用者資料庫，帳號不能共用。
+      // 切換器只在後端打開 ALLOW_UPSTREAM_ENV_SWITCH 時才會出現（見 utils/upstream_env.py），
+      // 所以這段設定在正式環境不會有任何作用。
+      //
+      // 這裡只放 email。本系統的登入是 email-only（POST /auth/login 不收密碼，改用
+      // PARTY_A_PLUGIN_SECRET 簽出上游 token），所以不需要、也不要把密碼寫進任何檔案。
+      envAccounts: {
+        default: "eva.wepredict@gmail.com",
+        prd: "a080697@gmail.com"
+      }
     };
   </script>
   <div id="app"></div>
