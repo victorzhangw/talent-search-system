@@ -108,6 +108,19 @@ export function useChatLogic(emit) {
     const selectedCandidateIds = ref([])
     // Active Conversation Logic State
     const activeConversationCandidateIds = ref([])
+    // 鎖定人物件的唯一來源。
+    //
+    // 這裡本來沒有東西：鎖定名單是拿 `candidates` 過濾出來的，而 `candidates` 是分頁清單
+    // （PAGE_LIMIT = 20，`fetchCandidates(false)` 整個取代）。所以只要鎖定的人不在當前
+    // 那一頁，晶片上的「選定 N 位人選」就會少掉他們——使用者回報的「6 位剩 2 位」就是
+    // 這個。三條還原路徑（重新整理／開新分頁／切換歷史對話）都只還原 ID，人物件從來沒有
+    // 被讀回來：`traitty_selected_candidates` 這個 key 寫了 4 次、刪了 2 次、讀 0 次，
+    // `openNewTab` 存進 localStorage 的 `selectedCandidates` 也一樣。
+    //
+    // 同一個 filter 還決定送給後端的 `candidates_info`，而 `chat.py` 的守門是
+    // `candidates_info ⊆ trait_reports` 單向檢查，截短永遠不會被擋——掉了姓名的人在
+    // payload 裡會變成 `Candidate-<id>`。
+    const activeCandidateObjects = ref([])
 
     const isLoadingCandidates = ref(false)
     const hasMoreCandidates = ref(true)
@@ -241,9 +254,35 @@ export function useChatLogic(emit) {
         }
     })
 
+    // 順序跟著 activeIds 走。分頁清單裡有的用那一份（資料較新），沒有的就用鎖定當下存
+    // 下來的物件——後者才是「人不在當前頁就消失」的解法。
     const activeConversationCandidatesObjects = computed(() => {
-        return candidates.value.filter(c => idIncludes(activeConversationCandidateIds.value, c.candidate_id))
+        const remembered = new Map(
+            activeCandidateObjects.value.map(c => [String(c.candidate_id), c]))
+        return activeConversationCandidateIds.value
+            .map(id => candidates.value.find(c => idEquals(c.candidate_id, id))
+                       || remembered.get(String(id)))
+            .filter(Boolean)
     })
+
+    /** 把這批人記成本輪的鎖定對象（取代，不是合併）。 */
+    const rememberActiveCandidates = (list) => {
+        activeCandidateObjects.value = (list || []).filter(c => c && c.candidate_id != null)
+    }
+
+    /** 從 sessionStorage / localStorage 還原鎖定人物件；壞掉就當作沒有，不讓它擋住還原。 */
+    const restoreActiveCandidateObjects = (list) => {
+        try {
+            const parsed = typeof list === 'string' ? JSON.parse(list) : list
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                rememberActiveCandidates(parsed)
+                return true
+            }
+        } catch (e) {
+            console.error('[ChatLogic] Failed to restore locked candidate objects:', e)
+        }
+        return false
+    }
 
     // --- API & Config Helpers ---
     const getApiConfig = () => {
@@ -278,7 +317,7 @@ export function useChatLogic(emit) {
         const state = {
             token: userToken.value,
             activeIds: activeConversationCandidateIds.value,
-            selectedCandidates: candidates.value.filter(c => idIncludes(activeConversationCandidateIds.value, c.candidate_id)),
+            selectedCandidates: activeConversationCandidatesObjects.value,
             messages: messages.value,
             sessionId: currentSessionId.value,
             theme: themeIndex.value
@@ -559,6 +598,8 @@ export function useChatLogic(emit) {
                 await trackTraitReportsFetch(fetchBatchTraitReports(restoredCandidates));
                 const restoredIds = restoredCandidates.map(c => c.candidate_id);
                 activeConversationCandidateIds.value = restoredIds;
+                // /candidates/by-ids 回來的是完整的一批人，不受分頁清單影響。
+                rememberActiveCandidates(restoredCandidates);
                 try {
                     sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(restoredIds));
                     sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(restoredCandidates));
@@ -674,6 +715,8 @@ export function useChatLogic(emit) {
 
                 if (state.activeIds && state.activeIds.length > 0) {
                     activeConversationCandidateIds.value = state.activeIds
+                    // 這份物件一直有被存進去，只是從來沒有被讀回來。
+                    restoreActiveCandidateObjects(state.selectedCandidates)
                     isSelectionLocked.value = true
                     selectedCandidateIds.value = [] // Keep UI clean
                 }
@@ -697,6 +740,9 @@ export function useChatLogic(emit) {
                 if (Array.isArray(ids) && ids.length > 0) {
                     console.log('[ChatContainer] Restoring session state for IDs:', ids)
                     activeConversationCandidateIds.value = ids
+                    // 同上：traitty_selected_candidates 寫了 4 次、讀 0 次。
+                    restoreActiveCandidateObjects(
+                        sessionStorage.getItem('traitty_selected_candidates'))
                     isSelectionLocked.value = true
                     selectedCandidateIds.value = []
 
@@ -814,6 +860,7 @@ export function useChatLogic(emit) {
 
         // Identify objects for report fetching
         const selectedCandidates = candidates.value.filter(c => idIncludes(ids, c.candidate_id))
+        rememberActiveCandidates(selectedCandidates)
 
         // Save to Session Storage for New Tab Restoration
         try {
@@ -863,19 +910,22 @@ export function useChatLogic(emit) {
         // Unlock Selection
         isSelectionLocked.value = false
         activeConversationCandidateIds.value = []
+        rememberActiveCandidates([])
         selectedCandidateIds.value = [] // Should be empty already
     }
 
     const removeCandidate = (candidateIdToRemove) => {
         activeConversationCandidateIds.value = activeConversationCandidateIds.value.filter(id => !idEquals(id, candidateIdToRemove))
+        rememberActiveCandidates(activeCandidateObjects.value.filter(
+            c => !idEquals(c.candidate_id, candidateIdToRemove)))
 
         if (activeConversationCandidateIds.value.length === 0) {
             resetAndReselect()
         } else {
             try {
                 sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(activeConversationCandidateIds.value))
-                const activeCands = candidates.value.filter(c => idIncludes(activeConversationCandidateIds.value, c.candidate_id))
-                sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(activeCands))
+                sessionStorage.setItem('traitty_selected_candidates',
+                    JSON.stringify(activeConversationCandidatesObjects.value))
 
                 // 同步清除被移除候選人的報告資料，避免 sendMessage 時
                 // trait_reports 中仍存在已移除候選人的報告，導致後端
@@ -923,12 +973,13 @@ export function useChatLogic(emit) {
 
         // 更新 state
         activeConversationCandidateIds.value = mergedIds
+        rememberActiveCandidates([...activeCandidateObjects.value, ...newCandidateObjects])
 
         // 更新 sessionStorage
         try {
             sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(mergedIds))
-            const allActiveCands = candidates.value.filter(c => idIncludes(mergedIds, c.candidate_id))
-            sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(allActiveCands))
+            sessionStorage.setItem('traitty_selected_candidates',
+                JSON.stringify(activeConversationCandidatesObjects.value))
         } catch (e) {
             console.error('[ChatLogic] Failed to update session storage on add:', e)
         }
@@ -1029,8 +1080,10 @@ export function useChatLogic(emit) {
 
             // Using activeConversationCandidateIds here!
             const activeIds = activeConversationCandidateIds.value
-            // Define activeCandidates for usage in body
-            const activeCandidates = candidates.value.filter(c => idIncludes(activeIds, c.candidate_id))
+            // Define activeCandidates for usage in body.
+            // 不能再拿分頁清單過濾：鎖定的人不在當前頁就會從 candidates_info 掉出去，
+            // 而後端的守門是 candidates_info ⊆ trait_reports 單向檢查，擋不到截短。
+            const activeCandidates = activeConversationCandidatesObjects.value
 
             // Determine mode
             // 1. Quick Questions -> Force 'expert'
@@ -1335,6 +1388,7 @@ export function useChatLogic(emit) {
         handleLoginSuccess,
         loadMoreCandidates,
         handleSelectionChange,
+        restoreSessionState,
         lockSelectionAndStart,
         resetAndReselect,
         removeCandidate,
