@@ -21,6 +21,27 @@ from ..database import db_session, TraitBand, TraitDefinition
 
 _NON_ALNUM_RE = re.compile(r'[^a-zA-Z0-9]')
 
+# 廠商送的英文名與規格正本用字不同的少數幾個。**必須逐個測驗分開列**。
+#
+# 不改規格正本（`docs/Traitty_RAG_SpeC_v6.1.xlsx`）——那是客戶擁有的文件，而
+# 2026-07-14 的調查已確認 DB 的 `name_en` 與該檔逐字相同，落差在廠商那一側。也不放寬
+# 比對規則：模糊比對會把「Self Competence」和「Self Confidence」這種真正不同的構念黏在
+# 一起。
+#
+# 為什麼要分測驗：第一版寫成不分測驗的一張表，結果 CIA 掉了一個特質——`CIA_12` 的
+# name_en 本來就是 `Materialism Avoidance`，那條無差別的別名把它改寫成 CSR 的用字，
+# 於是它在 CIA 底下找不到自己。同一個字串在兩份測驗裡分別是正本與異體。
+#
+# （順帶一提，CIA_12 用的是完整的 `Materialism Avoidance`，所以看起來是 CSR_23 那一筆
+# 才是漏字的那個。但正本歸客戶管，這裡只做對照，不代客戶改。）
+#
+# key 是 (測驗代號, 正規化後的廠商用字)，value 是正規化後的正本用字。
+VENDOR_NAME_ALIASES = {
+    # CSR_23。規格寫 Material Avoidance，廠商送 Materialism Avoidance。
+    # 每位 CSR 受測者固定因此丟掉一個特質；2026-09-04 一天 17 次。
+    ('CSR', 'materialismavoidance'): 'materialavoidance',
+}
+
 
 def normalize_en_name(value: str) -> str:
     """Vendor formatting varies ('Self-Discipline' vs 'Self Discipline'); compare on
@@ -28,6 +49,12 @@ def normalize_en_name(value: str) -> str:
     if not value:
         return value
     return _NON_ALNUM_RE.sub('', value).lower()
+
+
+def spec_name_key(value: str, project_abbrev: str) -> str:
+    """比對用的鍵：先正規化，再把該測驗已知的廠商用字換成規格正本的用字。"""
+    normalized = normalize_en_name(value)
+    return VENDOR_NAME_ALIASES.get((project_abbrev, normalized), normalized)
 
 
 class ResolvedTrait:
@@ -96,7 +123,7 @@ def resolve_traits(candidate: dict,
         normalized_name_en = func.lower(
             func.regexp_replace(TraitDefinition.name_en, r'[^a-zA-Z0-9]', '', 'g'))
         trait_def = db_session.query(TraitDefinition).filter(
-            normalized_name_en == normalize_en_name(display_name),
+            normalized_name_en == spec_name_key(display_name, project_abbrev),
             TraitDefinition.trait_id.like(f'{project_abbrev}_%')).first()
 
         if not trait_def:

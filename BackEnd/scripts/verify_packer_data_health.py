@@ -170,6 +170,25 @@ def main():
                              "WHERE trait_id = 'CIA_36'")
         check('CIA_36 情緒易激度 exists (Q5 and Q14 both scope it)', has36 == 1)
 
+        # -- 廠商送的名字要對得上規格正本的名字（修正計畫 Unit 6）------------------
+        # 對不上就整個特質被丟掉，而答案照樣寫得完整，讀的人看不出少了東西。
+        from api_v2.services.respondent_adapter import spec_name_key, normalize_en_name
+        typo = [r[0] for r in conn.execute(text(
+            "select trait_id from trait_definitions where name_en ~ '[0-9]$'"))]
+        check('沒有任何 name_en 以數字結尾（ANI_02 曾經是 Resilience1，'
+              '害每位 ANI 受測者的韌性都被丟掉）', not typo, typo)
+        by_key = {}
+        for tid, en in conn.execute(text('select trait_id, name_en from trait_definitions')):
+            by_key.setdefault((tid.split('_')[0], normalize_en_name(en)), []).append(tid)
+        for abbrev, vendor_name, expected in (
+                ('ANI', 'Resilience', 'ANI_02'),
+                ('CSR', 'Materialism Avoidance', 'CSR_23'),   # 廠商用字與正本不同，走別名
+                ('CSR', 'Material Avoidance', 'CSR_23'),      # 正本用字仍要能命中
+                # 同一個字串在 CIA 裡是正本用字。別名若不分測驗，CIA_12 會找不到自己。
+                ('CIA', 'Materialism Avoidance', 'CIA_12')):
+            hit = by_key.get((abbrev, spec_name_key(vendor_name, abbrev)), [])
+            check(f'{abbrev} 的 {vendor_name!r} 解析得到 {expected}', hit == [expected], hit)
+
     # -- [4] end to end ---------------------------------------------------------
     # Row counts can all look plausible and the payload still come out short, so the
     # last word is an assembled LOG. Uses a respondent carrying every CIA trait, which
