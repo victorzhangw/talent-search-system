@@ -483,7 +483,8 @@ def chat():
             if current_app.config.get('USE_LOG_PACKER') and trait_reports:
                 from ..services.packed_chat import try_packed_stream
                 packed = try_packed_stream(rag_service, module_id, query, mode,
-                                           trait_reports, candidates_info, session_id, req_id)
+                                           trait_reports, candidates_info, session_id,
+                                           req_id, candidate_ids=candidate_ids)
 
             try:
                 if packed is not None:

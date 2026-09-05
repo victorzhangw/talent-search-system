@@ -137,6 +137,43 @@ def dropped_audit(skips, respondents):
                        'by_respondent': by_id}
 
 
+def apply_roster(trait_reports, candidate_ids, candidates_info, session_id):
+    """本輪名單以 `candidate_ids` 為準；`trait_reports` 只是資料來源。
+
+    打包器原本直接拿 `trait_reports.keys()` 當名單，而那是前端整包 sessionStorage 快取，
+    不是這次請求選了誰。前端送來的 `candidate_ids` 才是本輪名單，而它一直沒有被用到。
+    少了這道過濾，前端任何一條清快取的路徑漏掉一次，被移除的人就繼續留在 payload 裡。
+
+    順帶記一件 `chat.py` 的守門看不到的事：那裡的檢查是 `candidates_info ⊆ trait_reports`，
+    單向，所以 `candidates_info` 被截短永遠不會被擋。而 `sendMessage` 的 `candidates_info`
+    是拿分頁清單（20 筆）過濾出來的，鎖定的人只要不在當前頁就會掉——掉了姓名就退化成
+    `Candidate-<id>`。全語料還沒出現過，但這裡是唯一能在伺服器端看到它的地方。
+
+    回傳 (要用的 reports, 稽核用的 roster 記錄)。
+    """
+    reports = trait_reports or {}
+    audit = {'source': 'trait_reports', 'requested': None, 'used': len(reports),
+             'dropped': []}
+    if candidate_ids:
+        wanted = {str(c) for c in candidate_ids}
+        kept = {k: v for k, v in reports.items() if str(k) in wanted}
+        dropped = sorted(str(k) for k in reports if str(k) not in wanted)
+        audit = {'source': 'candidate_ids', 'requested': len(wanted),
+                 'used': len(kept), 'dropped': dropped}
+        if dropped:
+            packer_logger.warning(
+                f"session={session_id} dropped {len(dropped)} stale trait report(s) not in "
+                f"this turn's candidate_ids: {dropped}")
+        reports = kept
+        if candidates_info is not None and len(candidates_info) < len(wanted):
+            audit['candidates_info_short_by'] = len(wanted) - len(candidates_info)
+            packer_logger.warning(
+                f"session={session_id} candidates_info carries {len(candidates_info)} of "
+                f"{len(wanted)} candidate_ids -- the frontend truncated the roster, so the "
+                f"missing respondents will be named Candidate-<id> in the payload")
+    return reports, audit
+
+
 class _Chunk:
     """Minimal stand-in for an OpenAI streaming chunk."""
 
@@ -147,13 +184,14 @@ class _Chunk:
 
 class PackedStream:
     def __init__(self, pipeline: LogPipeline, stream_fn, session_id, question, req_id=None,
-                 dropped=None):
+                 dropped=None, roster=None):
         self._pipeline = pipeline
         self._stream_fn = stream_fn
         self._session_id = session_id
         self._question = question
         self._req_id = req_id
         self._dropped = list(dropped or ())
+        self._roster = roster or {}
         self.finished = False
         self.audit: dict = {}
 
@@ -184,6 +222,9 @@ class PackedStream:
         if respondents:
             audit['respondents'] = respondents
         audit['dropped_traits'] = dropped
+        # 名單從哪裡來、丟掉了誰。讀 log 的人第一眼就要能分辨「模型漏寫」與
+        # 「這個人根本沒進 payload」。
+        audit['roster'] = self._roster
         audit['session_id'] = self._session_id
         # 這一輪的 prompt 記在 prompts.log、回覆記在 conversations.log、閘門結果記在這裡。
         # 三個檔以前只有 session_id 可對，而同一個 session 連續幾輪的 header 長得一模一樣，
@@ -204,8 +245,8 @@ class PackedStream:
 
 
 def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: str,
-                      trait_reports: dict, candidates_info, session_id, req_id=None
-                      ) -> Optional[PackedStream]:
+                      trait_reports: dict, candidates_info, session_id, req_id=None,
+                      candidate_ids=None) -> Optional[PackedStream]:
     """A PackedStream, or None to let the caller use the legacy path."""
     try:
         question = module_map.question_for(module_id) if module_id else None
@@ -221,7 +262,9 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
             packer_logger.warning(f"session={session_id} skipped trait: "
                                   f"reason={reason} | {ctx}")
 
-        respondents = from_trait_reports(trait_reports, candidates_info, on_skip=_skip)
+        reports, roster = apply_roster(trait_reports, candidate_ids, candidates_info,
+                                       session_id)
+        respondents = from_trait_reports(reports, candidates_info, on_skip=_skip)
         if not respondents:
             packer_logger.info(f"session={session_id} no resolvable respondents; legacy path")
             return None
@@ -242,4 +285,4 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
 
     log_payload(pipeline, session_id, module_id, question, req_id, dropped)
     return PackedStream(pipeline, rag_service.packer_stream, session_id, question, req_id,
-                        dropped=dropped)
+                        dropped=dropped, roster=roster)

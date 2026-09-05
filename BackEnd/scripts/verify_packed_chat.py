@@ -19,7 +19,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), enc
 
 from sqlalchemy import text  # noqa: E402
 from api_v2.database.connection import get_db_engine  # noqa: E402
-from api_v2.services.packed_chat import try_packed_stream, PackedStream  # noqa: E402
+from api_v2.services.packed_chat import (try_packed_stream, PackedStream,  # noqa: E402
+                                         apply_roster)
 from api_v2.services.respondent_adapter import from_trait_reports  # noqa: E402
 
 failures = []
@@ -230,6 +231,39 @@ def main():
           {k: r0[k] for k in ('traits_total', 'traits_dropped', 'traits_sent')})
     check('a clean request reports zero rather than omitting the block',
           _clean_dropped_total(rag, reports, basics) == 0)
+
+    print('\n[14] 本輪名單以 candidate_ids 為準（修正計畫 Unit 3）')
+    stale = {'C1': trait_report(traits), 'C2': trait_report(traits),
+             'C3': trait_report(traits)}
+    info3 = [{'candidate_id': c, 'name': f'人{c}'} for c in ('C1', 'C2', 'C3')]
+    kept, roster = apply_roster(stale, ['C1', 'C3'], info3, 'S14')
+    check('快取裡多出來的人被擋在 payload 之外', sorted(kept) == ['C1', 'C3'], sorted(kept))
+    check('稽核記下名單來源與被丟掉的是誰',
+          roster['source'] == 'candidate_ids' and roster['dropped'] == ['C2'], roster)
+    kept, roster = apply_roster(stale, None, info3, 'S14')
+    check('沒有 candidate_ids 時行為不變（一般對話不受影響）',
+          len(kept) == 3 and roster['source'] == 'trait_reports', roster)
+    kept, _ = apply_roster(stale, [], info3, 'S14')
+    check('空清單同樣視為未指定', len(kept) == 3, sorted(kept))
+    kept, _ = apply_roster({1: 'a', 2: 'b'}, ['1', 2], None, 'S14')
+    check('int 與 str 混用的 id 比得起來', sorted(map(str, kept)) == ['1', '2'], sorted(kept))
+    kept, roster = apply_roster(stale, ['C1', 'C9'], info3, 'S14')
+    check('candidate_ids 有而 trait_reports 沒有的人不會炸',
+          sorted(kept) == ['C1'] and roster['used'] == 1, roster)
+    _, roster = apply_roster(stale, ['C1', 'C2', 'C3'],
+                             [{'candidate_id': 'C1', 'name': '人C1'}], 'S14')
+    check('candidates_info 被前端截短時留下伺服器端信號',
+          roster.get('candidates_info_short_by') == 2, roster)
+
+    print('\n[15] 名單過濾接上 try_packed_stream')
+    rag15 = FakeRag('內容。以行為事例佐證。\n\n')
+    packed15 = try_packed_stream(rag15, None, '排序', 'auto', stale, info3, 'S15',
+                                 candidate_ids=['C1', 'C3'])
+    list(packed15)
+    audit15 = packed15.finish()
+    check('payload 只有 2 位，稽核說得出是誰被丟掉',
+          len(audit15['respondents']) == 2 and audit15['roster']['dropped'] == ['C2'],
+          audit15['roster'])
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
