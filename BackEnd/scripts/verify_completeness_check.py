@@ -171,6 +171,72 @@ def main():
     check('single-person answers are not name-checked',
           not check_answer(body, r1, q5, CALIB).missing_respondents)
 
+    print('\n[5b] 自由提問也做受測者覆蓋率檢查（修正計畫 Unit 2）')
+    res = check_answer('## 王智弘\n\n內容。', two, None, CALIB)
+    check('多人自由提問漏掉一位 -> failed 並指出是誰',
+          res.status == 'failed' and res.missing_respondents == ['林孟德'],
+          res.missing_respondents)
+    check('appendable_reason() 說得出缺的是人不是段落',
+          '缺少獨立段落的受測者' in res.appendable_reason(), res.appendable_reason())
+    res = check_answer('## 王智弘\n\n內容。\n\n## 林孟德\n\n內容。', two, None, CALIB)
+    check('每個人都有標題 -> 不再判缺人', res.missing_respondents == [],
+          res.missing_respondents)
+    check('單人自由提問仍不做姓名檢查',
+          not check_answer('內容。', r1, None, CALIB).missing_respondents)
+    # 自由提問沒有指定輸出結構，一份不用標題的排序清單、一張表格都是好答案。全語料 29 筆
+    # 多人回覆裡有 9 筆是這種形狀，拿標題當判準會全部判成缺人。
+    check('自由提問：寫在內文也算寫到（不要求標題）',
+          not check_answer('排序為王智弘、林孟德。', two, None, CALIB).missing_respondents)
+    check('題庫題維持嚴格：內文提到不算有自己的段落',
+          '林孟德' in check_answer(sections_answer(q5, expected_sections_for(q5, 2)[0])
+                                 + '\n\n關於林孟德的部分寫在內文',
+                                 two, q5, CALIB).missing_respondents)
+
+    print('\n[5d] 廠商姓名格式：payload 帶空白與單位，模型寫乾淨的名字')
+    vendor = [Respondent('柳 宇賸-人資發展課', 'R1', {'CIA_05': 'B'}),
+              Respondent('呂 佳珍教育訓練課', 'R2', {'CIA_05': 'B'}),
+              Respondent('Howard Hsu', 'R3', {'CIA_05': 'B'})]
+    res = check_answer('*   **柳宇賸**：內容。\n*   **呂佳珍**：內容。\n*   **Howard**：內容。',
+                       vendor, None, CALIB)
+    check('c5e0ef45 的形狀不再被誤判成漏人', res.missing_respondents == [],
+          res.missing_respondents)
+    res = check_answer('*   **柳宇賸**：內容。\n*   **Howard Hsu**：內容。',
+                       vendor, None, CALIB)
+    check('真的沒寫到的那位仍然抓得出來', res.missing_respondents == ['呂 佳珍教育訓練課'],
+          res.missing_respondents)
+
+    print('\n[5c] 提問者本人不需要自己的段落')
+    vic = [Respondent('Victoria', 'R1', {'CIA_05': 'B'}),
+           Respondent('梁婉婷', 'R2', {'CIA_05': 'B'})]
+    res = check_answer('## 梁婉婷\n\n內容。', vic, None, CALIB,
+                       user_query='我是 Victoria，帶領一個 8 人的電話客服團隊。')
+    check('「我是 Victoria」-> Victoria 不列入缺人', res.missing_respondents == [],
+          res.missing_respondents)
+    # 6920b8fb 的真實提問：自稱與姓名之間隔著一段頭銜，姓名在 payload 裡還帶空白。
+    zheng = [Respondent('鄭 皓仁', 'R1', {'CIA_05': 'B'}),
+             Respondent('游 雅鳳-FDA', 'R2', {'CIA_05': 'B'})]
+    res = check_answer('## 游 雅鳳-FDA\n\n內容。', zheng, None, CALIB,
+                       user_query='我是連鎖餐飲門市的責任主管 鄭皓仁，目前同時帶三位新人。')
+    check('自稱與姓名間隔著頭銜、姓名帶空白，仍能豁免',
+          res.missing_respondents == [], res.missing_respondents)
+    res = check_answer('## 游 雅鳳-FDA\n\n內容。', zheng, None, CALIB,
+                       user_query='再一次排序')
+    check('沒有自稱就照常判缺人', res.missing_respondents == ['鄭 皓仁'],
+          res.missing_respondents)
+    res = check_answer('## 游 雅鳳-FDA\n\n內容。', zheng, None, CALIB,
+                       user_query='我是主管。請分析鄭皓仁。')
+    check('自稱跨句不算（逗號句號後的姓名不豁免）',
+          res.missing_respondents == ['鄭 皓仁'], res.missing_respondents)
+    # 使用者只在第一輪自我介紹，之後直接問「我照前面的建議…」。只看本輪的話，
+    # a6718cb3 與 6920b8fb 的後續輪次會把提問者本人判成漏掉的分析對象。
+    res = check_answer('## 游 雅鳳-FDA\n\n內容。', zheng, None, CALIB,
+                       user_query='我照前面的建議調整了做法，接下來該怎麼做？',
+                       history=[{'role': 'user',
+                                 'content': '我是連鎖餐飲門市的責任主管 鄭皓仁。'},
+                                {'role': 'assistant', 'content': '好的。'}])
+    check('自稱在前幾輪說過，後續輪次仍然豁免', res.missing_respondents == [],
+          res.missing_respondents)
+
     print('\n[6] Free-form: length only')
     res = check_answer('短短的回答。', r1, None, CALIB)
     check('short free-form answer passes', res.status == 'passed', res.char_count)

@@ -1,9 +1,11 @@
 """Output completeness checks on the answer (事項 10 / 13, b §8).
 
     題庫題    every expected section heading is present (subset test -- extra headings
-              are fine); for a multi-person answer, each respondent also needs their own
-              heading. Length is not checked.
+              are fine). Length is not checked.
     自由提問  answer stays within 1,000 characters.
+    共同      a multi-person answer needs a heading per respondent, minus anyone the
+              current question introduces in the first person (see
+              `self_introduced_names`).
     共同      if a respondent scores A on 社會期望反應, the answer has to carry evidence
               wording (佐證 / 行為事例 / 工作樣本 / 不以單次).
 
@@ -65,6 +67,21 @@ _MARKED_HEADING_RE = re.compile(
     r'第\s*[0-9一二三四五六七八九十]+\s*(?:部分|節|章|段)|'
     r'(?:[0-9]+|[一二三四五六七八九十]+)\s*[、,，.．)）:：])')
 
+# 提問者本人不需要一個「介紹自己」的段落。a6718cb3 的提問是「我是 Victoria，帶領一個 8 人的
+# 電話客服團隊」、6920b8fb 的是「我是連鎖餐飲門市的責任主管 鄭皓仁」——兩人的特質都在
+# payload 裡（模型要據此給建議），但回答是寫「給」他們看的，沒有他們自己的段落是對的。
+#
+# 這一條是有實據的：調查中一度把這兩位算成「被漏掉的分析對象」，得出「有歷史就有 32% 機率
+# 漏人」的結論，剔除後真正漏人只有 2 筆。沒有這個豁免，覆蓋率檢查會把同一個誤判做成一次
+# 補生成，在回答尾巴補一段沒人要的自我分析。
+#
+# 自稱與姓名之間允許一段頭銜（「責任主管 鄭皓仁」），但不跨句：越過逗號句號就不算自稱。
+_SELF_INTRO_MARKERS = ('我是', '我叫', '本人')
+_SELF_INTRO_GAP = r'[^，。！？!?,;；\n]{0,20}'
+
+_CJK_RE = re.compile(r'^[一-鿿]+$')
+_ORG_SUFFIX_RE = re.compile(r'[-－]')
+
 
 def is_marked_heading(line: str) -> bool:
     return bool(_MARKED_HEADING_RE.match(line))
@@ -112,6 +129,63 @@ def heading_candidates(line: str) -> List[str]:
         if label and label != norm:
             candidates.append(label)
     return candidates
+
+
+def name_forms(name: str) -> List[str]:
+    """模型可能拿來當段落標題的每一種姓名寫法。
+
+    廠商送來的姓名帶著格式雜訊——姓與名之間一個空白，後面直接黏上單位：
+    `柳 宇賸-人資發展課`、`呂 佳珍教育訓練課`、`游 璧碩`。模型寫標題時一律用乾淨的
+    `柳宇賸`／`呂佳珍`／`游璧碩`，所以原本的 `r.name in heading` 一次都不會命中。
+    req c5e0ef45 的回覆八個人全部寫到了，用原本的比法卻會判成漏了七個——啟用自由提問的
+    覆蓋率檢查以前必須先修掉，否則補生成會在完整的回答後面再補一次。
+
+    寧可多給幾種寫法：判成「有寫到」的代價是漏掉一次真正的遺漏，判成「沒寫到」的代價是
+    在一篇完整的回答尾巴硬接一段補充。後者對讀者的傷害大得多。
+    """
+    raw = (name or '').strip()
+    if not raw:
+        return []
+    forms = {raw}
+    head = _ORG_SUFFIX_RE.split(raw)[0].strip()      # 去掉 `-單位` 後綴
+    forms.add(head)
+    forms |= {_WHITESPACE_RE.sub('', f) for f in tuple(forms)}
+
+    parts = head.split()
+    if len(parts) >= 2:
+        first, rest = parts[0], ''.join(parts[1:])
+        if _CJK_RE.match(first):
+            # 「姓 名」中間那個空白是可靠的分界；單位是直接黏在名後面的，所以取名的前
+            # 一到兩個字就能還原出 `呂 佳珍教育訓練課` -> `呂佳珍`。
+            for n in (2, 1):
+                if len(rest) >= n:
+                    forms.add(first + rest[:n])
+        elif len(first) >= 3:
+            # 西文姓名，模型常只寫 first name（「Howard 的適配優勢」）。兩個字母的
+            # 縮寫（GT）太短，不收。
+            forms.add(first)
+    return sorted({f for f in forms if len(f) >= 2}, key=len, reverse=True)
+
+
+def self_introduced_names(user_query: Optional[str], respondents) -> List[str]:
+    """受測者中，本輪提問裡以第一人稱自稱的那些人——他們不需要自己的段落。
+
+    姓名與提問的空白都先去掉再比對：payload 存的是「鄭 皓仁」，提問打的是「鄭皓仁」。
+    """
+    if not user_query:
+        return []
+    flat = _WHITESPACE_RE.sub('', user_query)
+    out = []
+    for r in respondents:
+        # 使用者打的是乾淨的姓名，payload 存的是帶空白與單位的版本，所以比對走同一組
+        # 寫法（`name_forms`）；最長的先試，愈短的愈容易誤中。
+        for form in name_forms(r.name or ''):
+            form = _WHITESPACE_RE.sub('', form)
+            if re.search(f'(?:{"|".join(_SELF_INTRO_MARKERS)}){_SELF_INTRO_GAP}'
+                         f'{re.escape(form)}', flat):
+                out.append(r.name)
+                break
+    return out
 
 
 def expected_sections_for(question: Optional[dict], respondent_count: int):
@@ -198,10 +272,21 @@ class CompletenessResult:
 
 class CompletenessChecker:
     def __init__(self, respondents, question: Optional[dict],
-                 calibration_traits: Optional[set] = None):
+                 calibration_traits: Optional[set] = None,
+                 user_query: Optional[str] = None,
+                 history: Optional[List[dict]] = None):
         self.respondents = respondents
         self.question = question
         self.calibration_traits = calibration_traits or set()
+        # 自稱要連前幾輪一起看。使用者只在第一輪說一次「我是 Victoria」，後續輪次就直接
+        # 問「我照前面的建議…現在有新的情況」——只看本輪的話，a6718cb3 與 6920b8fb 的
+        # 後續輪次會把提問者本人判成漏掉的分析對象。
+        # 只有自由提問拿得到 user_query（題庫題的「提問」是模組指令），所以豁免名單在
+        # 題庫題永遠是空的，那條路徑的行為不變。
+        prior = '\n'.join(m.get('content') or '' for m in (history or [])
+                          if m.get('role') == 'user')
+        self.self_introduced = set(self_introduced_names(
+            '\n'.join(t for t in (user_query, prior) if t), respondents))
         self.expected, self._fallback_note = expected_sections_for(question, len(respondents))
         self._headings: List[str] = []          # every line, for exact section matching
         self._marked_headings: List[str] = []   # explicitly marked lines only, for names
@@ -254,10 +339,29 @@ class CompletenessChecker:
                 result.status = 'failed'
                 result.sections_check = 'failed'
 
-        if self.question is not None and len(self.respondents) > 1:
+        # 自由提問也要查。以前這裡有 `self.question is not None`，於是 34 筆自由提問的
+        # `missing_respondents` 全都是 []——不是「檢查過都在」，是從未檢查，補生成一次都沒
+        # 觸發過。而漏人正好只發生在自由提問：43c1f019 名單 7 加到 8，漏掉的正是新增那位；
+        # 4920eef8 名單 1 加到 8，回答宣稱其餘七位沒有資料。
+        if len(self.respondents) > 1:
+            # 題庫題的段落結構是題目指定的，所以「有沒有自己的標題」問得出來。自由提問沒有
+            # 指定結構——使用者問「誰最適合，給我排序」，一份不用標題的排序清單、一張表格
+            # 都是好答案。拿標題當判準，全語料 29 筆多人回覆會判出 12 筆缺人，其中 9 筆的
+            # 人名其實都在（e1cd17fe 用表格、e4989baf 依主題而非依人分段），補生成會在完整
+            # 的回答後面硬接一段。自由提問因此只問「有沒有寫到這個人」。
+            #
+            # 代價寫在這裡，不要之後再重新發現一次：這樣就抓不到 4920eef8 那種「七個人的
+            # 名字都列了，但列在『這些人沒有資料』的句子裡」。那是模型謊報資料缺席，屬於
+            # 另一種檢查；4920eef8 的根因（歷史蓋過名單）由 Unit 1 的名單宣告處理。
+            if self.question is not None:
+                haystack = [_WHITESPACE_RE.sub('', h) for h in self._marked_headings]
+            else:
+                haystack = [_WHITESPACE_RE.sub('', answer)]
             result.missing_respondents = [
                 r.name for r in self.respondents
-                if not any(r.name in h for h in self._marked_headings)]
+                if r.name not in self.self_introduced
+                and not any(_WHITESPACE_RE.sub('', form) in h
+                            for form in name_forms(r.name) for h in haystack)]
             if result.missing_respondents:
                 result.status = 'failed'
 
@@ -271,8 +375,11 @@ class CompletenessChecker:
 
 
 def check_answer(answer: str, respondents, question: Optional[dict],
-                 calibration_traits: Optional[set] = None) -> CompletenessResult:
+                 calibration_traits: Optional[set] = None,
+                 user_query: Optional[str] = None,
+                 history: Optional[List[dict]] = None) -> CompletenessResult:
     """Non-streaming convenience wrapper."""
-    checker = CompletenessChecker(respondents, question, calibration_traits)
+    checker = CompletenessChecker(respondents, question, calibration_traits,
+                                  user_query, history)
     checker.observe(answer)
     return checker.finalize()

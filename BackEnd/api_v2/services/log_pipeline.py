@@ -187,7 +187,8 @@ class LogPipeline:
         # 那裡切回來只能靠位置推算，而位置正是 rewrite/completion 追加訊息時會變的東西。
         self.history = list(history or [])
         self.messages = self.log.to_messages(history)
-        self.checker = CompletenessChecker(respondents, question, table.calibration_traits)
+        self.checker = CompletenessChecker(respondents, question, table.calibration_traits,
+                                           user_query=user_query, history=self.history)
         self.followup_fn = followup_fn
         self.gate = SegmentGate(ExitScanner.for_log(self.log), checker=self.checker,
                                 rewriter=self._rewrite, completer=self._complete,
