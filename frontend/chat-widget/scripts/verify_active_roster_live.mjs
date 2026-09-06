@@ -93,7 +93,15 @@ console.log(`鎖定 6 位（第 1 頁 ${fromP1.length} 位、第 2 頁 ${fromP2.
 // 靠這裡塞。仍然設 userToken.value 是因為畫面流程用它判斷「登入了沒有」。
 // 附帶一提：以前沒設的話送出去的是 `Bearer null`，後端會靜默退回一個寫死的 email 並回
 // HTTP 200＋空資料，測試會看起來「通過但沒資料」——那條退路已經改成 401（E-7）。
-const attach = (logic) => { logic.userToken.value = token; return logic }
+// upstreamEnv 一定要跟著設：composable 每次呼叫前會自己 /auth/login，而它送出去的 env
+// 就是 upstreamEnv.value。不設的話它會拿 default（UAT）去登入，然後用 UAT 的身分去查
+// PRD 的 candidate_id——症狀是「報告拿得到但 traits 全是 0」「by-ids 回 0 位」。
+// 真實的 widget 是由 handleLoginSuccess 從登入回應把它設起來的。
+const attach = (logic) => {
+    logic.userToken.value = token
+    logic.upstreamEnv.value = auth.upstream?.env || ENV
+    return logic
+}
 const fresh = () => { sessionStorage.clear(); localStorage.clear(); return attach(useChatLogic()) }
 
 // --- S3 跨頁鎖定 + 重新整理 ------------------------------------------------
