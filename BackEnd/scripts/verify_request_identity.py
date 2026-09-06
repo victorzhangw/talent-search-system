@@ -32,6 +32,7 @@ from api_v2.routes import init_proxy as init_route     # noqa: E402
 from api_v2.routes import reports as reports_route     # noqa: E402
 from api_v2.routes import chat as chat_route           # noqa: E402
 from api_v2.services.rag_engine import RAGService      # noqa: E402
+from api_v2.utils.upstream_env import ENV_CLAIM        # noqa: E402
 
 failures = []
 
@@ -51,6 +52,16 @@ BAD_TOKENS = [
     ('不是 JWT', 'not-a-jwt'),
     ('JWT 但沒有 email 欄位', None),  # 下面填
 ]
+
+
+class _FakeService:
+    """上游的替身：回空清單，讓路由跑完但不打網路。"""
+
+    def get_candidates(self, *a, **k):
+        return {'data': [], 'page': {'total': 0}}
+
+    def get_assessments(self, *a, **k):
+        return []
 
 
 def check(label, condition, detail=''):
@@ -117,15 +128,8 @@ def main():
     print('\n[3] 合法 token 通得過這一關（不能把正常使用者一起擋掉）')
     good_token = sign({'email': 'someone@example.com', 'user_id': 1, 'aud': 'traitty'})
 
-    # 上游全部換成 stub：這一節要問的是「身分這一關有沒有把人放過去」，
-    # 不是上游整合。回空清單就夠——後面的路由邏輯本來就有各自的測試。
-    class _FakeService:
-        def get_candidates(self, *a, **k):
-            return {'data': [], 'page': {'total': 0}}
-
-        def get_assessments(self, *a, **k):
-            return []
-
+    # 上游全部換成 stub（`_FakeService`，模組層級）：這一節要問的是「身分這一關有沒有
+    # 把人放過去」，不是上游整合。回空清單就夠——路由邏輯本來就有各自的測試。
     class _Resp:
         status_code = 200
 
@@ -212,6 +216,54 @@ def main():
         raised = type(e).__name__ + ': ' + str(e)
     check('少了 user_email 就 raise ValueError（不是靜默用預設值）',
           isinstance(raised, str) and 'user_email' in raised, raised)
+
+    print()
+    print('[7] 簽上游 token 的鑰匙跟著環境走（E-10）')
+    # 網址早就跟著 env 走了（integration_real.base_url），但 candidates / reports 以前
+    # 是 generate_upstream_token(user_email) 沒帶 env——鑰匙固定是預設那把。今天沒事只是
+    # 因為 PRD 剛好接受同一把（C-1）；哪天不是，症狀會是「init 正常、清單與報告 401」。
+    app.config['ALLOW_UPSTREAM_ENV_SWITCH'] = True
+    app.config['PARTY_A_PLUGIN_SECRET_PRD'] = 'prd-only-secret'
+    app.config['TRAITTY_API_BASE_PRD'] = 'https://prd.example.test'
+
+    prd_token = sign({'email': 'someone@example.com', 'aud': 'traitty',
+                      ENV_CLAIM: 'prd', 'exp': 4102444800})
+
+    for module, label in ((cand_route, 'candidates'), (reports_route, 'reports')):
+        recorded = {}
+        real = module.generate_upstream_token
+
+        def spy(email, env=None, _real=real, _rec=recorded):
+            _rec['env'] = env
+            _rec['token'] = _real(email, env)
+            return _rec['token']
+
+        module.generate_upstream_token = spy
+        saved_service = module.get_service
+        module.get_service = lambda: _FakeService()
+        try:
+            path = ('/api/v2/candidates/?limit=1' if label == 'candidates'
+                    else '/api/v2/reports/batch')
+            if label == 'candidates':
+                app.test_client().get(path, headers={'Authorization': 'Bearer ' + prd_token})
+            else:
+                app.test_client().post(path, json={'assessment_ids': [1]},
+                                       headers={'Authorization': 'Bearer ' + prd_token})
+        finally:
+            module.generate_upstream_token = real
+            module.get_service = saved_service
+
+        check(f'{label}: 帶著 env=prd 去簽', recorded.get('env') == 'prd', recorded.get('env'))
+        verified = None
+        try:
+            pyjwt.decode(recorded.get('token', ''), 'prd-only-secret',
+                         algorithms=['HS256'], audience='traitty')
+            verified = True
+        except Exception as e:
+            verified = f'{type(e).__name__}: {e}'
+        check(f'{label}: 簽出來的 token 用 PRD 的 secret 驗得過', verified is True, verified)
+
+    app.config['ALLOW_UPSTREAM_ENV_SWITCH'] = False
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0

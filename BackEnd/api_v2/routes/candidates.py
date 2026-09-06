@@ -6,6 +6,7 @@ from ..services.integration_real import RealIntegrationService
 from ..utils.token_generator import generate_upstream_token
 from ..utils.response_helpers import ok, err
 from ..utils.request_identity import user_email_from_request, unauthorized
+from ..utils.upstream_env import env_from_request
 
 # No url_prefix, handled in app.py
 bp = Blueprint('candidates', __name__)
@@ -30,7 +31,7 @@ def list_candidates():
     if not user_email:
         return unauthorized()
 
-    upstream_token = generate_upstream_token(user_email)
+    upstream_token = generate_upstream_token(user_email, env_from_request())
 
     service = get_service()
     
@@ -81,7 +82,7 @@ def list_candidates_by_ids():
     if not user_email:
         return unauthorized()
 
-    upstream_token = generate_upstream_token(user_email)
+    upstream_token = generate_upstream_token(user_email, env_from_request())
     service = get_service()
 
     # No get-by-id upstream call is exercised in production yet, so reuse the same
@@ -117,7 +118,7 @@ def get_candidate_report(candidate_id):
     if not user_email:
         return unauthorized()
 
-    upstream_token = generate_upstream_token(user_email)
+    upstream_token = generate_upstream_token(user_email, env_from_request())
     service = get_service()
 
     # 2. Find Assessment ID for this Candidate

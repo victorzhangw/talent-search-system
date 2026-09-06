@@ -6,6 +6,7 @@ from ..services.integration_real import RealIntegrationService
 from ..utils.token_generator import generate_upstream_token
 from ..utils.response_helpers import ok, err
 from ..utils.request_identity import user_email_from_request, unauthorized
+from ..utils.upstream_env import env_from_request
 
 # No url_prefix, handled in app.py
 bp = Blueprint('reports', __name__, url_prefix='/reports')
@@ -43,7 +44,7 @@ def get_batch_reports():
     if not user_email:
         return unauthorized()
 
-    upstream_token = generate_upstream_token(user_email)
+    upstream_token = generate_upstream_token(user_email, env_from_request())
     print(f"[Batch Reports] Generated upstream token: {upstream_token[:50]}...", flush=True)
     
     service = get_service()
