@@ -2,26 +2,19 @@ from flask import Blueprint, request, current_app
 from ..utils.token_generator import generate_upstream_token
 from ..utils.upstream_env import env_from_request, upstream_base, describe
 from ..utils.response_helpers import ok, err
-import jwt
+from ..utils.request_identity import user_email_from_request, unauthorized
 import httpx
 
 bp = Blueprint('init_proxy', __name__)
 
 @bp.route('/', methods=['GET'])
 def get_init_status():
-    user_email = "eva@wepredict.io" # Default fallback
-    auth_header = request.headers.get('Authorization')
-    
-    if auth_header and auth_header.startswith('Bearer '):
-        incoming_token = auth_header.split(" ")[1]
-        try:
-            # Decode without verification just to get email (for now)
-            decoded = jwt.decode(incoming_token, options={"verify_signature": False})
-            user_email = decoded.get('email', user_email)
-        except Exception as e:
-            print(f"Warning: Failed to decode incoming token: {e}")
+    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
+    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
+    user_email = user_email_from_request()
+    if not user_email:
+        return unauthorized()
 
-    # Generate FRESH Upstream Token
     env = env_from_request()
     upstream_token = generate_upstream_token(user_email, env)
 

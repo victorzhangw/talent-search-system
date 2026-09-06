@@ -5,7 +5,7 @@ from ..database import db_session, TraitDefinition
 from ..services.integration_real import RealIntegrationService
 from ..utils.token_generator import generate_upstream_token
 from ..utils.response_helpers import ok, err
-import jwt
+from ..utils.request_identity import user_email_from_request, unauthorized
 
 # No url_prefix, handled in app.py
 bp = Blueprint('candidates', __name__)
@@ -24,21 +24,12 @@ def list_candidates():
     # 1. Extract Frontend Identity (Email)
     # Note: In a production app, we would verify the signature of the incoming Session Token.
     # Here we assume the frontend sends a valid JWT and we just extract the email to impersonate/forward.
-    user_email = "eva@wepredict.io" # Default fallback
-    auth_header = request.headers.get('Authorization')
-    
-    if auth_header and auth_header.startswith('Bearer '):
-        incoming_token = auth_header.split(" ")[1]
-        try:
-            # Decode without verification just to get email (for now)
-            # OR if we share the secret, we can verify.
-            # Assuming same secret key as Auth Route.
-            decoded = jwt.decode(incoming_token, options={"verify_signature": False})
-            user_email = decoded.get('email', user_email)
-        except Exception as e:
-            print(f"Warning: Failed to decode incoming token: {e}")
+    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
+    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
+    user_email = user_email_from_request()
+    if not user_email:
+        return unauthorized()
 
-    # 2. Key Step: Generate FRESH Upstream Token
     upstream_token = generate_upstream_token(user_email)
 
     service = get_service()
@@ -84,15 +75,11 @@ def list_candidates_by_ids():
     if not requested_ids:
         return err('MISSING_FIELD', 'ids parameter is required', 400, field='ids')
 
-    user_email = "eva@wepredict.io"
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        incoming_token = auth_header.split(" ")[1]
-        try:
-            decoded = jwt.decode(incoming_token, options={"verify_signature": False})
-            user_email = decoded.get('email', user_email)
-        except Exception:
-            pass
+    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
+    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
+    user_email = user_email_from_request()
+    if not user_email:
+        return unauthorized()
 
     upstream_token = generate_upstream_token(user_email)
     service = get_service()
@@ -124,15 +111,12 @@ def list_candidates_by_ids():
 @bp.route('/<candidate_id>/report', methods=['GET'])
 def get_candidate_report(candidate_id):
     # 1. Auth & Token
-    user_email = "eva@wepredict.io"
-    auth_header = request.headers.get('Authorization')
-    if auth_header and auth_header.startswith('Bearer '):
-        incoming_token = auth_header.split(" ")[1]
-        try:
-            decoded = jwt.decode(incoming_token, options={"verify_signature": False})
-            user_email = decoded.get('email', user_email)
-        except: pass
-    
+    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
+    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
+    user_email = user_email_from_request()
+    if not user_email:
+        return unauthorized()
+
     upstream_token = generate_upstream_token(user_email)
     service = get_service()
 

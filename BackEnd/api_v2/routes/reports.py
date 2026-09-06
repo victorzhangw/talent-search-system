@@ -5,7 +5,7 @@ from ..database import db_session, ChatSession, ChatMessage
 from ..services.integration_real import RealIntegrationService
 from ..utils.token_generator import generate_upstream_token
 from ..utils.response_helpers import ok, err
-import jwt
+from ..utils.request_identity import user_email_from_request, unauthorized
 
 # No url_prefix, handled in app.py
 bp = Blueprint('reports', __name__, url_prefix='/reports')
@@ -37,20 +37,12 @@ def get_batch_reports():
     print("[Batch Reports] ========== Request Received ==========", flush=True)
     
     # 1. Auth & Token
-    user_email = "eva@wepredict.io"
-    auth_header = request.headers.get('Authorization')
-    print(f"[Batch Reports] Authorization header: {auth_header[:50] if auth_header else 'None'}...", flush=True)
-    print(f"[Batch Reports] Authorization header: {auth_header[:50] if auth_header else 'None'}...", file=sys.stderr, flush=True)
-    
-    if auth_header and auth_header.startswith('Bearer '):
-        incoming_token = auth_header.split(" ")[1]
-        try:
-            decoded = jwt.decode(incoming_token, options={"verify_signature": False})
-            user_email = decoded.get('email', user_email)
-            print(f"[Batch Reports] Decoded email: {user_email}", flush=True)
-        except Exception as e:
-            print(f"[Batch Reports] Token decode error: {e}", flush=True)
-    
+    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
+    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
+    user_email = user_email_from_request()
+    if not user_email:
+        return unauthorized()
+
     upstream_token = generate_upstream_token(user_email)
     print(f"[Batch Reports] Generated upstream token: {upstream_token[:50]}...", flush=True)
     
