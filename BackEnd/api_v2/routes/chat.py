@@ -1,11 +1,11 @@
 from flask import Blueprint, request, Response, stream_with_context, current_app
 from ..utils.response_helpers import ok, err
+from ..utils.request_identity import resolve_user_email
 import json
 import threading
 import os
 import time
 import uuid
-import jwt as pyjwt
 from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
@@ -290,23 +290,13 @@ def chat():
         print(f">>> [DEBUG] Failed to parse JSON: {e}", flush=True)
         return err('INVALID_JSON', 'Invalid JSON in request body', 400)
 
-    # JWT validation — every /chat/ call requires a fresh short-lived token
-    _auth = request.headers.get('Authorization', '')
-    if not _auth.startswith('Bearer '):
-        return err('UNAUTHORIZED', '請先登入後再試', 401)
-    try:
-        _secret = os.getenv('PARTY_A_PLUGIN_SECRET', 'traitty_ai_api')
-        _claims = pyjwt.decode(_auth[7:], _secret, algorithms=['HS256'], audience='traitty')
-    except pyjwt.ExpiredSignatureError:
-        return err('TOKEN_EXPIRED', '登入已過期，請重新整理頁面', 401)
-    except pyjwt.InvalidTokenError:
-        return err('UNAUTHORIZED', '無效的認證 Token', 401)
-
-    # 這次是誰在問。RAG 打上游要用這個身分（企業名稱、候選人基本資料），
-    # 不能像以前那樣一律用寫死的帳號。沒有 email 的 token 進不來。
-    requester_email = _claims.get('email')
-    if not requester_email:
-        return err('UNAUTHORIZED', '無效的認證 Token', 401)
+    # JWT validation — every /chat/ call requires a fresh short-lived token。
+    # 驗證與其他路由共用同一段（utils/request_identity.py），避免兩邊的規則走鐘。
+    # `requester_email` 就是「這次是誰在問」，RAG 打上游要用這個身分（企業名稱、
+    # 候選人基本資料），不能像以前那樣一律用寫死的帳號。
+    requester_email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
 
     query = data.get('query')
     candidate_ids = data.get('candidate_ids', [])

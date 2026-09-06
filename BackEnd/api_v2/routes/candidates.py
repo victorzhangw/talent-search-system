@@ -5,7 +5,7 @@ from ..database import db_session, TraitDefinition
 from ..services.integration_real import RealIntegrationService
 from ..utils.token_generator import generate_upstream_token
 from ..utils.response_helpers import ok, err
-from ..utils.request_identity import user_email_from_request, unauthorized
+from ..utils.request_identity import resolve_user_email
 from ..utils.upstream_env import env_from_request
 
 # No url_prefix, handled in app.py
@@ -25,11 +25,11 @@ def list_candidates():
     # 1. Extract Frontend Identity (Email)
     # Note: In a production app, we would verify the signature of the incoming Session Token.
     # Here we assume the frontend sends a valid JWT and we just extract the email to impersonate/forward.
-    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
-    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
-    user_email = user_email_from_request()
-    if not user_email:
-        return unauthorized()
+    # 身分只認這次請求帶的 token，而且驗簽、驗期、驗 aud。解不出來就回 401，
+    # 不再退回任何預設帳號（0905 文件 E-7 / E-11）。
+    user_email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
 
     upstream_token = generate_upstream_token(user_email, env_from_request())
 
@@ -76,11 +76,11 @@ def list_candidates_by_ids():
     if not requested_ids:
         return err('MISSING_FIELD', 'ids parameter is required', 400, field='ids')
 
-    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
-    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
-    user_email = user_email_from_request()
-    if not user_email:
-        return unauthorized()
+    # 身分只認這次請求帶的 token，而且驗簽、驗期、驗 aud。解不出來就回 401，
+    # 不再退回任何預設帳號（0905 文件 E-7 / E-11）。
+    user_email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
 
     upstream_token = generate_upstream_token(user_email, env_from_request())
     service = get_service()
@@ -112,11 +112,11 @@ def list_candidates_by_ids():
 @bp.route('/<candidate_id>/report', methods=['GET'])
 def get_candidate_report(candidate_id):
     # 1. Auth & Token
-    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
-    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
-    user_email = user_email_from_request()
-    if not user_email:
-        return unauthorized()
+    # 身分只認這次請求帶的 token，而且驗簽、驗期、驗 aud。解不出來就回 401，
+    # 不再退回任何預設帳號（0905 文件 E-7 / E-11）。
+    user_email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
 
     upstream_token = generate_upstream_token(user_email, env_from_request())
     service = get_service()

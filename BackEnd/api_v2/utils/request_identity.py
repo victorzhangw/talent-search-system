@@ -1,7 +1,7 @@
-"""這次請求的使用者身分——從 Authorization 的 JWT 取 email。
+"""這次請求的使用者身分——驗證 Authorization 的 JWT 並取出 email。
 
 為什麼要有這個檔：`candidates.py`／`reports.py`／`init_proxy.py` 原本各自寫著同一段
-「解不開 token 就退回寫死的 eva@wepredict.io」。2026-09-05 對 PRD 實測時，
+「解不開 token 就退回寫死的帳號」。2026-09-05 對 PRD 實測時，
 `Authorization: Bearer null` 得到的是：
 
     POST /api/v2/reports/batch  -> HTTP 200 success:true，2 份報告，每份 traits=0
@@ -10,57 +10,78 @@
 
 前端因此判定成功、`traitReportsState` 變成 ready、`chat.py` 的守門因為 key 都在也放行，
 接著 `from_trait_reports` 因為 scores 是空的把每個人都丟掉，整個請求悄悄退回舊路徑。
-使用者看到的是「資料好像少了」而畫面上一切正常。現在一律回 401，不再有預設身分。
+使用者看到的是「資料好像少了」而畫面上一切正常。（0905 文件 E-7）
 
-**這裡不驗簽章、也不驗 exp**，維持本專案既有作法。`/auth/login` 簽出來的 token 只有
-2 分鐘，而 widget 登入時取一次就一路用到底（`useChatLogic.js` 的 `userToken.value`），
-驗 exp 會讓正常使用者在 2 分鐘後全部被擋。要收緊到「驗簽 + 驗期」得先讓前端會換 token，
-那是另一個單元。這一單元只拿掉「預設身分」這條退路。
+現在一律回 401，不再有預設身分；而且**驗簽章、驗效期、驗 aud**（E-11）——只解不驗的
+話，任何人偽造一張 `{"email": "別人"}` 都讀得到別人的資料。
 
-`/chat/` 不走這裡——它本來就驗簽、驗期、驗 aud（`chat.py`），不需要放寬。
+驗效期以前做不到，因為 `/auth/login` 的 token 只有 2 分鐘而 widget 登入時取一次就一路
+用到底，一驗就會把正常使用者在兩分鐘後全部擋掉。前端改成每次呼叫前先換一張新 token
+之後（`useChatLogic.js` 的 `authFetch`），這裡才收得緊。
+
+`env_from_request()`（`upstream_env.py`）仍然是不驗簽只取欄位——那是刻意的，它的安全性
+靠白名單與預設關閉的開關，不靠解碼；詳見該檔的說明。
 """
 
-from typing import Optional
+import os
+from typing import Optional, Tuple
 
 import jwt
 from flask import request
 
 from .response_helpers import err
 
+# 簽發端是 `routes/auth.py`，用同一把 secret、同一個 aud。
+AUDIENCE = 'traitty'
 
-def user_email_from_request() -> Optional[str]:
-    """回這次請求的使用者 email。
+# 允許的時鐘誤差。token 本身只有 2 分鐘，這個值只是讓前後端差幾秒不會誤擋。
+LEEWAY_SECONDS = 10
 
-    缺 header、不是 Bearer、JWT 解不開、或 payload 裡沒有 email —— 一律回 None，
-    由呼叫端回 401。不提供任何預設值。
+
+def _secret() -> str:
+    # 在呼叫當下讀，不在 import 當下讀——測試會在載入模組之後才設環境變數。
+    return os.getenv('PARTY_A_PLUGIN_SECRET', 'traitty_ai_api')
+
+
+def resolve_user_email() -> Tuple[Optional[str], object]:
+    """回 `(email, error_response)`。
+
+    解得出身分就是 `(email, None)`；否則 `(None, <flask 回應>)`，呼叫端直接 return 它。
+    沒有預設值，也沒有「解不開就算了」這條路。
     """
     auth_header = request.headers.get('Authorization') or ''
     if not auth_header.startswith('Bearer '):
-        _log('missing or malformed Authorization header')
-        return None
+        return None, _reject('missing or malformed Authorization header')
 
-    incoming_token = auth_header[7:].strip()
-    if not incoming_token or incoming_token.lower() in ('null', 'undefined'):
-        _log('empty token')
-        return None
+    token = auth_header[7:].strip()
+    if not token or token.lower() in ('null', 'undefined'):
+        return None, _reject('empty token')
 
     try:
-        decoded = jwt.decode(incoming_token, options={"verify_signature": False})
-    except Exception as e:
-        _log(f'failed to decode token: {e}')
-        return None
+        claims = jwt.decode(token, _secret(), algorithms=['HS256'],
+                            audience=AUDIENCE, leeway=LEEWAY_SECONDS)
+    except jwt.ExpiredSignatureError:
+        # 與 `/chat/` 用同一個碼：前端據此決定是「重新整理」還是「請重新登入」。
+        _log('token expired')
+        return None, err('TOKEN_EXPIRED', '登入已過期，請重新整理頁面', 401)
+    except jwt.InvalidTokenError as e:
+        return None, _reject(f'invalid token: {e}')
 
-    email = decoded.get('email')
+    email = claims.get('email')
     if not isinstance(email, str) or not email.strip():
-        _log('token carries no email claim')
-        return None
+        return None, _reject('token carries no email claim')
 
-    return email.strip()
+    return email.strip(), None
 
 
 def unauthorized():
     """身分解不出來時的統一回應。用字與 `chat.py` 的 401 一致。"""
     return err('UNAUTHORIZED', '請先登入後再試', 401)
+
+
+def _reject(reason: str):
+    _log(reason)
+    return unauthorized()
 
 
 def _log(reason: str) -> None:

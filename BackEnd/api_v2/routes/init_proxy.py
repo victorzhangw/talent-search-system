@@ -2,18 +2,18 @@ from flask import Blueprint, request, current_app
 from ..utils.token_generator import generate_upstream_token
 from ..utils.upstream_env import env_from_request, upstream_base, describe
 from ..utils.response_helpers import ok, err
-from ..utils.request_identity import user_email_from_request, unauthorized
+from ..utils.request_identity import resolve_user_email
 import httpx
 
 bp = Blueprint('init_proxy', __name__)
 
 @bp.route('/', methods=['GET'])
 def get_init_status():
-    # 身分只認這次請求帶的 token。解不開就回 401，不再退回任何預設帳號——
-    # 那條退路會讓無效 token 拿到 HTTP 200 與別的企業的資料（見 0905 文件 E-7）。
-    user_email = user_email_from_request()
-    if not user_email:
-        return unauthorized()
+    # 身分只認這次請求帶的 token，而且驗簽、驗期、驗 aud。解不出來就回 401，
+    # 不再退回任何預設帳號（0905 文件 E-7 / E-11）。
+    user_email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
 
     env = env_from_request()
     upstream_token = generate_upstream_token(user_email, env)

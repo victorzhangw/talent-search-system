@@ -8,6 +8,9 @@
 這支釘住的是「沒有預設身分」這件事。四種壞 token（沒 header／Bearer null／不是 JWT／
 沒有 email 欄位）對五個端點都必須是 401；合法 token 則必須通得過這一關。
 
+E-11 之後再加一層：簽章、效期、aud 都要驗（第 [8] 節）。偽造的簽章、過期的 token、
+別人家的 aud，一律進不來。
+
 用法：
     python scripts/verify_request_identity.py
 
@@ -17,6 +20,7 @@
 import json
 import os
 import sys
+import time
 
 sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -52,6 +56,25 @@ BAD_TOKENS = [
     ('不是 JWT', 'not-a-jwt'),
     ('JWT 但沒有 email 欄位', None),  # 下面填
 ]
+
+
+class _StubRag:
+    """/chat/ 的模型替身：只記下傳進來的身分，不呼叫模型。
+
+    路由的 before_request 會在 rag_service 是 None 時自己建一個真的 RAGService，
+    在 MOCK 模式下那會去讀不存在的 mock_data.json 而 500——所以凡是要打 /chat/ 的
+    段落都要先把它換掉。
+    """
+
+    seen = {}
+    model_name = 'stub'
+
+    def load_history(self, session_id):
+        return []
+
+    def generate_response(self, *args, **kwargs):
+        _StubRag.seen.update(kwargs)
+        return iter([]), 'stub'
 
 
 class _FakeService:
@@ -152,15 +175,15 @@ def main():
         cand_route.get_service, reports_route.get_service, init_route.httpx.get = saved
 
     print('\n[4] 解出來的 email 真的被拿去簽上游 token（不是被換成別人）')
+    from api_v2.utils.request_identity import resolve_user_email
     with app.test_request_context(headers={'Authorization': f'Bearer {good_token}'}):
-        from api_v2.utils.request_identity import user_email_from_request
-        check('user_email_from_request() 回 token 裡的 email',
-              user_email_from_request() == 'someone@example.com',
-              user_email_from_request())
+        email, error = resolve_user_email()
+        check('resolve_user_email() 回 token 裡的 email', email == 'someone@example.com', email)
+        check('合法 token 沒有 error', error is None, error)
     with app.test_request_context(headers={'Authorization': 'Bearer null'}):
-        from api_v2.utils.request_identity import user_email_from_request
-        check('壞 token 回 None（不是回預設值）',
-              user_email_from_request() is None, user_email_from_request())
+        email, error = resolve_user_email()
+        check('壞 token 回 None（不是回預設值）', email is None, email)
+        check('壞 token 一定帶著 error 回應', error is not None)
 
     print()
     print('[5] /chat/ 把「這次是誰在問」傳給 RAG（E-9）')
@@ -168,19 +191,8 @@ def main():
     chat_ok = sign({'email': 'asker@example.com', 'aud': 'traitty', 'exp': 4102444800})
     chat_no_email = sign({'sub': 'tester', 'aud': 'traitty', 'exp': 4102444800})
 
-    seen = {}
-
-    class _StubRag:
-        """只記下 /chat/ 傳了什麼身分進來，不呼叫模型。"""
-
-        model_name = 'stub'
-
-        def load_history(self, session_id):
-            return []
-
-        def generate_response(self, *args, **kwargs):
-            seen.update(kwargs)
-            return iter([]), 'stub'
+    seen = _StubRag.seen
+    seen.clear()
 
     body = {'query': '你好', 'session_id': 'IDENTITY_TEST', 'user_id': 'asker@example.com',
             'mode': 'expert', 'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}}
@@ -264,6 +276,68 @@ def main():
         check(f'{label}: 簽出來的 token 用 PRD 的 secret 驗得過', verified is True, verified)
 
     app.config['ALLOW_UPSTREAM_ENV_SWITCH'] = False
+
+    print()
+    print('[8] 驗簽 + 驗期 + 驗 aud（E-11）')
+    # 前端改成每次呼叫前先換一張新 token（useChatLogic.js 的 authFetch）之後，這裡才
+    # 收得緊：以前驗 exp 會把正常使用者在兩分鐘後全部擋掉。
+    now = int(time.time())
+    forged = pyjwt.encode({'email': 'someone@example.com', 'aud': 'traitty',
+                           'exp': now + 600}, 'not-the-real-secret', algorithm='HS256')
+    expired = sign({'email': 'someone@example.com', 'aud': 'traitty',
+                    'iat': now - 600, 'exp': now - 300})
+    wrong_aud = sign({'email': 'someone@example.com', 'aud': 'someone-else',
+                      'exp': now + 600})
+    valid = sign({'email': 'someone@example.com', 'aud': 'traitty', 'exp': now + 600})
+
+    chat_endpoint = ('POST /chat/', 'POST', '/chat/',
+                     {'query': '你好', 'session_id': 'IDENTITY_TEST',
+                      'user_id': 'someone@example.com', 'mode': 'expert',
+                      'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}})
+
+    chat_saved = chat_route.rag_service
+    chat_route.rag_service = _StubRag()
+    for label, method, path, body in ENDPOINTS + [chat_endpoint]:
+        resp = call(app, method, path, body, forged)
+        good, detail = is_401(resp)
+        check(f'{label} <- 偽造簽章', good, detail)
+
+        resp = call(app, method, path, body, wrong_aud)
+        good, detail = is_401(resp)
+        check(f'{label} <- aud 不是 traitty', good, detail)
+
+        resp = call(app, method, path, body, expired)
+        code = ''
+        try:
+            code = (json.loads(resp.get_data(as_text=True)).get('error') or {}).get('code')
+        except Exception:
+            pass
+        check(f'{label} <- 過期 -> 401 TOKEN_EXPIRED',
+              resp.status_code == 401 and code == 'TOKEN_EXPIRED',
+              f'HTTP {resp.status_code} code={code}')
+
+    chat_route.rag_service = chat_saved
+
+    # 收緊之後，正常的（沒過期、簽章對的）token 還是要過得去。
+    saved = (cand_route.get_service, reports_route.get_service, init_route.httpx.get)
+    cand_route.get_service = lambda: _FakeService()
+    reports_route.get_service = lambda: _FakeService()
+
+    class _Resp2:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {'status': True, 'quota_summary': {}}
+
+    init_route.httpx.get = lambda *a, **k: _Resp2()
+    try:
+        for label, method, path, body in ENDPOINTS:
+            resp = call(app, method, path, body, valid)
+            check(f'{label} <- 沒過期的合法 token 不是 401', resp.status_code != 401,
+                  f'HTTP {resp.status_code}')
+    finally:
+        cand_route.get_service, reports_route.get_service, init_route.httpx.get = saved
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
