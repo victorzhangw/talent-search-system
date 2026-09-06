@@ -385,7 +385,7 @@
         v-if="showReportModal"
         :candidateId="currentReportCandidate.id"
         :candidateName="currentReportCandidate.name"
-        :token="userToken"
+        :authFetch="authFetch"
         @close="showReportModal = false"
     />
 
@@ -438,6 +438,7 @@ const {
     // State
     currentTab,
     isSelectionLocked,
+    authFetch,
     userToken,
     autoLoginError,
     quotaSummary,

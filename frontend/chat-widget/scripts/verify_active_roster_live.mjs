@@ -89,9 +89,10 @@ const LOCKED_IDS = LOCKED.map(c => c.candidate_id)
 console.log(`鎖定 6 位（第 1 頁 ${fromP1.length} 位、第 2 頁 ${fromP2.length} 位）：`
             + LOCKED.map(c => `${c.candidate_id} ${c.name}`).join('、') + '\n')
 
-// widget 的每個呼叫都用 userToken.value 組 Authorization，所以這裡一定要設。
-// 沒設的話送出去的是 `Bearer null`，而後端會靜默退回一個寫死的 email 並回 HTTP 200＋空資料
-// （見 reports.py / candidates.py 的 fallback）——測試會看起來「通過但沒資料」。
+// composable 現在每次呼叫前都會自己 /auth/login 換一張新 token（E-11），所以身分不再
+// 靠這裡塞。仍然設 userToken.value 是因為畫面流程用它判斷「登入了沒有」。
+// 附帶一提：以前沒設的話送出去的是 `Bearer null`，後端會靜默退回一個寫死的 email 並回
+// HTTP 200＋空資料，測試會看起來「通過但沒資料」——那條退路已經改成 401（E-7）。
 const attach = (logic) => { logic.userToken.value = token; return logic }
 const fresh = () => { sessionStorage.clear(); localStorage.clear(); return attach(useChatLogic()) }
 

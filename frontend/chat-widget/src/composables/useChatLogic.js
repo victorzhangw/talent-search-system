@@ -220,9 +220,7 @@ export function useChatLogic(emit) {
     const fetchQuickModules = async () => {
         const { apiBaseUrl } = getApiConfig()
         try {
-            const res = await fetch(`${apiBaseUrl}/modules/`, {
-                headers: { 'Authorization': `Bearer ${userToken.value}` }
-            })
+            const res = await authFetch(`${apiBaseUrl}/modules/`)
             if (res.ok) {
                 const resp = await res.json()
                 quickQuestionCategories.value = (resp.success ? resp.data?.categories : null) || {}
@@ -346,6 +344,57 @@ export function useChatLogic(emit) {
         return { serverRoot, apiBaseUrl }
     }
 
+
+    /**
+     * 每一次打後端 API 之前，先換一張新的 token。
+     *
+     * 為什麼不沿用登入時那一張：`/auth/login` 簽出來的 token 只有 2 分鐘，而這個
+     * composable 以前是登入時取一次就一路用到底（`userToken.value` 從不更新）。後端
+     * 因此不能驗 exp——一驗，使用者開著頁面兩分鐘之後所有請求都會被擋掉；而後端不驗
+     * exp 就等於任何人偽造一張 `{"email": "別人"}` 的 token 都讀得到別人的資料。
+     * （0905 文件 E-11）
+     *
+     * 所以改成「每次呼叫前先 login」。`/chat/` 本來就是這樣做的，現在其餘呼叫點照做，
+     * 後端才收得緊。代價是每個請求多一次 `/auth/login` 往返。
+     */
+    const fetchFreshToken = async () => {
+        const { serverRoot } = getApiConfig()
+        const email = currentUserEmail()
+        if (!email) return null
+        try {
+            const res = await fetch(`${serverRoot}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email, env: upstreamEnv.value })
+            })
+            if (!res.ok) return null
+            const body = await res.json()
+            const token = (body && body.data && body.data.token) || null
+            // 畫面與流程仍然靠 userToken.value 判斷「登入了沒有」，所以換到的新 token
+            // 要寫回去。
+            if (token) userToken.value = token
+            return token
+        } catch (e) {
+            console.warn('[Auth] 取新 token 失敗：', e)
+            return null
+        }
+    }
+
+    /**
+     * 帶著新 token 打 API：呼叫端只要把 fetch 換成這個，其餘不變。
+     *
+     * 取不到 token 就直接丟出，不送出沒有身分的請求——後端一定回 401，送出去只是多
+     * 一次往返，而且 `Bearer null` 正是 E-7 那個症狀的來源。
+     */
+    const authFetch = async (url, options = {}) => {
+        const token = await fetchFreshToken()
+        if (!token) throw new Error('無法取得認證 Token，請重新整理頁面後再試')
+        return fetch(url, {
+            ...options,
+            headers: { ...(options.headers || {}), 'Authorization': `Bearer ${token}` }
+        })
+    }
+
     const computedServerRoot = computed(() => getApiConfig().serverRoot)
 
     // --- Methods ---
@@ -419,12 +468,9 @@ export function useChatLogic(emit) {
 
         traitReportsState.value = 'loading'
         try {
-            const res = await fetch(apiUrl, {
+            const res = await authFetch(apiUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${userToken.value}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
 
@@ -471,12 +517,9 @@ export function useChatLogic(emit) {
 
         traitReportsState.value = 'loading'
         try {
-            const res = await fetch(`${apiBaseUrl}/reports/batch`, {
+            const res = await authFetch(`${apiBaseUrl}/reports/batch`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${userToken.value}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ assessment_ids: assessmentIds })
             })
 
@@ -522,9 +565,7 @@ export function useChatLogic(emit) {
             const { serverRoot } = getApiConfig()
             const userId = currentUserEmail() || 'anonymous'
 
-            const res = await fetch(`${serverRoot}/chat/history?user_id=${userId}&page=${page}`, {
-                headers: { 'Authorization': `Bearer ${userToken.value}` }
-            })
+            const res = await authFetch(`${serverRoot}/chat/history?user_id=${userId}&page=${page}`)
             if (res.ok) {
                 const resp = await res.json()
                 const d = resp.success ? (resp.data || {}) : {}
@@ -563,9 +604,7 @@ export function useChatLogic(emit) {
         showMobileHistoryDrawer.value = false // close drawer when previewing
 
         try {
-            const res = await fetch(`${serverRoot}/chat/${sessionData.session_id}`, {
-                headers: { 'Authorization': `Bearer ${userToken.value}` }
-            })
+            const res = await authFetch(`${serverRoot}/chat/${sessionData.session_id}`)
             if (res.ok) {
                 const resp = await res.json()
                 const rawMessages = resp.success ? (resp.data?.messages ?? []) : []
@@ -610,9 +649,7 @@ export function useChatLogic(emit) {
                 const { apiBaseUrl } = getApiConfig();
                 const ids = metaCandidates.map(c => c.candidate_id);
                 try {
-                    const res = await fetch(`${apiBaseUrl}/candidates/by-ids?ids=${ids.join(',')}`, {
-                        headers: { 'Authorization': `Bearer ${userToken.value}` }
-                    });
+                    const res = await authFetch(`${apiBaseUrl}/candidates/by-ids?ids=${ids.join(',')}`);
                     if (res.ok) {
                         const resp = await res.json();
                         restoredCandidates = resp.success ? (resp.data ?? []) : [];
@@ -683,12 +720,9 @@ export function useChatLogic(emit) {
             // Call the local backend proxy map instead of upstream directly
             const initUrl = `${apiBaseUrl}/init/`;
 
-            const res = await fetch(initUrl, {
+            const res = await authFetch(initUrl, {
                 method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${userToken.value}`
-                }
+                headers: { 'Accept': 'application/json' }
             });
 
             if (res.ok) {
@@ -834,11 +868,7 @@ export function useChatLogic(emit) {
             // Using LIMIT and OFFSET
             const offset = isLoadMore ? candidateOffset.value : 0
             // Corrected to use query params
-            const res = await fetch(`${apiBaseUrl}/candidates/?limit=${PAGE_LIMIT}&offset=${offset}`, {
-                headers: {
-                    'Authorization': `Bearer ${userToken.value}`
-                }
-            })
+            const res = await authFetch(`${apiBaseUrl}/candidates/?limit=${PAGE_LIMIT}&offset=${offset}`)
             const resp = await res.json()
 
             let rawList = []
@@ -1177,33 +1207,12 @@ export function useChatLogic(emit) {
             // 快速提問時攜帶 module_id
             const moduleId = currentModuleId.value || null;
 
-            // Obtain a fresh short-lived token before every LLM call
-            let _chatToken = null
-            const _email = currentUserEmail()
-            if (_email) {
-                try {
-                    const _tokenRes = await fetch(`${serverRoot}/auth/login`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: _email })
-                    })
-                    if (_tokenRes.ok) {
-                        const _tokenData = await _tokenRes.json()
-                        _chatToken = _tokenData.data?.token || null
-                    }
-                } catch (_e) {
-                    console.warn('[Chat] Failed to obtain fresh token:', _e)
-                }
-            }
-            if (!_chatToken) {
-                throw new Error('無法取得認證 Token，請重新整理頁面後再試')
-            }
-
-            const response = await fetch(`${serverRoot}/chat/`, {
+            // 提問前換一張新 token——現在所有呼叫點都這樣做（authFetch），
+            // 這裡不再自己抄一份登入流程。
+            const response = await authFetch(`${serverRoot}/chat/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${_chatToken}`,
                 },
                 body: JSON.stringify({
                     query: query,
@@ -1360,12 +1369,9 @@ export function useChatLogic(emit) {
 
         try {
             const { serverRoot } = getApiConfig()
-            const res = await fetch(`${serverRoot}/chat/message/${messageId}/rating`, {
+            const res = await authFetch(`${serverRoot}/chat/message/${messageId}/rating`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${userToken.value}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rating })
             })
 
@@ -1416,6 +1422,7 @@ export function useChatLogic(emit) {
 
     return {
         // State
+        authFetch,
         currentTab,
         isSelectionLocked,
         userToken,

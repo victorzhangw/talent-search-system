@@ -29,7 +29,9 @@ class MemoryStorage {
 globalThis.sessionStorage = new MemoryStorage()
 globalThis.localStorage = new MemoryStorage()
 globalThis.window = {
-    TRAITTY_WIDGET_CONFIG: { apiBaseUrl: 'http://localhost:5000/api/v2' },
+    // userEmail 是必要的：composable 現在每次打 API 前會先 /auth/login 換一張新 token
+    // （0905 文件 E-11），沒有 email 就換不到，還原名單那一段會整段走進失敗分支。
+    TRAITTY_WIDGET_CONFIG: { apiBaseUrl: 'http://localhost:5000/api/v2', userEmail: 'tester@example.com' },
     location: { href: 'http://localhost:5173/' },
     open: () => {}
 }
@@ -38,6 +40,9 @@ let byIdsResponse = []
 globalThis.fetch = async (url) => ({
     ok: true,
     json: async () => {
+        if (String(url).includes('/auth/login')) {
+            return { success: true, data: { token: 'tok', user: { email: 'tester@example.com' } } }
+        }
         if (String(url).includes('/candidates/by-ids')) {
             return { success: true, data: byIdsResponse, meta: { missing_candidate_ids: [] } }
         }

@@ -53,7 +53,9 @@ import { onMounted, ref } from 'vue'
 const props = defineProps({
     candidateId: [String, Number],
     candidateName: String,
-    token: String
+    // 由 composable 傳進來：它會在每次呼叫前先換一張新 token（0905 文件 E-11）。
+    // 以前這裡收的是登入當下那一張，開著頁面超過 2 分鐘就過期。
+    authFetch: Function
 })
 
 const emit = defineEmits(['close'])
@@ -71,7 +73,7 @@ const getBandLabel = (score) => {
 }
 
 onMounted(async () => {
-    console.log("TraitReportModal Mounted. ID:", props.candidateId, "Token:", props.token ? "Yes" : "No")
+    console.log("TraitReportModal Mounted. ID:", props.candidateId)
     
     // Try to load from Session Storage first
     try {
@@ -95,9 +97,7 @@ onMounted(async () => {
     // Fallback: Fetch from API if not in cache
     console.log('[TraitReportModal] Cache miss, fetching from API...')
     try {
-        const res = await fetch(`http://localhost:5000/api/v2/candidates/${props.candidateId}/report`, {
-            headers: { 'Authorization': `Bearer ${props.token}` }
-        })
+        const res = await props.authFetch(`http://localhost:5000/api/v2/candidates/${props.candidateId}/report`)
         if (!res.ok) throw new Error('Fetch failed')
         const resp = await res.json()
         if (!resp.success) throw new Error(resp.error?.message || 'Fetch failed')
