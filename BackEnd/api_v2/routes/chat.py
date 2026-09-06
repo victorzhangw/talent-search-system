@@ -296,10 +296,16 @@ def chat():
         return err('UNAUTHORIZED', '請先登入後再試', 401)
     try:
         _secret = os.getenv('PARTY_A_PLUGIN_SECRET', 'traitty_ai_api')
-        pyjwt.decode(_auth[7:], _secret, algorithms=['HS256'], audience='traitty')
+        _claims = pyjwt.decode(_auth[7:], _secret, algorithms=['HS256'], audience='traitty')
     except pyjwt.ExpiredSignatureError:
         return err('TOKEN_EXPIRED', '登入已過期，請重新整理頁面', 401)
     except pyjwt.InvalidTokenError:
+        return err('UNAUTHORIZED', '無效的認證 Token', 401)
+
+    # 這次是誰在問。RAG 打上游要用這個身分（企業名稱、候選人基本資料），
+    # 不能像以前那樣一律用寫死的帳號。沒有 email 的 token 進不來。
+    requester_email = _claims.get('email')
+    if not requester_email:
         return err('UNAUTHORIZED', '無效的認證 Token', 401)
 
     query = data.get('query')
@@ -497,7 +503,8 @@ def chat():
                         trait_reports=trait_reports,
                         mode=mode,
                         module_id=module_id,
-                        req_id=req_id
+                        req_id=req_id,
+                        user_email=requester_email
                     )
             except OperationalError as db_err:
                 print(f"[RAG DB Error] {db_err}", flush=True)

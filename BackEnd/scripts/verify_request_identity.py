@@ -30,6 +30,8 @@ from api_v2.app import create_app                      # noqa: E402
 from api_v2.routes import candidates as cand_route     # noqa: E402
 from api_v2.routes import init_proxy as init_route     # noqa: E402
 from api_v2.routes import reports as reports_route     # noqa: E402
+from api_v2.routes import chat as chat_route           # noqa: E402
+from api_v2.services.rag_engine import RAGService      # noqa: E402
 
 failures = []
 
@@ -155,6 +157,61 @@ def main():
         from api_v2.utils.request_identity import user_email_from_request
         check('壞 token 回 None（不是回預設值）',
               user_email_from_request() is None, user_email_from_request())
+
+    print()
+    print('[5] /chat/ 把「這次是誰在問」傳給 RAG（E-9）')
+    # /chat/ 本來就驗簽、驗期、驗 aud，所以這裡的 token 要簽得對。
+    chat_ok = sign({'email': 'asker@example.com', 'aud': 'traitty', 'exp': 4102444800})
+    chat_no_email = sign({'sub': 'tester', 'aud': 'traitty', 'exp': 4102444800})
+
+    seen = {}
+
+    class _StubRag:
+        """只記下 /chat/ 傳了什麼身分進來，不呼叫模型。"""
+
+        model_name = 'stub'
+
+        def load_history(self, session_id):
+            return []
+
+        def generate_response(self, *args, **kwargs):
+            seen.update(kwargs)
+            return iter([]), 'stub'
+
+    body = {'query': '你好', 'session_id': 'IDENTITY_TEST', 'user_id': 'asker@example.com',
+            'mode': 'expert', 'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}}
+
+    saved_rag = chat_route.rag_service
+    chat_route.rag_service = _StubRag()
+    try:
+        resp = app.test_client().post('/chat/', json=body,
+                                      headers={'Authorization': 'Bearer ' + chat_no_email})
+        good, detail = is_401(resp)
+        check('POST /chat/ <- 簽章正確但沒有 email 欄位 -> 401', good, detail)
+
+        app.test_client().post('/chat/', json=body,
+                               headers={'Authorization': 'Bearer ' + chat_ok})
+        check('generate_response() 收到的 user_email 是發問者',
+              seen.get('user_email') == 'asker@example.com', seen.get('user_email'))
+    finally:
+        chat_route.rag_service = saved_rag
+
+    print()
+    print('[6] RAG 沒有身分就不做事，也沒有寫死的預設身分')
+    engine_src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
+                                   'api_v2', 'services', 'rag_engine.py'),
+                      encoding='utf-8').read()
+    check('rag_engine.py 裡沒有 eva@wepredict.io', 'eva@wepredict.io' not in engine_src)
+
+    raised = None
+    try:
+        RAGService.generate_response(object(), 'q', [], 's')
+    except ValueError as e:
+        raised = str(e)
+    except Exception as e:
+        raised = type(e).__name__ + ': ' + str(e)
+    check('少了 user_email 就 raise ValueError（不是靜默用預設值）',
+          isinstance(raised, str) and 'user_email' in raised, raised)
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0

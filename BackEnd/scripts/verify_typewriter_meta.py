@@ -46,7 +46,9 @@ def meta_of(app, **overrides):
         app.config[key] = value
 
     secret = os.getenv('PARTY_A_PLUGIN_SECRET', 'traitty_ai_api')
-    token = pyjwt.encode({'sub': 'tester', 'aud': 'traitty', 'exp': 4102444800},
+    # email 是必要欄位——/chat/ 要用它決定打上游時的身分（0905 文件 E-9）。
+    token = pyjwt.encode({'sub': 'tester', 'email': 'tester@example.com',
+                          'aud': 'traitty', 'exp': 4102444800},
                          secret, algorithm='HS256')
     r = app.test_client().post(
         '/chat/',

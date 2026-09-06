@@ -160,11 +160,20 @@ class RAGService:
 
     def generate_response(self, query: str, candidate_ids: List[str], session_id: str,
                          candidates_info: List[Dict] = None, trait_reports: Dict = None, mode: str = 'explanation',
-                         module_id: str = None, req_id: str = None):
+                         module_id: str = None, req_id: str = None, user_email: str = None):
         """
         Orchestrates the Full RAG Flow:
         Token -> Data Fetch (Cache/API) -> Context -> LLM
+
+        `user_email` 是「這次是誰在問」，由 `/chat/` 從它已經驗過的 token 取出來傳進來。
+        這裡打的上游（`resolve_enterprise` 決定 prompt 裡的企業名稱、沒有 candidates_info
+        時的候選人基本資料）必須用問問題的那個人的身分——這個參數之前不存在，全部請求
+        一律用同一個寫死的帳號去打，等於把別人的企業身分套在所有人身上。
+        （0905 文件 E-9）沒有預設值：拿不到身分就是程式接錯了，寧可炸掉也不要靜默錯置。
         """
+        if not user_email:
+            raise ValueError('generate_response() 需要 user_email：上游身分不能沒有來源')
+
         
         # Cache Key Strategy: Session ID + Candidate IDs hash
         # This ensures isolation per session, while supporting re-fetch if candidates change
@@ -188,8 +197,7 @@ class RAGService:
 
         else:
             rag_logger.info(f"Cache MISS for key: {cache_key}. Fetching upstream...")
-            # 1. Generate Fresh Token for Upstream
-            user_email = "eva@wepredict.io" 
+            # 1. Generate Fresh Token for Upstream（身分來自這次請求，見 docstring）
             upstream_token = generate_upstream_token(user_email)
             
             # 2. Fetch Data (Parallelizable, but sync for now)
