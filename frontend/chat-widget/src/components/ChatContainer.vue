@@ -27,7 +27,7 @@
              :title="`目前上游：${upstreamBaseUrl || '（登入中）'}\n帳號：${currentUserEmail() || '未設定'}`">
           <span class="env-dot"></span>
           <select :value="upstreamEnv" :disabled="isSwitchingEnv || isTyping"
-                  @change="onEnvChange($event.target.value)">
+                  @change="onEnvChange($event.target.value, $event)">
             <option v-for="opt in upstreamEnvOptions" :key="opt.env" :value="opt.env">
               {{ opt.env === 'default' ? 'UAT' : opt.env.toUpperCase() }}
             </option>
@@ -566,7 +566,13 @@ const handleSendQuick = async (q) => {
 
 // 切到 PRD 之前先確認一次。那不是唯讀的觀察模式——提問會扣線上帳號的真實額度
 // （/v1/ai/usage/daily-settlement），而且對話會寫進該環境的歷史。
-const onEnvChange = async (env) => {
+const onEnvChange = async (env, event) => {
+    // 下拉是 :value 綁定的，Vue 只在 upstreamEnv 真的變了才會回寫 DOM。切換沒發生時
+    // （按了取消、或正在回覆中被擋下）畫面會停在使用者點的那個選項，於是膠囊顯示 PRD
+    // 但實際還連著 UAT——2026-09-07 瀏覽器實測抓到的。所以只要沒切成，就把它拉回來。
+    const resync = () => {
+        if (event && event.target) event.target.value = upstreamEnv.value
+    }
     if (env !== 'default') {
         const target = upstreamEnvOptions.value.find(o => o.env === env)
         const ok = window.confirm(
@@ -576,9 +582,10 @@ const onEnvChange = async (env) => {
             + `目前的候選人、特質報告與對話都會清空，並改用該環境的帳號重新登入。
 `
             + `提問會扣該帳號的真實額度。`)
-        if (!ok) return
+        if (!ok) { resync(); return }
     }
     await switchUpstreamEnv(env)
+    resync()
 }
 
 // Template Ref for CandidateSelector (needed for clearing selection)
