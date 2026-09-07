@@ -20,6 +20,7 @@
 
 import argparse
 import json
+import random
 import os
 import sys
 import time
@@ -279,8 +280,100 @@ def s8_focus_chain(env, cast, run):
     ]
 
 
+
+# --------------------------------------------------------------- S9 隨機劇本 ---
+#
+# 問法的樣板。每一種對應「使用者這輪在問誰」的一種形狀，`shape` 會寫進 manifest，
+# 人工標註時可以直接看出這一輪原本想測什麼。
+#
+# 不用 LLM 生成提問：樣板可重現（給定 seed 就跑得出同一串），而且形狀分佈可控——
+# 隨機生成的句子有九成會落在「泛稱」那一類，正好是我們已經有 92 筆的那一類。
+TURN_SHAPES = (
+    ('named_one',   '請只針對 {a} 說明他的溝通風格，以及面談時需要留意的風險。'),
+    ('named_one',   '{a} 適合什麼樣的工作型態？'),
+    ('switch',      '那 {b} 呢？同樣的角度說明。'),
+    ('switch',      '換成 {b} 來看，會有什麼不同？'),
+    ('followup',    '他在壓力之下的表現如何？請再補充一點。'),
+    ('followup',    '那他在跨部門協作上呢？'),
+    ('compare',     '請比較 {a} 與 {b} 在團隊合作上的差異。'),
+    ('exclude',     '除了 {a} 之外，其他人呢？'),
+    ('generic',     '這幾位個別適合什麼崗位？'),
+    ('generic',     '他們之中誰比較適合帶團隊？'),
+    ('whole',       '請針對本次選取的人選做一次相對排序，並說明各自的適配優勢。'),
+)
+
+
+def s9_random_chain(env, cast, run, seed=None, turns=5, size=None):
+    """隨機挑名單、隨機挑問法，跑一串多輪對話。
+
+    為什麼要有這支：E-12（點名式提問被補生成硬接上沒問的人）修好之後，要不要把
+    「使用者這輪只問了誰」接進判定，取決於它判得準不準。而 0810-0907 的語料裡點名式
+    提問是 0 筆——真實流量全是泛稱，量不出東西來。所以這裡刻意製造各種形狀的提問，
+    連同稽核記錄一起產出，讓人可以逐筆核對演算法判得對不對。
+
+    `--seed` 固定就能重跑出同一串對話，對照修改前後的判定。
+    """
+    rng = random.Random(seed)
+    pool = load_any(env, 8)
+    # 第 1 輪沒有前文，接續式的問法在那裡沒有意義：實測 S9-303-t1 的「換成 X 來看」
+    # 被模型當成整批比較，回答寫了全名單——那一筆量不到任何東西。
+    opening = [t for t in TURN_SHAPES if t[0] in ('named_one', 'generic', 'whole')]
+    size = size or rng.randint(3, 5)
+    people = pool[:size]
+    spare = pool[size]                       # 留一位給「中途加人」
+    reports = trait_reports_for(env, people)
+    reports_plus = trait_reports_for(env, people + [spare])
+
+    sid = f'uat-s9-{run}-{seed}'
+    names = [p.get('name') for p in people]
+    print(f'    S9 seed={seed} 名單 {len(people)} 位：{names}；備用 {spare.get("name")}')
+
+    out, current, roster, cur_reports = [], list(people), list(names), reports
+    last_named = None
+    # 每串至少保證一次 followup：它是「繼承」路徑唯一的樣本來源，而隨機抽了 15 輪
+    # 一次都沒中（11 選 1、每輪獨立）。位置放在點名之後的任一輪。
+    forced_followup = rng.randint(2, turns) if turns >= 2 else None
+
+    for i in range(turns):
+        if i == 0:
+            shape, template = rng.choice(opening)
+        elif i + 1 == forced_followup and last_named:
+            shape, template = rng.choice([t for t in TURN_SHAPES if t[0] == 'followup'])
+        else:
+            shape, template = rng.choice(TURN_SHAPES)
+        # followup 要有上一輪的點名才有意義；沒有就換一個形狀，不然測不到繼承。
+        if shape == 'followup' and not last_named:
+            shape, template = TURN_SHAPES[0]
+        a = rng.choice(roster)
+        b = rng.choice([n for n in roster if n != a]) if len(roster) > 1 else a
+        query = template.format(a=a, b=b)
+
+        # 每一串隨機插入一次「中途加人」，重現名單變動那條路徑。
+        if i == turns - 2 and spare.get('name') not in roster:
+            current = current + [spare]
+            roster = roster + [spare.get('name')]
+            cur_reports = reports_plus
+
+        focus_hint = []
+        if shape in ('named_one',):
+            focus_hint, last_named = [a], [a]
+        elif shape == 'switch':
+            focus_hint, last_named = [b], [b]
+        elif shape == 'compare':
+            focus_hint, last_named = [a, b], [a, b]
+        elif shape == 'followup':
+            focus_hint = list(last_named or [])
+
+        turn = ask(env, sid, query, current, cur_reports,
+                   f'S9-{seed}-t{i + 1}-{shape}', focus=focus_hint)
+        turn['shape'] = shape
+        out.append(turn)
+    return out
+
+
 SCENARIOS = {'S1': s1_roster_grows, 'S2': s2_stale_cache, 'S7': s7_single_to_multi,
-             'S8': s8_focus_chain}
+             'S8': s8_focus_chain,
+             'S9': s9_random_chain}
 
 # 需要 0904 那批固定 id 的劇本。S8 自己動態選角，所以在 UAT 上也跑得起來。
 NEEDS_FIXED_CAST = {'S1', 'S2', 'S7'}
@@ -291,6 +384,9 @@ def main():
     ap.add_argument('--env', default='prd', choices=('prd', 'default'))
     ap.add_argument('--only', action='append', choices=sorted(SCENARIOS),
                     help='只跑指定劇本，可重複')
+    ap.add_argument('--runs', type=int, default=1, help='S9 要跑幾串（每串一個 seed）')
+    ap.add_argument('--turns', type=int, default=5, help='S9 每串幾輪')
+    ap.add_argument('--seed', type=int, action='append', help='S9 指定 seed，可重複')
     args = ap.parse_args()
 
     names = args.only or sorted(SCENARIOS)
@@ -300,8 +396,10 @@ def main():
     init = get('/api/v2/init/', token).get('data') or {}
     quota = init.get('quota_summary') or {}
     print(f'額度：{quota}')
-    if quota.get('remaining', 0) < 10:
-        raise SystemExit('剩餘額度不足 10，先不要跑。')
+    planned = (args.runs * args.turns) if 'S9' in names else 0
+    planned += sum(2 if n in ('S1', 'S7') else 1 for n in names if n != 'S9')
+    if quota.get('remaining', 0) < max(10, planned + 5):
+        raise SystemExit(f'剩餘額度不足（這一輪預計花 {planned} 次），先不要跑。')
 
     if set(names) & NEEDS_FIXED_CAST:
         cast = load_cast(args.env)
@@ -314,7 +412,13 @@ def main():
     turns = []
     for name in names:
         print(f'  {name}')
-        turns.extend(SCENARIOS[name](args.env, cast, run))
+        if name == 'S9':
+            seeds = args.seed or [random.randrange(10000) for _ in range(args.runs)]
+            for seed in seeds:
+                turns.extend(s9_random_chain(args.env, cast, run, seed=seed,
+                                             turns=args.turns))
+        else:
+            turns.extend(SCENARIOS[name](args.env, cast, run))
 
     after = (get('/api/v2/init/', login(args.env)).get('data') or {}).get('quota_summary') or {}
     manifest = {'env': args.env, 'email': EMAIL, 'run': run,

@@ -27,6 +27,7 @@ from .log_assembler import AudienceMismatch, UnknownTrait
 from .log_pipeline import LogPipeline
 from .module_map import module_map
 from .respondent_adapter import from_trait_reports
+from .focus_detect import detect_focus
 
 packer_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
 
@@ -184,7 +185,7 @@ class _Chunk:
 
 class PackedStream:
     def __init__(self, pipeline: LogPipeline, stream_fn, session_id, question, req_id=None,
-                 dropped=None, roster=None):
+                 dropped=None, roster=None, focus=None):
         self._pipeline = pipeline
         self._stream_fn = stream_fn
         self._session_id = session_id
@@ -192,6 +193,7 @@ class PackedStream:
         self._req_id = req_id
         self._dropped = list(dropped or ())
         self._roster = roster or {}
+        self._focus = focus or {}
         self.finished = False
         self.audit: dict = {}
 
@@ -225,6 +227,9 @@ class PackedStream:
         # 名單從哪裡來、丟掉了誰。讀 log 的人第一眼就要能分辨「模型漏寫」與
         # 「這個人根本沒進 payload」。
         audit['roster'] = self._roster
+        # 「使用者這輪在問誰」。**只記錄，不參與判定**——missing_respondents 仍以整個
+        # 名單為期待值。放在這裡是為了累積可標註的樣本，見 focus_detect.py。
+        audit['focus'] = self._focus
         audit['session_id'] = self._session_id
         # 這一輪的 prompt 記在 prompts.log、回覆記在 conversations.log、閘門結果記在這裡。
         # 三個檔以前只有 session_id 可對，而同一個 session 連續幾輪的 header 長得一模一樣，
@@ -284,5 +289,13 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: s
         return None
 
     log_payload(pipeline, session_id, module_id, question, req_id, dropped)
+    # 題庫題的「提問」是模組指令不是使用者的話，判「問誰」沒有意義，所以只在自由提問算。
+    focus = {}
+    if question is None:
+        try:
+            focus = detect_focus(query, [r.name for r in respondents],
+                                 history=pipeline.history, respondents=respondents)
+        except Exception as e:                       # 稽核欄位不該弄掉一個請求
+            packer_logger.warning(f"session={session_id} focus detection failed: {e}")
     return PackedStream(pipeline, rag_service.packer_stream, session_id, question, req_id,
-                        dropped=dropped, roster=roster)
+                        dropped=dropped, roster=roster, focus=focus)

@@ -15,9 +15,11 @@
 `[任務指令]`（使用者原句）。有了這份表才談得上量準確率，否則只能兩個演算法互相
 驗證，而那證明不了誰對。
 
-**這支腳本不做判定**。`提問中出現的姓名` 只是一個透明的資料欄位（見 `strict_forms`），
-不是「這輪要問誰」的答案；答案那一欄留空給人標。不先填是刻意的：先填會把標註的人
-錨定在演算法的答案上，量出來的準確率就沒有意義了。
+判定用的是**生產版那一支**（`api_v2/services/focus_detect.py`），不是這裡另寫一份——
+量的必須跟上線的是同一個東西，否則量出來的準確率不代表線上行為。
+
+輸出同時給「演算法判定」與空白的「人工判定」兩欄。先看到演算法答案會有錨定效應，
+所以標註時建議先把演算法那幾欄遮起來，或先標完再比對。
 
 輸出到 `api_v2/logs/<今天>/focus_corpus.tsv`（`logs/` 在 .gitignore 裡，語料含真實
 姓名，不進版控）。
@@ -33,6 +35,8 @@ from datetime import date
 sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
+from api_v2.services.focus_detect import detect_focus, names_in  # noqa: E402
+
 LOGS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'api_v2', 'logs')
 
 RECORD_SEP = '=' * 60
@@ -45,47 +49,14 @@ _ORG_SUFFIX = re.compile(r'[-－]')
 _CJK = re.compile(r'^[一-鿿]+$')
 
 HEADER = ['日期', '時間', 'req', 'session', '第幾輪', '名單人數', '名單',
-          '提問', '前一輪提問', '提問中出現的姓名', '實際要問誰（人工標註）', '備註']
+          '提問', '前一輪提問',
+          '演算法判定_來源', '演算法判定_對象', '演算法判定_矛盾',
+          '人工判定_對象', '演算法對嗎(Y/N)', '備註']
 
 
-def strict_forms(name):
-    """比 `completeness_check.name_forms` 嚴格的姓名寫法。
-
-    生產用的那一支刻意偏寬，因為它的用途是「回答裡有沒有寫到這個人」——判成沒寫到的
-    代價（在完整回答尾巴硬接一段）比較大，所以寧可多命中。
-
-    拿來掃**提問**時代價方向是反的：誤中一個名字就把範圍縮到錯的人身上，真正該被檢查
-    的那位反而不再被檢查。所以這裡砍掉兩字的截斷形——`呂 佳珍教育訓練課` 會產生
-    `呂佳珍`（保留，使用者真的會這樣打）與 `呂佳`（丟掉，會命中「呂佳玲」）。
-    """
-    raw = (name or '').strip()
-    if not raw:
-        return []
-    forms = {raw}
-    head = _ORG_SUFFIX.split(raw)[0].strip()
-    forms.add(head)
-    forms |= {_WS.sub('', f) for f in tuple(forms)}
-
-    parts = head.split()
-    if len(parts) >= 2:
-        first, rest = parts[0], ''.join(parts[1:])
-        if _CJK.match(first):
-            # 只取「姓 + 名的前兩字」，不取前一字：三字以下的截斷形誤中率太高。
-            if len(rest) >= 2:
-                forms.add(first + rest[:2])
-        elif len(first) >= 3:
-            forms.add(first)
-    return sorted({f for f in forms if len(f) >= 3}, key=len, reverse=True)
-
-
-def names_in(query, roster):
-    """名單裡有哪些人的姓名出現在提問中。純資料，不是判定。"""
-    flat = _WS.sub('', query or '')
-    out = []
-    for name in roster:
-        if any(_WS.sub('', f) in flat for f in strict_forms(name)):
-            out.append(name)
-    return out
+def verdict_of(query, roster, history):
+    """生產版的判定。history 只需要 user 訊息，這裡用前幾輪的提問組出來。"""
+    return detect_focus(query, roster, history=history)
 
 
 def parse_records(text):
@@ -168,16 +139,29 @@ def main():
 
     out = args.out or os.path.join(LOGS, str(date.today()), 'focus_corpus.tsv')
     os.makedirs(os.path.dirname(out), exist_ok=True)
+    # 判定要看歷史，所以先把每個 session 之前的提問組成 user 訊息串。
+    seen_q = {}
+    for r in sorted(rows, key=lambda x: (x['session'], x['time'])):
+        r['history'] = [{'role': 'user', 'content': q}
+                        for q in seen_q.get(r['session'], [])]
+        seen_q.setdefault(r['session'], []).append(r['query'])
+
     with io.open(out, 'w', encoding='utf-8-sig', newline='') as f:
         f.write('\t'.join(HEADER) + '\n')
         for r in rows:
-            hit = names_in(r['query'], r['roster'])
+            v = verdict_of(r['query'], r['roster'], r['history'])
             f.write('\t'.join([
                 r['day'], r['time'].split()[-1], r['req'], r['session'][:8],
                 str(r['turn']), str(r['count']), '、'.join(r['roster']),
-                r['query'], r['prev_query'], '、'.join(hit), '', '',
+                r['query'], r['prev_query'],
+                v['source'], '、'.join(v['names']), 'Y' if v['conflict'] else '',
+                '', '', '',
             ]) + '\n')
 
+    by_source = {}
+    for r in rows:
+        v = verdict_of(r['query'], r['roster'], r['history'])
+        by_source[v['source']] = by_source.get(v['source'], 0) + 1
     named = sum(1 for r in rows if names_in(r['query'], r['roster']))
     followups = sum(1 for r in rows if r['turn'] > 1)
     multi = sum(1 for r in rows if r['count'] > 1)
@@ -185,8 +169,10 @@ def main():
     print(f'    多人名單            {multi} 筆（單人名單不需要判斷「問誰」）')
     print(f'    提問裡出現名單姓名  {named} 筆')
     print(f'    是追問（非第一輪）  {followups} 筆')
+    print(f'    演算法判定分佈      {dict(sorted(by_source.items(), key=lambda kv: -kv[1]))}')
     print(f'\n  輸出：{os.path.abspath(out)}')
-    print('  第 11 欄「實際要問誰」留空，請人工標註後才能算準確率。')
+    print('  「人工判定_對象」與「演算法對嗎」兩欄留空，標註後才能算準確率。')
+    print('  標註時建議先遮住演算法那三欄，避免錨定。')
     return 0
 
 
