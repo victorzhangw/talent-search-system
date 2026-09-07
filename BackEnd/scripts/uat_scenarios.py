@@ -85,6 +85,29 @@ def load_cast(env):
     return out
 
 
+def load_any(env, count):
+    """這個環境上任意 N 位有評測資料的候選人。
+
+    CAST 是 0904 那批 PRD 的 id，重現劇本必須用它；但 S8 驗的是「問法」不是那批人，
+    綁死 id 會讓它只能在 PRD 上跑，而 PRD 的每一次提問都花真實額度。
+    """
+    token = login(env)
+    out, offset = [], 0
+    while offset < 600 and len(out) < count:
+        rows = (get(f'/api/v2/candidates/?limit=100&offset={offset}', token).get('data') or [])
+        if not rows:
+            break
+        for c in rows:
+            if (c.get('latest_assessment') or {}).get('assessment_id'):
+                out.append(c)
+                if len(out) >= count:
+                    break
+        offset += 100
+    if len(out) < count:
+        raise SystemExit(f'{env} 上有評測資料的候選人不足 {count} 位（只有 {len(out)}）')
+    return out
+
+
 def trait_reports_for(env, people):
     """和 widget 一樣：用 latest_assessment.assessment_id 去抓，再以 candidate_id 為 key。"""
     token = login(env)
@@ -105,11 +128,16 @@ def info_for(people):
             for p in people]
 
 
-def ask(env, session_id, query, people, trait_reports, label, read_timeout=240):
+def ask(env, session_id, query, people, trait_reports, label, read_timeout=240,
+        focus=None):
     """送一次提問並把 SSE 收完。回傳這一輪的觀察結果。
 
     `trait_reports` 是分開傳的，因為有一個劇本要故意送「比名單多」的報告——那正是
     前端快取沒清乾淨的樣子，也是 Unit 3 要擋掉的東西。
+
+    `focus` 是「這一輪只問這幾位」——使用者在自由提問裡點名某人時，回答本來就不該
+    寫到名單上的每一位，判定要跟著換（見 verify_uat_scenarios.py）。名單宣告與打包
+    範圍仍然是完整名單，那兩件事不因為點名而改變。
     """
     token = login(env)
     body = {
@@ -163,6 +191,7 @@ def ask(env, session_id, query, people, trait_reports, label, read_timeout=240):
             'roster': [str(p['candidate_id']) for p in people],
             'roster_names': [p.get('name') for p in people],
             'trait_report_keys': sorted(trait_reports),
+            'focus': list(focus or []),
             'answer_chars': len(text), 'answer': text,
             'notices': notices, 'errors': errors}
 
@@ -210,7 +239,51 @@ def s7_single_to_multi(env, cast, run):
             ask(env, sid, RANK_Q, eight, r8, 'S7-turn2-加到8位')]
 
 
-SCENARIOS = {'S1': s1_roster_grows, 'S2': s2_stale_cache, 'S7': s7_single_to_multi}
+def s8_focus_chain(env, cast, run):
+    """S8 — 自由提問裡指定候選人，然後換人問、追問、中途加人比較。
+
+    前面三個劇本問的都是同一句 `RANK_Q`（整批排序），驗的是「名單對不對」。但真實
+    使用者不是這樣用的：他們會在多人名單裡點名某一位問，得到答案之後換另一位問，
+    再不點名地追問下去。這條路徑有三件事只有這樣問才驗得到：
+
+    1. **點名之後，名單宣告與打包範圍不能跟著縮小。** `[本輪判讀對象]` 仍應是完整
+       名單——縮小的話，下一輪追問就沒有其他人的資料可用了。
+    2. **換人問的時候，回答要真的換人。** 這是 Unit 1 的另一面：上一輪的主角就在
+       歷史裡，模型很容易繼續寫他。
+    3. **不點名的追問要接得住上下文。** 「他在壓力下如何」的「他」是上一輪那位，
+       不是名單第一位、也不是全部。
+
+    順帶：點名之後其餘的人本來就不會被寫到，所以這是目前唯一可能讓後端的覆蓋率
+    檢查判定「漏人」的情境——A-2（補生成）至今沒有樣本，這裡有機會生出第一個。
+
+    四輪共用一個 session，因為第 3 輪的「他」要靠歷史才解得出來。
+    """
+    sid = f'uat-s8-{run}'
+    people = load_any(env, 6)
+    five, sixth = people[:5], people[5]
+    a, b = five[0].get('name'), five[3].get('name')
+    c = sixth.get('name')
+    r5 = trait_reports_for(env, five)
+    r6 = trait_reports_for(env, five + [sixth])
+    print(f'    S8 名單 5 位：{[p.get("name") for p in five]}；第 4 輪加入 {c}')
+
+    return [
+        ask(env, sid, f'請只針對 {a} 說明他的溝通風格，以及面談時需要留意的風險。',
+            five, r5, 'S8-turn1-指定甲', focus=[a]),
+        ask(env, sid, f'那 {b} 呢？同樣的角度說明。',
+            five, r5, 'S8-turn2-換人問乙', focus=[b]),
+        ask(env, sid, '他在壓力之下的表現如何？請再補充一點。',
+            five, r5, 'S8-turn3-不點名追問乙', focus=[b]),
+        ask(env, sid, f'請比較 {b} 與 {c} 在團隊合作上的差異。',
+            five + [sixth], r6, 'S8-turn4-加人並比較乙丙', focus=[b, c]),
+    ]
+
+
+SCENARIOS = {'S1': s1_roster_grows, 'S2': s2_stale_cache, 'S7': s7_single_to_multi,
+             'S8': s8_focus_chain}
+
+# 需要 0904 那批固定 id 的劇本。S8 自己動態選角，所以在 UAT 上也跑得起來。
+NEEDS_FIXED_CAST = {'S1', 'S2', 'S7'}
 
 
 def main():
@@ -230,8 +303,12 @@ def main():
     if quota.get('remaining', 0) < 10:
         raise SystemExit('剩餘額度不足 10，先不要跑。')
 
-    cast = load_cast(args.env)
-    print(f'候選人已對到 {len(cast)} 位\n')
+    if set(names) & NEEDS_FIXED_CAST:
+        cast = load_cast(args.env)
+        print(f'候選人已對到 {len(cast)} 位\n')
+    else:
+        cast = {}
+        print('（本輪劇本不需要 0904 那批固定 id，改為動態選角）\n')
 
     run = time.strftime('%H%M%S')
     turns = []

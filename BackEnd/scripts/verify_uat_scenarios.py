@@ -139,7 +139,20 @@ def judge_turn(turn, audit, payload, seq):
               f'（{[f"{a['before_len']}->{a['after_len']}" for a in grown]}）')
 
     # Unit 2：多人回答的覆蓋率
-    if len(turn['roster']) > 1:
+    focus = turn.get('focus') or []
+    if focus:
+        # 使用者點名了某幾位，回答本來就不該寫到名單上的每一位。要驗的換成
+        # 「點到的人有沒有被寫到」，其餘的人只記錄不判定。
+        absent = [n for n in focus if not mentions(turn['answer'], n)]
+        check('被點名的人寫到了（S8）', not absent, absent)
+        others = [n for n in turn['roster_names']
+                  if n not in focus and mentions(turn['answer'], n)]
+        print(f'      註：點名 {focus}；回答另外提到 {others or "（沒有其他人）"}')
+        retried = (audit.get('retry_count') or {}).get('completeness', 0)
+        if retried:
+            print(f'      註：**補生成觸發了 {retried} 次**（A-2 至今第一個樣本）'
+                  f'，稽核的 missing_respondents={audit.get("missing_respondents")}')
+    elif len(turn['roster']) > 1:
         missed = [n for n in turn['roster_names'] if not mentions(turn['answer'], n)]
         check('回答寫到每一位（Unit 2）', not missed, missed)
         check('稽核的 missing_respondents 與實際一致（Unit 2）',
@@ -193,6 +206,45 @@ def judge_scenarios(manifest, audits, payloads):
               f'命中話術：{bad}' if bad else '')
 
 
+def judge_focus_chain(manifest):
+    """S8：點名、換人、追問、加人比較——只有跨輪才看得出來的事。"""
+    by_label = {t['label']: t for t in manifest['turns']}
+    t1 = by_label.get('S8-turn1-指定甲')
+    t2 = by_label.get('S8-turn2-換人問乙')
+    t3 = by_label.get('S8-turn3-不點名追問乙')
+    t4 = by_label.get('S8-turn4-加人並比較乙丙')
+    if not t1:
+        return
+
+    print('\n  [S8 跨輪：點名 → 換人 → 追問 → 加人比較]')
+    a = (t1.get('focus') or [None])[0]
+
+    if t2:
+        b = (t2.get('focus') or [None])[0]
+        check('S8 換人問的時候，回答真的換成乙', mentions(t2['answer'], b), b)
+        # 甲就在歷史裡，模型很容易繼續寫他。允許帶到，但不能反客為主。
+        na = flat(t2['answer']).count(flat(a or '\x00'))
+        nb = flat(t2['answer']).count(flat(b or '\x00'))
+        check('S8 換人那輪，乙的份量不少於甲（沒有沿用上一輪的主角）', nb >= na,
+              f'{b}x{nb} vs {a}x{na}')
+        check('S8 換人那輪名單沒有跟著縮小（點名不等於改名單）',
+              sorted(t2['roster']) == sorted(t1['roster']),
+              f'{t2["roster"]} vs {t1["roster"]}')
+
+    if t3 and t2:
+        b = (t2.get('focus') or [None])[0]
+        check('S8 不點名的追問接得住上下文（仍是乙）', mentions(t3['answer'], b), b)
+        others = [n for n in t3['roster_names']
+                  if n != b and mentions(t3['answer'], n)]
+        print(f'      註：追問那輪另外提到 {others or "（沒有其他人）"}')
+
+    if t4:
+        added = sorted(set(t4['roster']) - set(t1['roster']))
+        check('S8 第 4 輪確實加了人', bool(added), f'新增 {added}')
+        absent = [n for n in (t4.get('focus') or []) if not mentions(t4['answer'], n)]
+        check('S8 比較那輪，被比較的兩位都在回答裡', not absent, absent)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--date', default=str(date.today()))
@@ -211,6 +263,7 @@ def main():
         judge_turn(turn, audit_for(audits, turn, i), payload_for(payloads, turn, i), i)
 
     judge_scenarios(manifest, audits, payloads)
+    judge_focus_chain(manifest)
 
     # 出口掃描器的成本，放在最後當觀察值而不是判定——它不是本輪修改的驗收條件，但改寫率
     # 是 B-1／B-2／B-3（詞表誤判）該不該做的直接證據。
