@@ -176,8 +176,17 @@ def main():
     check('多人自由提問漏掉一位 -> failed 並指出是誰',
           res.status == 'failed' and res.missing_respondents == ['林孟德'],
           res.missing_respondents)
-    check('appendable_reason() 說得出缺的是人不是段落',
-          '缺少獨立段落的受測者' in res.appendable_reason(), res.appendable_reason())
+    # E-12：自由提問的漏人只記錄、不補。補生成在自由提問的觸發紀錄是 0 次正確、
+    # 3 次誤判（2026-09-07 S8），而誤判的代價是使用者拿到一大段沒問的內容。
+    check('自由提問：漏人不交給補生成（appendable_reason 為空）',
+          res.appendable_reason() == '', res.appendable_reason())
+    check('自由提問：但 reason() 仍然說得出漏了誰',
+          '缺少獨立段落的受測者' in res.reason() and '林孟德' in res.reason(), res.reason())
+    check('自由提問：status 仍是 failed（會落在 manual_review）',
+          res.status == 'failed', res.status)
+    check('自由提問：稽核仍記得到 missing_respondents',
+          res.as_audit()['missing_respondents'] == ['林孟德'],
+          res.as_audit()['missing_respondents'])
     res = check_answer('## 王智弘\n\n內容。\n\n## 林孟德\n\n內容。', two, None, CALIB)
     check('每個人都有標題 -> 不再判缺人', res.missing_respondents == [],
           res.missing_respondents)
@@ -191,6 +200,11 @@ def main():
           '林孟德' in check_answer(sections_answer(q5, expected_sections_for(q5, 2)[0])
                                  + '\n\n關於林孟德的部分寫在內文',
                                  two, q5, CALIB).missing_respondents)
+
+    q5_res = check_answer(sections_answer(q5, expected_sections_for(q5, 2)[0])
+                          + '\n\n關於林孟德的部分寫在內文', two, q5, CALIB)
+    check('題庫題不受影響：漏人仍然交給補生成',
+          '缺少獨立段落的受測者' in q5_res.appendable_reason(), q5_res.appendable_reason())
 
     print('\n[5d] 廠商姓名格式：payload 帶空白與單位，模型寫乾淨的名字')
     vendor = [Respondent('柳 宇賸-人資發展課', 'R1', {'CIA_05': 'B'}),

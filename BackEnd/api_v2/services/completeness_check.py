@@ -206,7 +206,8 @@ def expected_sections_for(question: Optional[dict], respondent_count: int):
 
 class CompletenessResult:
     __slots__ = ('status', 'sections_check', 'missing_sections', 'missing_respondents',
-                 'char_count', 'calibration_evidence', 'log_lines')
+                 'char_count', 'calibration_evidence', 'log_lines',
+                 'respondents_appendable')
 
     def __init__(self):
         # `status` is the verdict for the whole answer; the two *_check fields are the
@@ -220,6 +221,8 @@ class CompletenessResult:
         self.char_count: Optional[int] = None
         self.calibration_evidence = 'n/a'       # passed | failed | n/a
         self.log_lines: List[str] = []
+        # 「漏人」該不該交給補生成去補。題庫題是，自由提問不是——見 appendable_reason()。
+        self.respondents_appendable = True
 
     def as_audit(self) -> dict:
         return {
@@ -231,13 +234,31 @@ class CompletenessResult:
             'log': self.log_lines,
         }
 
-    def _appendable_bits(self) -> List[str]:
-        return ([('缺少段落：' + '、'.join(self.missing_sections))] if self.missing_sections else []) \
-             + ([('缺少獨立段落的受測者：' + '、'.join(self.missing_respondents))]
-                if self.missing_respondents else [])
+    def _missing_bits(self, for_completion: bool) -> List[str]:
+        bits = []
+        if self.missing_sections:
+            bits.append('缺少段落：' + '、'.join(self.missing_sections))
+        if self.missing_respondents and (self.respondents_appendable or not for_completion):
+            bits.append('缺少獨立段落的受測者：' + '、'.join(self.missing_respondents))
+        return bits
 
     def appendable_reason(self) -> str:
         """The part of `reason()` that appending more text could actually fix.
+
+        自由提問的「漏人」**不在此列**（`respondents_appendable` 為 False）：只記錄、
+        不補。理由是實測的觸發紀錄——0816-0904 全語料 34 筆自由提問一次都沒觸發過，
+        第一次觸發是 2026-09-07 的 S8 劇本，三輪三次**全部是誤判**：使用者問「請只針對
+        林慧嵐說明」，模型正確地只寫了她，覆蓋率檢查卻判定「漏了其他四位」，補生成把
+        使用者沒問的四位硬接在後面——5887 字的回答裡約 79% 是沒人要的內容。（E-12）
+
+        傷害來自「自動硬接」，不是來自「判定漏人」，所以拿掉的是補這個動作：
+        `missing_respondents` 照樣寫進稽核、`reason()` 照樣說得出是誰、status 仍是
+        failed（因此落在 manual_review）。43c1f019 那種真漏人依然看得見，只是不自動補，
+        使用者得自己再問一次。
+
+        要恢復自動補，前提是覆蓋率檢查先學會「使用者這輪只問了誰」——那需要點名偵測、
+        排除語、泛稱、追問繼承四條規則，不是一個條件的事。在那之前，寧可少補也不要
+        硬接：少補的代價是使用者再問一次，硬接的代價是每一次點名提問都拿到不要的內容。
 
         b §8's completion pass is 丙-2's 「只補上缺少的部分」: it appends, and everything
         already on screen stays there. That works for a missing section -- it is a new
@@ -255,11 +276,11 @@ class CompletenessResult:
         cure for the first is 乙-6: the evidence wordlist rejects phrasings the client's
         own examples use, so the check fails more often than it should.
         """
-        return '；'.join(self._appendable_bits())
+        return '；'.join(self._missing_bits(for_completion=True))
 
     def reason(self) -> str:
         """Everything that failed -- for the audit record and the log."""
-        bits = self._appendable_bits()
+        bits = self._missing_bits(for_completion=False)
         if self.calibration_evidence == 'failed':
             bits.append('需加入佐證類措辭（' + '／'.join(EVIDENCE_TERMS) + '）')
         if self.status == 'failed' and self.char_count and self.char_count > FREE_FORM_MAX_CHARS:
@@ -318,6 +339,8 @@ class CompletenessChecker:
 
     def finalize(self) -> CompletenessResult:
         result = CompletenessResult()
+        # 題庫題的指令明定每人一段，補生成補得對；自由提問沒有這個約定，補了就是硬接。
+        result.respondents_appendable = self.question is not None
         answer = self.text
         heading_set = set(self._headings)
 
