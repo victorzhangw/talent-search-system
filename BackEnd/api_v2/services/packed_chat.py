@@ -28,6 +28,7 @@ from .log_pipeline import LogPipeline
 from .module_map import module_map
 from .respondent_adapter import from_trait_reports
 from .focus_detect import detect_focus
+from .repeat_detect import measure as measure_repeat
 
 packer_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
 
@@ -230,6 +231,14 @@ class PackedStream:
         # 「使用者這輪在問誰」。**只記錄，不參與判定**——missing_respondents 仍以整個
         # 名單為期待值。放在這裡是為了累積可標註的樣本，見 focus_detect.py。
         audit['focus'] = self._focus
+        # 「這一輪有多少是把上一輪重寫一遍」。同樣**只記錄**——它要量的是 [前輪脈絡]
+        # 區塊有沒有用，而那個區塊還沒加時就得先有基線。見 repeat_detect.py（E-16）。
+        try:
+            audit['repeat'] = measure_repeat(self._pipeline.checker.text,
+                                             self._pipeline.history)
+        except Exception as e:
+            audit['repeat'] = {}
+            packer_logger.warning(f"session={self._session_id} repeat measure failed: {e}")
         audit['session_id'] = self._session_id
         # 這一輪的 prompt 記在 prompts.log、回覆記在 conversations.log、閘門結果記在這裡。
         # 三個檔以前只有 session_id 可對，而同一個 session 連續幾輪的 header 長得一模一樣，
