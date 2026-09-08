@@ -28,6 +28,19 @@ echo venv ready.
 
 :activate
 call "%VENV%\Scripts\activate.bat"
+
+REM Port 5000 must be free. Flask does not fail loudly here: the second
+REM instance starts, prints "Running on http://127.0.0.1:5000" and then serves
+REM nothing, while the first one keeps answering with its own (older) code.
+REM 2026-09-08 spent four UAT calls on exactly this.
+powershell -NoProfile -Command "if(@(Get-NetTCPConnection -State Listen -LocalPort 5000 -EA 0).Count -gt 0){exit 1}"
+if %errorlevel% neq 0 (
+    echo [ERR] Port 5000 is already in use - another backend is still running.
+    echo       Run stop-v2-all.bat first, then start again.
+    pause
+    exit /b 1
+)
+
 echo Starting Backend...
 python run_backend.py
 pause
