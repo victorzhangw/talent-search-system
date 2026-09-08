@@ -21,7 +21,8 @@ from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.log_assembler import (Respondent, assemble, check_audience,  # noqa: E402
                                            AudienceMismatch, SYSTEM_MARKER,
                                            INSTRUCTION_MARKER, ROSTER_MARKER,
-                                           COVERAGE_CLAUSE)
+                                           COVERAGE_CLAUSE, CONTEXT_MARKER,
+                                           CONTEXT_BLOCK)
 
 PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
                    'Traitty_調整_20260728＿final')
@@ -225,6 +226,33 @@ def main():
           '逐人分析' not in assemble(two, None, user_query=q).instruction)
     check('題庫題 instruction text itself is untouched',
           quiz_multi.endswith(f'{INSTRUCTION_MARKER}\n{both["instruction_multi"]}'))
+
+    print('\n[前輪脈絡 -- 追問輪的重寫（E-16）]')
+    # req c4f3f3b3：使用者問「還有其他建議嗎」，拿到的回答 1838 字裡有 1209 字（72%）
+    # 是把上一輪重寫一遍。payload 裡沒有任何一句話說「前面那些已經在畫面上了」。
+    no_hist = assemble(two, None, user_query=q).instruction
+    with_hist = assemble(two, None, user_query=q, has_history=True).instruction
+    check('沒有歷史時不加這個區塊', CONTEXT_MARKER not in no_hist, repr(no_hist[:40]))
+    check('有歷史時才加', with_hist.startswith(CONTEXT_MARKER), repr(with_hist[:40]))
+    check('題庫題同樣適用（追問輪不分題型）',
+          CONTEXT_MARKER in assemble(two, both, has_history=True).instruction)
+    check('順序是 前輪脈絡 -> 本輪判讀對象 -> 任務指令',
+          with_hist.index(CONTEXT_MARKER) < with_hist.index(ROSTER_MARKER)
+          < with_hist.index(INSTRUCTION_MARKER))
+    check('指令原文一字未改',
+          with_hist.endswith(f'{INSTRUCTION_MARKER}\n{q}'), repr(with_hist[-40:]))
+    check('約束的是「不要重新輸出已經給過的內容」',
+          '不要重述、改寫或重新輸出先前已經給過的內容' in CONTEXT_BLOCK)
+    # e4147c25 的提問是「換 蔡雨築 是否同樣的結論說明」——本來就該用同樣的結構分析
+    # 另一個人。措辭寫太死會變成答非所問，那比重讀更糟。
+    check('沒有把「換一個對象／角度」一起擋掉',
+          '換一個對象' in CONTEXT_BLOCK and '直接就新的對象或角度作答' in CONTEXT_BLOCK)
+    check('區塊只有一行，不會把 payload 撐大',
+          CONTEXT_BLOCK.count(chr(10)) == 0 and len(CONTEXT_BLOCK) < 200,
+          len(CONTEXT_BLOCK))
+    check('沒有歷史時，payload 與加這個區塊之前完全一樣',
+          len(with_hist) - len(no_hist)
+          == len(CONTEXT_MARKER) + 1 + len(CONTEXT_BLOCK) + 2)
 
     print('\n[to_messages() vs to_log_text()]')
     log = assemble(one, both)

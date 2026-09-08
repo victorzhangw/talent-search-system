@@ -9,6 +9,7 @@
     #### 其他特質索引…            ← scoped questions only
     #### 交互作用——…              ← sub-blocks from the selector
     ---
+    [前輪脈絡]                     ← 只在有歷史時，見 context_block()
     [本輪判讀對象]                 ← 名單與人數，見 roster_block()
     [任務指令]
 
@@ -45,6 +46,7 @@ SYSTEM_MARKER = '[SYSTEM PROMPT]'
 DATA_HEADER = '## 【輸入數據】'
 INSTRUCTION_MARKER = '[任務指令]'
 ROSTER_MARKER = '[本輪判讀對象]'
+CONTEXT_MARKER = '[前輪脈絡]'
 SEPARATOR = '---'
 
 # b §5 的受測者標頭是 `### [受測者 | 姓名 | ID]`，而客戶三份 v7 範例的 ID 欄都是
@@ -120,6 +122,36 @@ def roster_block(respondents: List['Respondent'],
     if len(respondents) > 1 and (question or {}).get('per_person_sections'):
         lines.append(COVERAGE_CLAUSE.format(n=len(respondents)))
     return '\n'.join(lines)
+
+
+CONTEXT_BLOCK = (
+    '以上對話中的回答，使用者已經看過了。本輪只需回答新的提問，'
+    '不要重述、改寫或重新輸出先前已經給過的內容；必要時以一句話帶過即可。'
+    '若本輪要換一個對象或換一個角度，請直接就新的對象或角度作答。'
+)
+
+
+def context_block() -> str:
+    """告訴模型「前面那些已經在使用者畫面上了」，只在有歷史時加（E-16）。
+
+    payload 裡原本沒有這句話。歷史是 `oldest first, verbatim` 的完整前文（2026-09-08
+    req `c4f3f3b3` 那一輪帶了 10 則訊息、12839 字），而 user message 只有一句五個字的
+    「還有其他建議嗎」；System 規範第 6 條又要求**每次回答**文末都附結語句。整份 payload
+    都在暗示「每一輪都是一份完整的報告」，於是模型把上一輪重寫一遍再多加兩段——1838 字
+    裡有 1209 字（72%）是重讀，新內容從第 1307 字才開始。
+
+    全語料 61 個追問輪裡，4 筆重複率 ≥ 40%，其中 2 筆是整段搬運（`longest_run` ≥ 300）。
+
+    位置與 `roster_block()` 同一個理由：messages 的順序是 system(資料) → history →
+    user(指令)，要壓過歷史就得放在 user message 裡；放進【輸入數據】會被歷史隔開。
+
+    **措辭約束的是「不要重新輸出已經給過的內容」，不是「不要談同一個主題」。** 最後那句
+    是必要的：`e4147c25` 的提問是「換 蔡雨築 是否同樣的結論說明」，本來就該用同樣的結構
+    分析另一個人，寫太死會變成答非所問——那比重讀更糟。
+
+    效果由稽核的 `repeat` 欄位量（`repeat_detect.py`），改前的基線已經記在那裡。
+    """
+    return f'{CONTEXT_MARKER}\n{CONTEXT_BLOCK}'
 
 
 class AudienceMismatch(ValueError):
@@ -244,7 +276,8 @@ class UnitCheckFailed(RuntimeError):
 def assemble(respondents: List[Respondent], question: Optional[dict],
              user_query: Optional[str] = None,
              renderer: Optional[TraitBlockRenderer] = None,
-             run_checks: bool = True) -> AssembledLog:
+             run_checks: bool = True,
+             has_history: bool = False) -> AssembledLog:
     """question=None means free-form, and then user_query is required (b §1.1).
 
     b §6 says the unit checks run on every assembly, so they are on by default and raise
@@ -282,7 +315,12 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
     else:
         key = 'instruction_multi' if len(respondents) > 1 else 'instruction_single'
         body_text = f'{INSTRUCTION_MARKER}\n{question[key]}'
-    instruction_text = f'{roster_block(respondents, question)}\n\n{body_text}'
+    # 兩個具名區塊的順序：`[前輪脈絡]` 講的是「前面那些不用再寫一次」，`[本輪判讀對象]`
+    # 講的是「這一輪要看誰」。後者離指令最近，因為名單被歷史蓋掉的代價最大（4920eef8）。
+    blocks = [roster_block(respondents, question), body_text]
+    if has_history:
+        blocks.insert(0, context_block())
+    instruction_text = '\n\n'.join(blocks)
 
     audit = {
         'question_id': question['idx'] if question else None,

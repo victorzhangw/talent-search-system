@@ -169,6 +169,19 @@ def main():
     check('no calibration trait -> evidence not required', pipe.result.status == STATUS_OK,
           pipe.result.audit['calibration_evidence_check'])
 
+    print('\n[E-16] 有歷史的那一輪才帶 [前輪脈絡]')
+    from api_v2.services.log_assembler import CONTEXT_MARKER  # noqa: E402
+    hist = [{'role': 'user', 'content': '誰最合適當行銷負責'},
+            {'role': 'assistant', 'content': '（上一輪的完整回答）'}]
+    first = LogPipeline(r1, None, user_query='誰最合適當行銷負責')
+    follow = LogPipeline(r1, None, user_query='還有其他建議嗎', history=hist)
+    check('第一輪不帶', CONTEXT_MARKER not in first.messages[-1]['content'])
+    check('追問輪帶了', CONTEXT_MARKER in follow.messages[-1]['content'])
+    check('它在 user message 裡，不在資料區（否則會被歷史隔開）',
+          CONTEXT_MARKER not in follow.messages[0]['content'])
+    check('歷史仍然夾在中間，順序沒被動到',
+          [m['role'] for m in follow.messages] == ['system', 'user', 'assistant', 'user'])
+
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
 
