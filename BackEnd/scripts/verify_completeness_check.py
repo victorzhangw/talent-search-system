@@ -24,7 +24,7 @@ from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.log_assembler import Respondent  # noqa: E402
 from api_v2.services.completeness_check import (  # noqa: E402
     CompletenessChecker, check_answer, heading_candidates, normalize_heading,
-    expected_sections_for, SKIP_LOG, UNSPLIT_LOG, EVIDENCE_TERMS, FREE_FORM_MAX_CHARS)
+    expected_sections_for, SKIP_LOG, UNSPLIT_LOG, EVIDENCE_TERMS, FREE_FORM_MAX_CHARS, owns_section)
 
 CALIB = table.calibration_traits
 failures = []
@@ -41,7 +41,9 @@ def sections_answer(q, headings, extra_body=''):
 
 
 def main():
-    q5 = table.get('如何面對困難、壓力、挑戰')
+    q5 = table.get('如何面對困難、壓力、挑戰')          # per_person_sections=False
+    qpp = table.get('領導風格與潛能分析')                # per_person_sections=True
+    q13 = table.get('有效的溝通方法／模式')              # per_person_sections=False（req ecae89f3）
     r1 = [Respondent('王智弘', 'R1', {'CIA_05': 'B'})]
 
     print('\n[1] Heading matching -- the spec acceptance table')
@@ -159,22 +161,25 @@ def main():
     # 這一區驗的是「人名有沒有自己的標題」，所以段落本身必須先是齊的——兩人回答要用
     # 多人清單的段落名，拿單人清單來組會先卡在段落齊全檢查，測不到人名這件事。
     body = sections_answer(q5, expected_sections_for(q5, 2)[0])
-    res = check_answer('## 王智弘\n\n' + body + '\n\n## 林孟德\n\n' + body, two, q5, CALIB)
+    # 逐人分段的檢查只在 per_person_sections=True 的題目上跑，所以這一區用 Q21。
+    body_pp = sections_answer(qpp, expected_sections_for(qpp, 2)[0])
+    res = check_answer('## 王智弘\n\n' + body_pp + '\n\n## 林孟德\n\n' + body_pp,
+                       two, qpp, CALIB)
     check('both names present as headings -> passed', res.status == 'passed',
           res.missing_respondents)
-    res = check_answer('## 王智弘\n\n' + body, two, q5, CALIB)
+    res = check_answer('## 王智弘\n\n' + body_pp, two, qpp, CALIB)
     check('a missing respondent -> failed', res.status == 'failed'
           and res.missing_respondents == ['林孟德'], res.missing_respondents)
     # 「內文提到不算有自己的段落」只在回答**確實照人分段**時成立：這裡王智弘有自己的
     # 標題，所以格式是照人分段的，林孟德只出現在內文就是真的漏了。
     # （原本這條的 fixture 兩個人都沒有標題，那種形狀現在走 by_mention——見 [5c]。）
-    res = check_answer('## 王智弘\n\n' + body + '\n\n關於林孟德的部分寫在內文',
-                       two, q5, CALIB)
+    res = check_answer('## 王智弘\n\n' + body_pp + '\n\n關於林孟德的部分寫在內文',
+                       two, qpp, CALIB)
     check('a name only in running prose does not count',
           res.missing_respondents == ['林孟德'] and res.respondents_check == 'by_section',
           f'{res.missing_respondents} / {res.respondents_check}')
     check('single-person answers are not name-checked',
-          not check_answer(body, r1, q5, CALIB).missing_respondents)
+          not check_answer(body_pp, r1, qpp, CALIB).missing_respondents)
 
     print('\n[5b] 自由提問也做受測者覆蓋率檢查（修正計畫 Unit 2）')
     res = check_answer('## 王智弘\n\n內容。', two, None, CALIB)
@@ -202,14 +207,12 @@ def main():
     check('自由提問：寫在內文也算寫到（不要求標題）',
           not check_answer('排序為王智弘、林孟德。', two, None, CALIB).missing_respondents)
     check('題庫題維持嚴格：照人分段時，內文提到不算有自己的段落',
-          '林孟德' in check_answer('## 王智弘\n\n'
-                                 + sections_answer(q5, expected_sections_for(q5, 2)[0])
+          '林孟德' in check_answer('## 王智弘\n\n' + body_pp
                                  + '\n\n關於林孟德的部分寫在內文',
-                                 two, q5, CALIB).missing_respondents)
+                                 two, qpp, CALIB).missing_respondents)
 
-    q5_res = check_answer('## 王智弘\n\n'
-                          + sections_answer(q5, expected_sections_for(q5, 2)[0])
-                          + '\n\n關於林孟德的部分寫在內文', two, q5, CALIB)
+    q5_res = check_answer('## 王智弘\n\n' + body_pp
+                          + '\n\n關於林孟德的部分寫在內文', two, qpp, CALIB)
     check('題庫題不受影響：漏人仍然交給補生成',
           '缺少獨立段落的受測者' in q5_res.appendable_reason(), q5_res.appendable_reason())
 
@@ -222,7 +225,7 @@ def main():
     trap = ('- **偏收斂、重結構**：成員可分為「推進組」（甲一、乙二）與'
             '「支援組」（丙三、丁四），兩組節奏不同。\n\n'
             '- **（甲一）**：內容。\n\n- **（乙二）**：內容。')
-    res = check_answer(trap, eight, q5, CALIB)
+    res = check_answer(trap, eight, qpp, CALIB)
     check('列了一串名字的內文 bullet 不算那些人的段落',
           res.missing_respondents == ['丙三', '丁四'], res.missing_respondents)
     check('照人分段的回答走 by_section', res.respondents_check == 'by_section',
@@ -230,24 +233,24 @@ def main():
     combo = ('- **（甲一）**：內容。\n\n- **（乙二）**：內容。\n\n'
              '- **丙三 vs. 丁四**：這組搭配需要主持保護。')
     check('「A vs. B」的組合標題不算 A 或 B 的段落',
-          check_answer(combo, eight, q5, CALIB).missing_respondents == ['丙三', '丁四'],
-          check_answer(combo, eight, q5, CALIB).missing_respondents)
+          check_answer(combo, eight, qpp, CALIB).missing_respondents == ['丙三', '丁四'],
+          check_answer(combo, eight, qpp, CALIB).missing_respondents)
 
     # 2026-08-18 req 5017a070：兩人的合作題，回答照主題分段，兩人都寫在內文段落裡。
     # 這種形狀不能用「有沒有自己的標題」去判，否則補生成會在完整的回答後面硬接兩段（E-12）。
     by_theme = ('### 團隊合作價值\n\n王智弘帶來的是推進與品質把關。\n\n'
                 '林孟德帶來的是穩定執行與程序把關。\n\n### 可能摩擦\n\n兩人節奏不同。')
-    res = check_answer(by_theme, two, q5, CALIB)
+    res = check_answer(by_theme, two, qpp, CALIB)
     check('照主題分段、人人都寫到 -> 不判缺人',
           res.missing_respondents == [] and res.respondents_check == 'by_mention',
           f'{res.missing_respondents} / {res.respondents_check}')
-    res = check_answer('### 團隊合作價值\n\n王智弘帶來的是推進與品質把關。', two, q5, CALIB)
+    res = check_answer('### 團隊合作價值\n\n王智弘帶來的是推進與品質把關。', two, qpp, CALIB)
     check('照主題分段但真的少一個人 -> 仍判得出來',
           res.missing_respondents == ['林孟德'], res.missing_respondents)
     # by_mention 的退路不能退成「名字出現過就算」，否則 e332a385 那條列 8 人的 bullet
     # 又會全部放行。一行點到 3 位以上就是在列名單，不是在寫這些人。
     res = check_answer('### 觀察\n\n成員可分為甲一、乙二、丙三、丁四四組節奏。',
-                       eight, q5, CALIB)
+                       eight, qpp, CALIB)
     check('by_mention 下，只出現在名單列舉裡不算寫到',
           res.missing_respondents == ['甲一', '乙二', '丙三', '丁四']
           and res.respondents_check == 'by_mention',
@@ -260,7 +263,7 @@ def main():
     res = check_answer('以下根據您提供的八位成員特質資料。\n\n'
                        '- **（甲一）**：內容。\n\n- **（乙二）**：內容。'
                        '\n\n- **（丙三）**：內容。\n\n- **（丁四）**：內容。',
-                       eight, q5, CALIB)
+                       eight, qpp, CALIB)
     check('開場自報 8 位、名單 4 位 -> 記進稽核', res.stated_count == 8, res.stated_count)
     # status 是 failed，但那是因為這個 fixture 沒有寫 q5 的段落名；重點是自報人數
     # 沒有讓任何一個人被判成缺席。
@@ -271,14 +274,41 @@ def main():
     ok = check_answer('以下根據您提供的四位成員特質資料。\n\n'
                       '- **（甲一）**：內容。\n\n- **（乙二）**：內容。'
                       '\n\n- **（丙三）**：內容。\n\n- **（丁四）**：內容。',
-                      eight, q5, CALIB)
+                      eight, qpp, CALIB)
     check('數對了就不記', ok.stated_count is None
           and not any('模型自報' in l for l in ok.log_lines), ok.stated_count)
     check('單人不做這個檢查',
-          check_answer('以下針對這兩位。' + body, r1, q5, CALIB).stated_count is None)
+          check_answer('以下針對這兩位。' + body_pp, r1, qpp, CALIB).stated_count is None)
     check('稽核欄位帶得出 stated_count 與 respondents_check',
           res.as_audit()['stated_count'] == 8
           and res.as_audit()['respondents_check'] == 'by_section', res.as_audit())
+
+    print('\n[5g] per_person_sections 閘門（req ecae89f3）')
+    # Q13 通篇寫「對象組合」，一句要求逐人的話都沒有；但 2026-09-08 req ecae89f3 的第 4 節
+    # 寫成 `- **與洪 玉芳溝通時：** …`，三個這種標籤讓判定以為「這篇是照人分段的」，
+    # 於是把寫在內文裡的其餘 8 位全判成漏人，補生成硬接了 1202 字重複的人名清單。
+    check('Q15 / Q21 / Q22 是 per_person_sections=True，其餘為 False',
+          [q['idx'] for q in table.all() if q.get('per_person_sections')] == [15, 21, 22],
+          [q['idx'] for q in table.all() if q.get('per_person_sections')])
+    # 段落要寫齊，否則 appendable_reason() 會混進「缺少段落」，測不到受測者那一半。
+    prefixed = (sections_answer(q13, expected_sections_for(q13, 2)[0])
+                + '\n\n- **與王智弘溝通時：** 說明背景與理由，避免只給結論。')
+    res = check_answer(prefixed, two, q13, CALIB)
+    check('per_person=False 的題目永遠不走 by_section',
+          res.respondents_check == 'by_mention', res.respondents_check)
+    check('per_person=False 的漏人只記錄、不交給補生成',
+          res.appendable_reason() == '' and res.missing_sections == [],
+          res.appendable_reason())
+    check('但 reason() 仍說得出漏了誰（落在 manual_review）',
+          '林孟德' in res.reason() and res.status == 'failed', res.reason())
+    # 「與王智弘溝通時」是建議事項，主詞是讀者不是王智弘——不是他的段落。
+    check('owns_section：名字要在標籤開頭，「與X溝通時」不算',
+          not owns_section('與王智弘溝通時', '王智弘')
+          and owns_section('（王智弘）', '王智弘')
+          and owns_section('王智弘——制度推行與關係整合型角色', '王智弘'))
+    pp = check_answer(prefixed, two, qpp, CALIB)
+    check('同一篇放在 per_person=True 的題目下，仍不把「與X溝通時」當成 X 的段落',
+          pp.respondents_check == 'by_mention', pp.respondents_check)
 
     print('\n[5d] 廠商姓名格式：payload 帶空白與單位，模型寫乾淨的名字')
     vendor = [Respondent('柳 宇賸-人資發展課', 'R1', {'CIA_05': 'B'}),

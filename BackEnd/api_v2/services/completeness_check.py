@@ -81,6 +81,9 @@ _SELF_INTRO_GAP = r'[^，。！？!?,;；\n]{0,20}'
 
 _CJK_RE = re.compile(r'^[一-鿿]+$')
 _ORG_SUFFIX_RE = re.compile(r'[-－]')
+# 段落標籤開頭可能有的裝飾：括號、引號、星號、項目符號。名字前面只允許這些，
+# 不允許實字——「與洪玉芳溝通時」的那個「與」就是實字，見 owns_section()。
+_LABEL_LEAD_RE = re.compile(r'^[\s（(【\[「『《〈*＊·•\-–—]+')
 
 # 模型在開場白自報的人數。2026-09-08 req e332a385 的第一句是「根據您提供的八位成員特質
 # 資料」，名單其實是 11 位——這個缺陷在回答的第一句就自己說出來了，只是沒有人在讀。
@@ -195,6 +198,31 @@ def name_forms(name: str) -> List[str]:
     return sorted({f for f in forms if len(f) >= 2}, key=len, reverse=True)
 
 
+def owns_section(label: str, name: str) -> bool:
+    """`label` 這個段落標籤，是不是 `name` 這個人自己的段落。
+
+    判準是**以名字開頭**（前面只容許括號、引號、星號這類裝飾），不是「提到他」。
+
+    2026-09-08 req ecae89f3 逼出這條。那篇回答的第 4 節「管理策略與建議」寫成
+
+        - **與洪 玉芳溝通時：** 說明背景與理由，避免只給結論…
+        - **與涂 佩吟溝通時：** …
+        - **與周 瑋君溝通時：** …
+
+    這三個標籤各只點到一個人，原本的判準因此認定「這篇是照人分段的」，於是把寫在
+    1-3 節內文裡的其餘 8 位全判成漏人，補生成在回答尾巴硬接了 1202 字的重複內容
+    ——使用者看到的是一段與前文毫無銜接的人名清單。那正是 E-12 的傷害形狀。
+
+    「與洪玉芳溝通時」是**建議事項**，主詞是讀者不是洪玉芳；「（陳惠娟）」「洪 玉芳」
+    「陳曉玲——制度推行與關係整合型角色」才是她們自己的段落。差別就在名字是不是開頭。
+
+    刻意不用長度上限：「陳曉玲——制度推行與關係整合型角色」是貨真價實的個人標題，
+    只是後綴很長，用長度砍會砍掉它。
+    """
+    head = _LABEL_LEAD_RE.sub('', label or '')
+    return any(head.startswith(_WHITESPACE_RE.sub('', f)) for f in name_forms(name or ''))
+
+
 def self_introduced_names(user_query: Optional[str], respondents) -> List[str]:
     """受測者中，本輪提問裡以第一人稱自稱的那些人——他們不需要自己的段落。
 
@@ -281,8 +309,12 @@ class CompletenessResult:
     def appendable_reason(self) -> str:
         """The part of `reason()` that appending more text could actually fix.
 
-        自由提問的「漏人」**不在此列**（`respondents_appendable` 為 False）：只記錄、
-        不補。理由是實測的觸發紀錄——0816-0904 全語料 34 筆自由提問一次都沒觸發過，
+        「漏人」只有在**這一題明定逐人分段**時才補（`per_person_sections`，19 題裡只有
+        Q15／Q21／Q22）。自由提問不補，沒有明定逐人的題庫題也不補——後者是 2026-09-08
+        req ecae89f3 補上的條件：Q13 通篇寫「對象組合」，卻因為判定從回答形狀去猜而觸發
+        補生成，硬接了 1202 字的重複人名清單。
+
+        自由提問那一半的理由是實測的觸發紀錄——0816-0904 全語料 34 筆自由提問一次都沒觸發過，
         第一次觸發是 2026-09-07 的 S8 劇本，三輪三次**全部是誤判**：使用者問「請只針對
         林慧嵐說明」，模型正確地只寫了她，覆蓋率檢查卻判定「漏了其他四位」，補生成把
         使用者沒問的四位硬接在後面——5887 字的回答裡約 79% 是沒人要的內容。（E-12）
@@ -344,6 +376,10 @@ class CompletenessChecker:
                           if m.get('role') == 'user')
         self.self_introduced = set(self_introduced_names(
             '\n'.join(t for t in (user_query, prior) if t), respondents))
+        # 「這一題要不要逐人分段」是題目的屬性，由題庫資料回答，不從回答的形狀猜。
+        # 19 題可多人的題目裡只有 Q15／Q21／Q22 明寫了「逐一／每位／個別成員」。
+        # req ecae89f3（Q13）證明猜不得——見 finalize() 裡的說明。
+        self.per_person = bool((question or {}).get('per_person_sections'))
         self.expected, self._fallback_note = expected_sections_for(question, len(respondents))
         self._headings: List[str] = []          # every line, for exact section matching
         # 帶標記的行連同它的候選寫法，供 `_section_labels()` 取冒號前的標籤。
@@ -394,6 +430,8 @@ class CompletenessChecker:
         仍然會被它放行。代價是：若模型真的把兩個人合寫成一段，這裡會判兩人皆缺——而多人
         題庫題的指令本來就要求每人一段（Unit A 的名單區塊又補了一句「不得省略或合併」），
         判缺是對的。
+
+        「這個標籤是誰的段落」由 `owns_section()` 判——要以名字開頭，不是提到就算。
         """
         labels = []
         for line, cands in self._marked_candidates:
@@ -435,8 +473,10 @@ class CompletenessChecker:
 
     def finalize(self) -> CompletenessResult:
         result = CompletenessResult()
-        # 題庫題的指令明定每人一段，補生成補得對；自由提問沒有這個約定，補了就是硬接。
-        result.respondents_appendable = self.question is not None
+        # 「漏人」交不交給補生成，看的是這一題有沒有明定逐人分段——不是「是不是題庫題」。
+        # 原本寫的是 `self.question is not None`，於是 Q13 這種純組合題也在補，見
+        # appendable_reason()。
+        result.respondents_appendable = self.per_person
         answer = self.text
         heading_set = set(self._headings)
 
@@ -466,15 +506,20 @@ class CompletenessChecker:
             # 題庫題比對的是「段落標籤」（`_section_labels()`），不是整行——整行會被內文
             # bullet 騙掉，見那支函式的說明。
             #
-            # 但「照人分段」不是每一道題庫題都成立的假設。2026-08-18 req 5017a070 是兩人的
-            # 合作題，回答照主題分段（團隊合作價值／最能互補／可能摩擦），兩個人的名字都在
-            # 內文裡、沒有任何一段以人為標題——用嚴格比法會判兩個人都缺席，補生成就會在一篇
-            # 完整的回答後面硬接兩段。E-12 的教訓就是這個形狀。
+            # 但「照人分段」不是每一道題庫題都成立的假設，而且**不能從回答的形狀去猜**。
             #
-            # 所以判準取自回答自己：**只要有任何一位名單成員擁有以他為標題的段落**，就代表
-            # 這篇是照人分段的，其他人沒有自己的段落就是真的漏了；一個都沒有，就退回
-            # 「有沒有寫到這個人」。不去解析指令來推導格式——b §8 明講那是語意判斷，
-            # `expected_sections` 才是唯一來源。
+            # 猜過一次，代價是線上缺陷：2026-09-08 req ecae89f3（Q13）的第 4 節寫成
+            # `- **與洪 玉芳溝通時：** …`，三個這種標籤讓判定認為「這篇是照人分段的」，
+            # 於是把寫在 1-3 節內文裡的其餘 8 位全判成漏人，補生成在回答尾巴硬接了
+            # 1202 字的重複人名清單——使用者看到的是一段與前文毫無銜接的文字。而 Q13 的
+            # 指令從頭到尾寫的是「對象組合」，一句要求逐人的話都沒有。
+            #
+            # 所以改由題庫資料回答（`per_person_sections`），與 `expected_sections` 同一
+            # 種手法：b §8 明講從指令推導輸出結構是語意判斷，那就把判斷留在資料裡，程式
+            # 只讀不推。19 題可多人的題目裡只有 Q15／Q21／Q22 是 True。
+            #
+            # False 的題目退回「有沒有寫到這個人」（by_mention），而且**只記錄不補**——
+            # 2026-08-18 req 5017a070 那種照主題分段的合作題，硬接就是 E-12 的形狀。
             #
             # 題庫題的段落結構是題目指定的，所以「有沒有自己的標題」問得出來。自由提問沒有
             # 指定結構——使用者問「誰最適合，給我排序」，一份不用標題的排序清單、一張表格
@@ -485,8 +530,10 @@ class CompletenessChecker:
             # 代價寫在這裡，不要之後再重新發現一次：這樣就抓不到 4920eef8 那種「七個人的
             # 名字都列了，但列在『這些人沒有資料』的句子裡」。那是模型謊報資料缺席，屬於
             # 另一種檢查；4920eef8 的根因（歷史蓋過名單）由 Unit 1 的名單宣告處理。
-            labels = self._section_labels() if self.question is not None else []
-            if labels and any(self._roster_hits(l) == 1 for l in labels):
+            labels = self._section_labels() if self.per_person else []
+            owned = {r.name for r in self.respondents
+                     for l in labels if owns_section(l, r.name)}
+            if owned:
                 haystack = labels
                 result.respondents_check = 'by_section'
             elif self.question is not None:
@@ -497,11 +544,15 @@ class CompletenessChecker:
                 # 答案，全語料 29 筆多人回覆有 9 筆是這種形狀。
                 haystack = [_WHITESPACE_RE.sub('', answer)]
                 result.respondents_check = 'by_mention'
+            if result.respondents_check == 'by_section':
+                covered = owned
+            else:
+                covered = {r.name for r in self.respondents
+                           if any(_WHITESPACE_RE.sub('', form) in h
+                                  for form in name_forms(r.name) for h in haystack)}
             result.missing_respondents = [
                 r.name for r in self.respondents
-                if r.name not in self.self_introduced
-                and not any(_WHITESPACE_RE.sub('', form) in h
-                            for form in name_forms(r.name) for h in haystack)]
+                if r.name not in self.self_introduced and r.name not in covered]
             if result.missing_respondents:
                 result.status = 'failed'
 

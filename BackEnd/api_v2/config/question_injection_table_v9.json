@@ -445,7 +445,9 @@
     "錄用後行動與發展建議（僅供參考）",
     "面試使用提醒"
    ],
-   "expected_sections_multi": []
+   "expected_sections_multi": [],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 2,
@@ -584,7 +586,9 @@
     "優勢發揮的情境條件",
     "主管使用提醒"
    ],
-   "expected_sections_multi": []
+   "expected_sections_multi": [],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 3,
@@ -714,7 +718,9 @@
     "角色互補或綜效優勢",
     "角色衝突或摩擦點",
     "團隊配置建議策略與分工、協作設計規則"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 4,
@@ -853,7 +859,9 @@
     "對象間的問題與風險",
     "風險提升或緩解情形",
     "管理挑戰與建議"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 5,
@@ -980,7 +988,9 @@
     "壓力情境協同模式",
     "團隊壓力管理重點",
     "管理策略與建議"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 6,
@@ -1133,7 +1143,9 @@
     "最有效的帶法",
     "容易踩雷的帶法"
    ],
-   "expected_sections_multi": []
+   "expected_sections_multi": [],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 7,
@@ -1296,7 +1308,9 @@
     "領導態勢形成",
     "角色配置建議",
     "培育與發展策略"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 8,
@@ -1430,7 +1444,9 @@
     "分層帶法",
     "90天期間管理的策略",
     "綜合點評"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 9,
@@ -1471,7 +1487,9 @@
     "在團隊中最適合扮演的角色",
     "需要特別注意的管理地雷與潛在盲點"
    ],
-   "expected_sections_multi": []
+   "expected_sections_multi": [],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 10,
@@ -1514,7 +1532,9 @@
     "給你的保證",
     "一句話總結"
    ],
-   "expected_sections_multi": []
+   "expected_sections_multi": [],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 11,
@@ -1642,7 +1662,9 @@
     "轉型風險",
     "支持建議"
    ],
-   "expected_sections_multi": []
+   "expected_sections_multi": [],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 12,
@@ -1783,7 +1805,9 @@
     "同期差異化定位",
     "資源配置",
     "接班梯隊建議"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 13,
@@ -1904,7 +1928,9 @@
     "對象溝通模式",
     "對象溝通重點",
     "管理策略與建議"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 14,
@@ -2011,7 +2037,9 @@
    "injection_note": "交互過濾集合＝本清單 ∪ 受測者命中之風險端點特質（見 risk_endpoints.adopted）；全塊注入僅限題意匡列（scoped_traits）",
    "note": "Codex band級複核合併(漏3誤4)＋家族補0",
    "expected_sections": [],
-   "expected_sections_note": "（本題指令未定義固定段落標題，§8 不做段落齊全檢查，程式應 log 略過原因）"
+   "expected_sections_note": "（本題指令未定義固定段落標題，§8 不做段落齊全檢查，程式應 log 略過原因）",
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 15,
@@ -2050,7 +2078,9 @@
    "injection_set": null,
    "injection_note": "全人型：不做題意過濾；交互覆蓋保證＋上限 40",
    "expected_sections": [],
-   "expected_sections_note": "（本題指令未定義固定段落標題，§8 不做段落齊全檢查，程式應 log 略過原因）"
+   "expected_sections_note": "（本題指令未定義固定段落標題，§8 不做段落齊全檢查，程式應 log 略過原因）",
+   "per_person_sections": true,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 16,
@@ -2171,7 +2201,9 @@
     "離職連鎖效應",
     "優先行動建議",
     "留才策略與槓桿"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 17,
@@ -2300,7 +2332,9 @@
     "相互影響情形",
     "管理策略",
     "綜合建議"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 18,
@@ -2429,7 +2463,9 @@
     "學習或競爭關係",
     "資源分配建議",
     "人才梯隊發展建議"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 19,
@@ -2552,7 +2588,9 @@
     "共同或個別?",
     "安排建議",
     "管理策略與行動"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 20,
@@ -2674,7 +2712,9 @@
     "具高效潛能的專案",
     "具潛在風險的任務",
     "綜合建議"
-   ]
+   ],
+   "per_person_sections": false,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 21,
@@ -2862,7 +2902,9 @@
     "同步發展與培養策略",
     "未來組織穩定成長下的建議方案",
     "提醒"
-   ]
+   ],
+   "per_person_sections": true,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   },
   {
    "idx": 22,
@@ -2998,7 +3040,9 @@
    ],
    "injection_note": "交互過濾集合＝本清單 ∪ 受測者命中之風險端點特質（見 risk_endpoints.adopted）；全塊注入僅限題意匡列（scoped_traits）",
    "expected_sections": [],
-   "expected_sections_note": "（本題指令未定義固定段落標題，§8 不做段落齊全檢查，程式應 log 略過原因）"
+   "expected_sections_note": "（本題指令未定義固定段落標題，§8 不做段落齊全檢查，程式應 log 略過原因）",
+   "per_person_sections": true,
+   "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）"
   }
  ],
  "risk_endpoint_trait_ids": [
