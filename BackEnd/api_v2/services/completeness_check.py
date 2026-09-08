@@ -88,6 +88,7 @@ _LABEL_LEAD_RE = re.compile(r'^[\s（(【\[「『《〈*＊·•\-–—]+')
 # 模型在開場白自報的人數。2026-09-08 req e332a385 的第一句是「根據您提供的八位成員特質
 # 資料」，名單其實是 11 位——這個缺陷在回答的第一句就自己說出來了，只是沒有人在讀。
 # 只掃開場的前 200 字：後文的「建議每場 5 位以內」之類是會議建議，不是在數名單。
+# 只在題庫題比對，理由見 finalize()。
 _STATED_COUNT_SCAN_CHARS = 200
 _STATED_COUNT_RE = re.compile(r'(?<![0-9])([0-9]{1,2}|[一二三四五六七八九十兩]{1,3})\s*[位名](?![0-9])')
 _CJK_DIGITS = {'一': 1, '二': 2, '兩': 2, '三': 3, '四': 4, '五': 5,
@@ -556,7 +557,10 @@ class CompletenessChecker:
             if result.missing_respondents:
                 result.status = 'failed'
 
-        if len(self.respondents) > 1:
+        # 只在題庫題記。自由提問的名單常常不是回答的範圍——2026-09-08 req fb7eacbd 的提問是
+        # 「謝淑玲，簡玥瀅 適合的崗位是什麼？」，名單 10 位，模型正確地寫「兩位」，這裡卻
+        # 記成落差。那不是缺陷，是 E-12 講的同一件事：使用者點名幾位，回答就該只有幾位。
+        if len(self.respondents) > 1 and self.question is not None:
             n = stated_count(answer)
             if n is not None and n != len(self.respondents):
                 result.stated_count = n

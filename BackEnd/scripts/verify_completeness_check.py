@@ -277,6 +277,11 @@ def main():
                       eight, qpp, CALIB)
     check('數對了就不記', ok.stated_count is None
           and not any('模型自報' in l for l in ok.log_lines), ok.stated_count)
+    # req fb7eacbd：提問是「謝淑玲，簡玥瀅 適合的崗位是什麼？」，名單 10 位，模型正確地
+    # 寫「兩位」——那不是落差，是使用者只問了兩位。自由提問的名單常常不是回答的範圍。
+    check('自由提問不記自報人數',
+          check_answer('以下針對兩位說明。甲一…乙二…丙三…丁四…',
+                       eight, None, CALIB).stated_count is None)
     check('單人不做這個檢查',
           check_answer('以下針對這兩位。' + body_pp, r1, qpp, CALIB).stated_count is None)
     check('稽核欄位帶得出 stated_count 與 respondents_check',

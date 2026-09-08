@@ -105,14 +105,19 @@ def roster_block(respondents: List['Respondent'],
         Victoria 本人是提問者，不替她寫一段才是對的；點名式提問（「請只針對林慧嵐說明」）
         更是只該寫一位。自由提問的覆蓋率屬於 `completeness_check`，不在這裡用指令硬逼。
       * 單人題庫題不加：`instruction_single` 本來就是寫給一個人的，那句話沒有意義。
-      * 多人題庫題加。它的 `instruction_multi` 本來就規定每人一段，這句只是把「每人」換成
-        一個模型可以對照的數字。
+      * 多人題庫題**只有 `per_person_sections=true` 的三題（Q15／Q21／Q22）加**。
+        一開始寫成「所有多人題庫題都加」，2026-09-08 15:07 的 `c2f088ee`（Q13）與 15:09 的
+        `6bb46227`（Q18）暴露了問題：這兩題的指令通篇寫「對象組合」、而且自己就寫著
+        「請嚴格依照以下結構輸出，不得新增、省略或調整順序」，我們卻在前面多要求一句
+        「逐人分析的段落必須涵蓋全部 N 位」——**要求了卻不檢查**（`completeness_check`
+        對這些題只做 `by_mention`），而且與題目自己的指令相牴觸。判準跟覆蓋率檢查共用
+        同一個欄位，兩邊才不會再各說各話。
     """
     names = '、'.join(r.name for r in respondents)
     lines = [ROSTER_MARKER,
              f'共 {len(respondents)} 位：{names}。',
              '以本節為準；先前對話若提到其他人選，一律不再視為本輪對象。']
-    if question is not None and len(respondents) > 1:
+    if len(respondents) > 1 and (question or {}).get('per_person_sections'):
         lines.append(COVERAGE_CLAUSE.format(n=len(respondents)))
     return '\n'.join(lines)
 

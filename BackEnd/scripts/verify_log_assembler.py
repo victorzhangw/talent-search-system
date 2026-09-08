@@ -115,12 +115,16 @@ def main():
         print(f'\n[{filename}]  {len(respondents)} respondent(s), idx={question["idx"]}')
         n = len(respondents)
         check('the roster block is present and well formed',
-              len(roster) == (4 if n > 1 else 3) and roster[0] == ROSTER_MARKER
+              len(roster) in (3, 4) and roster[0] == ROSTER_MARKER
               and roster[1].startswith(f'共 {n} 位：'), roster)
         check('every respondent is named in the roster block',
               all(r.name in roster[1] for r in respondents), roster[1] if roster else '')
-        check('multi carries the coverage clause, single does not',
-              (roster[-1] == COVERAGE_CLAUSE.format(n=n)) == (n > 1), roster[-1:])
+        wants = n > 1 and bool(question.get('per_person_sections'))
+        check('coverage clause appears exactly when the question demands per-person '
+              'sections',
+              (len(roster) == 4 and roster[-1] == COVERAGE_CLAUSE.format(n=n)) == wants,
+              f'per_person={question.get("per_person_sections")} n={n} '
+              f'lines={len(roster)}')
         check('line count matches once the roster block is taken out',
               len(actual) == len(expected), f'{len(actual)} vs {len(expected)}')
 
@@ -200,14 +204,20 @@ def main():
     # 2026-09-08 req e332a385：名單 11 位、11 份特質全送，模型寫「根據您提供的八位成員
     # 特質資料」，逐人分析只寫 7 位。題庫題原本不加名單區塊是為了維持 v7 的 0 差異，
     # 那份範例只有 2 個人——這個取捨在 11 人的規模下不成立。
-    quiz_multi = assemble(two, both).instruction
+    pp = table.get('領導風格與潛能分析')          # per_person_sections=True
+    quiz_multi = assemble(two, both).instruction    # 如何面對困難…＝False
     check('題庫題 also carries the roster block (req e332a385)',
           quiz_multi.startswith(ROSTER_MARKER), repr(quiz_multi[:30]))
-    check('題庫題 multi is told to cover all N, without a hard quota',
-          COVERAGE_CLAUSE.format(n=2) in quiz_multi
-          and '資料不足以明確判讀' in quiz_multi)
+    pp_multi = assemble(two, pp).instruction
+    check('per_person 的題目才被要求涵蓋全部 N 位，且不是硬性配額',
+          COVERAGE_CLAUSE.format(n=2) in pp_multi and '資料不足以明確判讀' in pp_multi)
     check('the coverage clause never demands a fixed number of sections',
-          '必須輸出' not in quiz_multi and '不得省略或合併' in quiz_multi)
+          '必須輸出' not in pp_multi and '不得省略或合併' in pp_multi)
+    # req c2f088ee（Q13）／6bb46227（Q18）：這兩題的指令通篇寫「對象組合」，自己還寫著
+    # 「不得新增、省略或調整順序」，不該再被我們要求逐人分段——而且覆蓋率檢查對它們
+    # 也只做 by_mention，要求了卻不檢查。
+    check('沒有明定逐人分段的多人題庫題不加涵蓋句',
+          '逐人分析' not in quiz_multi, repr(quiz_multi[:140]))
     check('單人題庫題 gets the roster but no coverage clause',
           ROSTER_MARKER in assemble(one, both).instruction
           and '逐人分析' not in assemble(one, both).instruction)
