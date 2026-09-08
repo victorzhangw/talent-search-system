@@ -397,6 +397,41 @@ def main():
     check('segment-by-segment and one-shot agree',
           one_shot.status == checker.finalize().status)
 
+    print('\n[8b] segment 邊界不是行邊界（E-15 / req 399ad86d）')
+    # 串流的切點是閘門決定的，跟 Markdown 的行毫無關係。399ad86d 的改寫器吃掉了段尾空行
+    # （E-14），下一段的 `- **陳 曉玲**：…` 因此黏在前一句後面；讀者看到的是行中的 `- `，
+    # Markdown 不算新項目，但當時的 observe() 因為它是新 segment 的第一行而當成標題。
+    glued = ('- **甲一**：內容內容，這一行沒有以換行收尾。'
+             '- **乙二**：被黏在同一行裡。')
+    whole = check_answer(glued, eight, qpp, CALIB)
+    split_at = glued.index('- **乙二**')
+    c = CompletenessChecker(eight, qpp, CALIB)
+    c.observe(glued[:split_at])
+    c.observe(glued[split_at:])
+    streamed = c.finalize()
+    check('分段餵與一次餵，判定必須一致',
+          streamed.missing_respondents == whole.missing_respondents,
+          f'{streamed.missing_respondents} vs {whole.missing_respondents}')
+    # 甲一那一段是真的以 `- **甲一**：` 起行，算她的；乙二黏在同一行的中間，不算。
+    check('黏在行中的 `- ` 不算新的段落標題（乙二判缺、甲一不判）',
+          whole.missing_respondents == ['乙二', '丙三', '丁四'],
+          whole.missing_respondents)
+    # 真的有換行時，兩段都要算數——修法不能把正常的情況一起擋掉。
+    proper = '- **甲一**：內容。\n\n- **乙二**：內容。'
+    c2 = CompletenessChecker(eight, qpp, CALIB)
+    cut = proper.index('- **乙二**')
+    c2.observe(proper[:cut])
+    c2.observe(proper[cut:])
+    check('正常換行的兩段仍各自算數',
+          c2.finalize().missing_respondents == ['丙三', '丁四'],
+          c2.finalize().missing_respondents)
+    # 最後一行沒有換行收尾時，finalize() 要把它收進來。
+    c3 = CompletenessChecker(eight, qpp, CALIB)
+    c3.observe('- **甲一**：內容。\n- **乙二**：最後一行沒有換行')
+    check('finalize() 會收掉沒有換行收尾的最後一行',
+          c3.finalize().missing_respondents == ['丙三', '丁四'],
+          c3.finalize().missing_respondents)
+
     print('\n[9] 段落名必須逐字出現在自己的指令裡，否則永遠不可能命中')
     # 從 informational 升級為會紅的檢查。這正是「（2項）」那一類缺陷的形狀：段落名帶了
     # 設定檔作者寫的註記，模型再聽話也寫不出來，於是每一次請求都判缺少、觸發一次補生成、

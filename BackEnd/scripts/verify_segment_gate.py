@@ -243,6 +243,32 @@ def main():
     check('status ok', gate.result.status == STATUS_OK)
     check('no two table rows share a line', '||' not in released,
           [ln for ln in released.split('\n') if ln.count('| **') > 1])
+
+    print('\n[13b] 段首的換行也要保留（req 399ad86d）')
+    # 長 bullet 超過 400 字時，`Segmenter._take` 從最後一個句尾切，所以**前一段的尾端
+    # 本來就沒有換行**；換行在下一段的開頭。改寫只補尾端擋不住這個——399ad86d 的
+    # segment 4 原文是 `\n- **陳 曉玲**：…`，改寫回來少了那個 \n，於是兩段黏成
+    # `…不被既有框架綁住。- **陳 曉玲**：…`，讀者看到陳曉玲被塞進李依帆的段落裡。
+    long_first = ('- **李 依帆**：她對公平原則有內在堅持，' + '在團隊面臨利益分配時能提醒成員回到規則。' * 12
+                  + '她的彈性能在變動中快速調整，不被既有框架綁住。')
+    glue_text = long_first + '\n- **陳 曉玲**：她待人誠懇，品質苛求，會盡量以不讓對方感到被針對的方式傳遞。\n\n'
+    glue_scanner = ExitScanner(injected_names=set(), injected_labels={'品質苛求'})
+
+    def lead_stripping_rewriter(segment, banned):
+        # 模型回的是乾淨的一段，前後的空白都不會帶回來——這就是實際觀察到的行為。
+        return segment.strip().replace('品質苛求', '對細節要求高')
+
+    gate = SegmentGate(glue_scanner, rewriter=lead_stripping_rewriter)
+    out = ''.join(gate.run(tokens_of(glue_text)))
+    check('改寫發生了', gate.result.retry_count['leakage'] >= 1, gate.result.retry_count)
+    check('段首換行沒有被吃掉，兩個 bullet 不在同一行',
+          not any(ln.count('- **') > 1 for ln in out.split('\n')),
+          [ln for ln in out.split('\n') if ln.count('- **') > 1])
+    check('陳曉玲那一行以 bullet 起行',
+          any(ln.startswith('- **陳 曉玲**') for ln in out.split('\n')),
+          [ln[:40] for ln in out.split('\n') if '陳 曉玲' in ln])
+    check('段尾的空行也還在（原本就有的保證不能退步）',
+          out.endswith('\n\n'), repr(out[-6:]))
     check('every row is still its own line',
           all(sum(1 for ln in released.split('\n') if name in ln) == 1
               for name in ('**Roger**', '**Eddy**', '**Eva H**')),

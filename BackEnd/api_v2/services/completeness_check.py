@@ -385,24 +385,50 @@ class CompletenessChecker:
         self._headings: List[str] = []          # every line, for exact section matching
         # 帶標記的行連同它的候選寫法，供 `_section_labels()` 取冒號前的標籤。
         self._marked_candidates: List[tuple] = []
+        self._pending = ''                      # 跨 segment 的未完行，見 observe()
         self._text_parts: List[str] = []
 
     def observe(self, segment: str):
-        """Feed one display-ready segment."""
+        """Feed one display-ready segment.
+
+        跨 segment 的未完行會留在 `_pending`，等下一段接上或 `finalize()` 收尾。
+
+        原本是對每個 segment 各自 `split()`，於是 **segment 邊界等於行邊界**——而串流的
+        切點是閘門決定的，跟 Markdown 的行毫無關係。2026-09-08 req 399ad86d：改寫器回傳
+        的文字沒帶回段尾空行（E-14），下一段的 `- **陳 曉玲**：…` 因此黏在前一段的句子
+        後面；讀者看到的是行中的 `- `，Markdown 不會把它算成新項目，但這裡卻因為它是
+        新 segment 的第一行而把它當成一個段落標題。線上判 `missing_respondents: []`，
+        用同一支程式離線重放卻判「缺陳曉玲」。
+
+        線上與離線重放必須一致，這不是潔癖：稽核記錄可以重放，是這整套判定能被檢驗的
+        前提，而 0905-0908 的回歸量測全部建立在離線重放上。
+        """
         if not segment:
             return
         self._text_parts.append(segment)
-        for line in segment.split('\n'):
-            norm = normalize_heading(line)
-            if not norm:
-                continue
-            # 兩種比對共用同一批候選寫法：段落齊全檢查要的是相等比對，所以每一種寫法都
-            # 收；人名檢查要的是「這一段是誰的」，所以只取最短的那個候選（＝冒號前的
-            # 標籤），見 `_section_labels()`。
-            cands = heading_candidates(line)
-            self._headings.extend(cands)
-            if is_marked_heading(line) and cands:
-                self._marked_candidates.append((line, cands))
+        buf = self._pending + segment
+        lines = buf.split('\n')
+        self._pending = lines.pop()          # 最後一段沒有換行收尾，可能還沒寫完
+        for line in lines:
+            self._take(line)
+
+    def _take(self, line: str):
+        norm = normalize_heading(line)
+        if not norm:
+            return
+        # 兩種比對共用同一批候選寫法：段落齊全檢查要的是相等比對，所以每一種寫法都
+        # 收；人名檢查要的是「這一段是誰的」，所以只取最短的那個候選（＝冒號前的
+        # 標籤），見 `_section_labels()`。
+        cands = heading_candidates(line)
+        self._headings.extend(cands)
+        if is_marked_heading(line) and cands:
+            self._marked_candidates.append((line, cands))
+
+    def _flush(self):
+        """把最後一行沒有換行收尾的內容收進來。冪等。"""
+        if self._pending:
+            line, self._pending = self._pending, ''
+            self._take(line)
 
     @property
     def text(self) -> str:
@@ -473,6 +499,7 @@ class CompletenessChecker:
                    for r in self.respondents for t in self.calibration_traits)
 
     def finalize(self) -> CompletenessResult:
+        self._flush()
         result = CompletenessResult()
         # 「漏人」交不交給補生成，看的是這一題有沒有明定逐人分段——不是「是不是題庫題」。
         # 原本寫的是 `self.question is not None`，於是 Q13 這種純組合題也在補，見

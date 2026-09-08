@@ -219,14 +219,24 @@ class SegmentGate:
             return segment
         record.hits = self.scanner.banned_terms(hits)
 
-        # The segmenter hands every piece over with its trailing separator attached, so
+        # The segmenter hands every piece over with its separators attached, so
         # concatenating what was released reproduces the stream. A rewrite replaces the
-        # whole piece, and the model's reply does not end in a blank line -- so each
-        # rewrite silently ate one paragraph break and the next segment glued onto this
-        # one. 2026-08-31 req f1ea065d lost three table rows and a section heading that
-        # way: three consecutive rows were joined into a single line, and a GFM renderer
-        # drops the cells past the header's column count. That is the "中間有內容缺失"
-        # the reader reported one message later. Carry the original break across.
+        # whole piece, and the model's reply carries neither the leading nor the trailing
+        # blank line -- so each rewrite silently ate a paragraph break and the neighbouring
+        # segments glued onto this one. Carry both across.
+        #
+        #   * 尾端：2026-08-31 req f1ea065d 掉了三列表格與一個段落標題——三列被併成一行，
+        #     GFM 渲染器會把超過表頭欄數的儲存格丟掉。那就是讀者下一則訊息說的「中間有
+        #     內容缺失」。
+        #   * 開頭：2026-09-08 req 399ad86d 的 segment 4 原文是 `\n- **陳 曉玲**：…`，
+        #     改寫回來變成 `- **陳 曉玲**：…`。前一段是長 bullet 被切在句號處（見
+        #     `Segmenter._take`，超過 400 字就從最後一個句尾切），尾端本來就沒有換行，
+        #     於是兩段黏成 `…不被既有框架綁住。- **陳 曉玲**：…`。Markdown 不會把行中的
+        #     `- ` 算成新項目，讀者看到的是陳曉玲那一段被塞進李依帆的段落裡。
+        #
+        # 只補尾端擋不住這個：能不能黏，取決於**接縫兩側**有沒有換行，而長段落被切在句尾
+        # 時，前一段的尾端本來就沒有。
+        lead = segment[:len(segment) - len(segment.lstrip())]
         separator = segment[len(segment.rstrip()):]
 
         while record.rewrites < self.max_rewrites and self.rewriter is not None:
@@ -253,7 +263,7 @@ class SegmentGate:
             hits = self._scan(segment)
             record.attempts[-1]['after_hits'] = self.scanner.banned_terms(hits)
             if not hits:
-                return segment.rstrip() + separator
+                return lead + segment.strip() + separator
 
         record.final_hits = self.scanner.banned_terms(hits)
         return None
