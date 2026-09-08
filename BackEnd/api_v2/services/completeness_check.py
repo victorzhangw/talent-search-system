@@ -82,6 +82,34 @@ _SELF_INTRO_GAP = r'[^，。！？!?,;；\n]{0,20}'
 _CJK_RE = re.compile(r'^[一-鿿]+$')
 _ORG_SUFFIX_RE = re.compile(r'[-－]')
 
+# 模型在開場白自報的人數。2026-09-08 req e332a385 的第一句是「根據您提供的八位成員特質
+# 資料」，名單其實是 11 位——這個缺陷在回答的第一句就自己說出來了，只是沒有人在讀。
+# 只掃開場的前 200 字：後文的「建議每場 5 位以內」之類是會議建議，不是在數名單。
+_STATED_COUNT_SCAN_CHARS = 200
+_STATED_COUNT_RE = re.compile(r'(?<![0-9])([0-9]{1,2}|[一二三四五六七八九十兩]{1,3})\s*[位名](?![0-9])')
+_CJK_DIGITS = {'一': 1, '二': 2, '兩': 2, '三': 3, '四': 4, '五': 5,
+               '六': 6, '七': 7, '八': 8, '九': 9, '十': 10}
+
+
+def _to_int(token: str):
+    if token.isdigit():
+        return int(token)
+    if token == '十':
+        return 10
+    if token.startswith('十'):                      # 十一 ~ 十九
+        return 10 + _CJK_DIGITS.get(token[1:], 0)
+    if token.endswith('十'):                        # 二十 ~ 九十
+        return _CJK_DIGITS.get(token[:-1], 0) * 10
+    if len(token) == 3 and token[1] == '十':        # 二十一 ~ 九十九
+        return _CJK_DIGITS.get(token[0], 0) * 10 + _CJK_DIGITS.get(token[2], 0)
+    return _CJK_DIGITS.get(token)
+
+
+def stated_count(answer: str):
+    """回答開場白裡自報的人數；沒有就 None。只記錄，不影響 status。"""
+    m = _STATED_COUNT_RE.search(answer[:_STATED_COUNT_SCAN_CHARS])
+    return _to_int(m.group(1)) if m else None
+
 
 def is_marked_heading(line: str) -> bool:
     return bool(_MARKED_HEADING_RE.match(line))
@@ -207,7 +235,7 @@ def expected_sections_for(question: Optional[dict], respondent_count: int):
 class CompletenessResult:
     __slots__ = ('status', 'sections_check', 'missing_sections', 'missing_respondents',
                  'char_count', 'calibration_evidence', 'log_lines',
-                 'respondents_appendable')
+                 'respondents_appendable', 'stated_count', 'respondents_check')
 
     def __init__(self):
         # `status` is the verdict for the whole answer; the two *_check fields are the
@@ -223,6 +251,12 @@ class CompletenessResult:
         self.log_lines: List[str] = []
         # 「漏人」該不該交給補生成去補。題庫題是，自由提問不是——見 appendable_reason()。
         self.respondents_appendable = True
+        # 模型在開場白自報的人數（見 stated_count()）。只記錄，不改 status：它的精確度
+        # 還沒量過，而 status 會牽動補生成與 manual_review，先不讓沒量過的訊號動它。
+        self.stated_count: Optional[int] = None
+        # 覆蓋率是怎麼判的：by_section（回答照人分段，比段落標籤）／by_mention（沒有照人
+        # 分段，只問有沒有寫到這個人）／n/a（單人）。寫進稽核，省得日後再重新推一次。
+        self.respondents_check = 'n/a'
 
     def as_audit(self) -> dict:
         return {
@@ -231,6 +265,8 @@ class CompletenessResult:
             'missing_respondents': self.missing_respondents,
             'char_count': self.char_count,
             'calibration_evidence_check': self.calibration_evidence,
+            'stated_count': self.stated_count,
+            'respondents_check': self.respondents_check,
             'log': self.log_lines,
         }
 
@@ -310,7 +346,8 @@ class CompletenessChecker:
             '\n'.join(t for t in (user_query, prior) if t), respondents))
         self.expected, self._fallback_note = expected_sections_for(question, len(respondents))
         self._headings: List[str] = []          # every line, for exact section matching
-        self._marked_headings: List[str] = []   # explicitly marked lines only, for names
+        # 帶標記的行連同它的候選寫法，供 `_section_labels()` 取冒號前的標籤。
+        self._marked_candidates: List[tuple] = []
         self._text_parts: List[str] = []
 
     def observe(self, segment: str):
@@ -322,16 +359,75 @@ class CompletenessChecker:
             norm = normalize_heading(line)
             if not norm:
                 continue
-            # Section matching takes every candidate form of the line; the respondent-name
-            # test keeps the whole normalized line, because it matches on substring and a
-            # shorter candidate cannot make a name appear that was not already there.
-            self._headings.extend(heading_candidates(line))
-            if is_marked_heading(line):
-                self._marked_headings.append(norm)
+            # 兩種比對共用同一批候選寫法：段落齊全檢查要的是相等比對，所以每一種寫法都
+            # 收；人名檢查要的是「這一段是誰的」，所以只取最短的那個候選（＝冒號前的
+            # 標籤），見 `_section_labels()`。
+            cands = heading_candidates(line)
+            self._headings.extend(cands)
+            if is_marked_heading(line) and cands:
+                self._marked_candidates.append((line, cands))
 
     @property
     def text(self) -> str:
         return ''.join(self._text_parts)
+
+    def _section_labels(self) -> List[str]:
+        """每個帶標記的行，取「冒號前的那個標籤」——也就是它真正的段落名。
+
+        2026-09-08 req e332a385：名單 11 位，第 2 節逐人分析只寫了 7 位，覆蓋率檢查卻判
+        `missing_respondents: []`。原因是這裡原本拿整行去比對，而 `_MARKED_HEADING_RE` 把
+        任何以 `- ` 開頭的行都當成標題——那篇回答整篇都是 `- **標籤**：一整段內文` 的體例，
+        於是第 1 節的第一條 bullet：
+
+            - **偏收斂、重結構…**：…「強力推進組」（簡玥瀅、徐瑋襄、王雅韻、郁晨翰）與
+              「穩健支援組」（陳惠娟、劉湘君、秦珮芳、張瑜芳）…
+
+        **一行就讓 8 個人通過覆蓋率檢查**，其中王雅韻從頭到尾沒有自己的段落。重放那一筆，
+        11 個人裡 0 個是靠真正的段落標題命中的，全部靠內文。
+
+        `heading_candidates()` 早就算好了冒號前的標籤（那是為了 f1d36fbb 的「標題與內容
+        同一行」加的），這裡直接取最短的那個候選：真正的段落標籤是「（陳惠娟）」，內文
+        bullet 的標籤是「偏收斂、重結構，但存在兩種動力極端」——姓名自然就掃不到。
+
+        再擋掉「一個標籤裡有兩個以上名單成員」的組合標題，例如第 4 節的
+        「**徐瑋襄 vs. 張雅玲**」。那是搭配組合，不是任何一個人的段落；不擋的話張雅玲
+        仍然會被它放行。代價是：若模型真的把兩個人合寫成一段，這裡會判兩人皆缺——而多人
+        題庫題的指令本來就要求每人一段（Unit A 的名單區塊又補了一句「不得省略或合併」），
+        判缺是對的。
+        """
+        labels = []
+        for line, cands in self._marked_candidates:
+            label = _WHITESPACE_RE.sub('', min(cands, key=len))
+            if self._roster_hits(label) > 1:
+                continue
+            labels.append(label)
+        return labels
+
+    def _roster_hits(self, flat_text: str) -> int:
+        """`flat_text`（已去空白）裡出現了幾位名單成員。"""
+        n = 0
+        for r in self.respondents:
+            if any(_WHITESPACE_RE.sub('', f) in flat_text
+                   for f in name_forms(r.name or '')):
+                n += 1
+        return n
+
+    def _discussion_lines(self) -> List[str]:
+        """回答裡「在談某個人」的那些行，供 by_mention 比對。
+
+        `by_mention` 是給沒有照人分段的回答用的退路（見 finalize()）。退路不能退成
+        「名字出現過就算」——2026-09-08 req e332a385 的第 1 節有一條 bullet 一口氣列了
+        8 個名字，那是在列名單，不是在寫這 8 個人。所以一行點到 3 位以上就不算數。
+
+        門檻放在 3：兩個人的比較句（「王智弘與游品堯各有一套節奏」）是真的在談這兩位，
+        req 5017a070 整篇就是這樣寫的；再多就只可能是列舉。
+        """
+        out = []
+        for line in self.text.split('\n'):
+            flat = _WHITESPACE_RE.sub('', line)
+            if flat and self._roster_hits(flat) <= 2:
+                out.append(flat)
+        return out
 
     def _needs_evidence(self) -> bool:
         return any(r.scores.get(t) == 'A'
@@ -367,6 +463,19 @@ class CompletenessChecker:
         # 觸發過。而漏人正好只發生在自由提問：43c1f019 名單 7 加到 8，漏掉的正是新增那位；
         # 4920eef8 名單 1 加到 8，回答宣稱其餘七位沒有資料。
         if len(self.respondents) > 1:
+            # 題庫題比對的是「段落標籤」（`_section_labels()`），不是整行——整行會被內文
+            # bullet 騙掉，見那支函式的說明。
+            #
+            # 但「照人分段」不是每一道題庫題都成立的假設。2026-08-18 req 5017a070 是兩人的
+            # 合作題，回答照主題分段（團隊合作價值／最能互補／可能摩擦），兩個人的名字都在
+            # 內文裡、沒有任何一段以人為標題——用嚴格比法會判兩個人都缺席，補生成就會在一篇
+            # 完整的回答後面硬接兩段。E-12 的教訓就是這個形狀。
+            #
+            # 所以判準取自回答自己：**只要有任何一位名單成員擁有以他為標題的段落**，就代表
+            # 這篇是照人分段的，其他人沒有自己的段落就是真的漏了；一個都沒有，就退回
+            # 「有沒有寫到這個人」。不去解析指令來推導格式——b §8 明講那是語意判斷，
+            # `expected_sections` 才是唯一來源。
+            #
             # 題庫題的段落結構是題目指定的，所以「有沒有自己的標題」問得出來。自由提問沒有
             # 指定結構——使用者問「誰最適合，給我排序」，一份不用標題的排序清單、一張表格
             # 都是好答案。拿標題當判準，全語料 29 筆多人回覆會判出 12 筆缺人，其中 9 筆的
@@ -376,10 +485,18 @@ class CompletenessChecker:
             # 代價寫在這裡，不要之後再重新發現一次：這樣就抓不到 4920eef8 那種「七個人的
             # 名字都列了，但列在『這些人沒有資料』的句子裡」。那是模型謊報資料缺席，屬於
             # 另一種檢查；4920eef8 的根因（歷史蓋過名單）由 Unit 1 的名單宣告處理。
-            if self.question is not None:
-                haystack = [_WHITESPACE_RE.sub('', h) for h in self._marked_headings]
+            labels = self._section_labels() if self.question is not None else []
+            if labels and any(self._roster_hits(l) == 1 for l in labels):
+                haystack = labels
+                result.respondents_check = 'by_section'
+            elif self.question is not None:
+                haystack = self._discussion_lines()
+                result.respondents_check = 'by_mention'
             else:
+                # 自由提問維持整篇比對：沒有指定輸出結構，一張表格、一份排序清單都是好
+                # 答案，全語料 29 筆多人回覆有 9 筆是這種形狀。
                 haystack = [_WHITESPACE_RE.sub('', answer)]
+                result.respondents_check = 'by_mention'
             result.missing_respondents = [
                 r.name for r in self.respondents
                 if r.name not in self.self_introduced
@@ -387,6 +504,13 @@ class CompletenessChecker:
                             for form in name_forms(r.name) for h in haystack)]
             if result.missing_respondents:
                 result.status = 'failed'
+
+        if len(self.respondents) > 1:
+            n = stated_count(answer)
+            if n is not None and n != len(self.respondents):
+                result.stated_count = n
+                result.log_lines.append(
+                    f'模型自報 {n} 位，本輪名單 {len(self.respondents)} 位（只記錄，不影響判定）')
 
         if self._needs_evidence():
             ok = any(term in answer for term in EVIDENCE_TERMS)

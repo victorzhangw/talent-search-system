@@ -165,9 +165,14 @@ def main():
     res = check_answer('## 王智弘\n\n' + body, two, q5, CALIB)
     check('a missing respondent -> failed', res.status == 'failed'
           and res.missing_respondents == ['林孟德'], res.missing_respondents)
-    res = check_answer(body + '\n\n關於林孟德的部分寫在內文', two, q5, CALIB)
+    # 「內文提到不算有自己的段落」只在回答**確實照人分段**時成立：這裡王智弘有自己的
+    # 標題，所以格式是照人分段的，林孟德只出現在內文就是真的漏了。
+    # （原本這條的 fixture 兩個人都沒有標題，那種形狀現在走 by_mention——見 [5c]。）
+    res = check_answer('## 王智弘\n\n' + body + '\n\n關於林孟德的部分寫在內文',
+                       two, q5, CALIB)
     check('a name only in running prose does not count',
-          '林孟德' in res.missing_respondents, res.missing_respondents)
+          res.missing_respondents == ['林孟德'] and res.respondents_check == 'by_section',
+          f'{res.missing_respondents} / {res.respondents_check}')
     check('single-person answers are not name-checked',
           not check_answer(body, r1, q5, CALIB).missing_respondents)
 
@@ -196,15 +201,84 @@ def main():
     # 多人回覆裡有 9 筆是這種形狀，拿標題當判準會全部判成缺人。
     check('自由提問：寫在內文也算寫到（不要求標題）',
           not check_answer('排序為王智弘、林孟德。', two, None, CALIB).missing_respondents)
-    check('題庫題維持嚴格：內文提到不算有自己的段落',
-          '林孟德' in check_answer(sections_answer(q5, expected_sections_for(q5, 2)[0])
+    check('題庫題維持嚴格：照人分段時，內文提到不算有自己的段落',
+          '林孟德' in check_answer('## 王智弘\n\n'
+                                 + sections_answer(q5, expected_sections_for(q5, 2)[0])
                                  + '\n\n關於林孟德的部分寫在內文',
                                  two, q5, CALIB).missing_respondents)
 
-    q5_res = check_answer(sections_answer(q5, expected_sections_for(q5, 2)[0])
+    q5_res = check_answer('## 王智弘\n\n'
+                          + sections_answer(q5, expected_sections_for(q5, 2)[0])
                           + '\n\n關於林孟德的部分寫在內文', two, q5, CALIB)
     check('題庫題不受影響：漏人仍然交給補生成',
           '缺少獨立段落的受測者' in q5_res.appendable_reason(), q5_res.appendable_reason())
+
+    print('\n[5e] 覆蓋率怎麼判：由回答自己的格式決定（req e332a385 / 5017a070）')
+    # 2026-09-08 req e332a385：名單 11 位，逐人分析只寫 7 位，覆蓋率檢查卻判 []。
+    # 根因是拿「整行」去比對，而 `- ` 開頭的內文 bullet 也算 marked heading——第 1 節
+    # 一條列了 8 個名字的 bullet，一行就讓 8 個人通過。
+    eight = [Respondent(n, f'R{i}', {'CIA_05': 'B'})
+             for i, n in enumerate(['甲一', '乙二', '丙三', '丁四'])]
+    trap = ('- **偏收斂、重結構**：成員可分為「推進組」（甲一、乙二）與'
+            '「支援組」（丙三、丁四），兩組節奏不同。\n\n'
+            '- **（甲一）**：內容。\n\n- **（乙二）**：內容。')
+    res = check_answer(trap, eight, q5, CALIB)
+    check('列了一串名字的內文 bullet 不算那些人的段落',
+          res.missing_respondents == ['丙三', '丁四'], res.missing_respondents)
+    check('照人分段的回答走 by_section', res.respondents_check == 'by_section',
+          res.respondents_check)
+    combo = ('- **（甲一）**：內容。\n\n- **（乙二）**：內容。\n\n'
+             '- **丙三 vs. 丁四**：這組搭配需要主持保護。')
+    check('「A vs. B」的組合標題不算 A 或 B 的段落',
+          check_answer(combo, eight, q5, CALIB).missing_respondents == ['丙三', '丁四'],
+          check_answer(combo, eight, q5, CALIB).missing_respondents)
+
+    # 2026-08-18 req 5017a070：兩人的合作題，回答照主題分段，兩人都寫在內文段落裡。
+    # 這種形狀不能用「有沒有自己的標題」去判，否則補生成會在完整的回答後面硬接兩段（E-12）。
+    by_theme = ('### 團隊合作價值\n\n王智弘帶來的是推進與品質把關。\n\n'
+                '林孟德帶來的是穩定執行與程序把關。\n\n### 可能摩擦\n\n兩人節奏不同。')
+    res = check_answer(by_theme, two, q5, CALIB)
+    check('照主題分段、人人都寫到 -> 不判缺人',
+          res.missing_respondents == [] and res.respondents_check == 'by_mention',
+          f'{res.missing_respondents} / {res.respondents_check}')
+    res = check_answer('### 團隊合作價值\n\n王智弘帶來的是推進與品質把關。', two, q5, CALIB)
+    check('照主題分段但真的少一個人 -> 仍判得出來',
+          res.missing_respondents == ['林孟德'], res.missing_respondents)
+    # by_mention 的退路不能退成「名字出現過就算」，否則 e332a385 那條列 8 人的 bullet
+    # 又會全部放行。一行點到 3 位以上就是在列名單，不是在寫這些人。
+    res = check_answer('### 觀察\n\n成員可分為甲一、乙二、丙三、丁四四組節奏。',
+                       eight, q5, CALIB)
+    check('by_mention 下，只出現在名單列舉裡不算寫到',
+          res.missing_respondents == ['甲一', '乙二', '丙三', '丁四']
+          and res.respondents_check == 'by_mention',
+          f'{res.missing_respondents} / {res.respondents_check}')
+    check('自由提問不受影響：整篇比對，寫在內文就算',
+          check_answer('成員可分為甲一、乙二、丙三、丁四四組節奏。',
+                       eight, None, CALIB).missing_respondents == [])
+
+    print('\n[5f] 模型自報人數（只記錄，不影響判定）')
+    res = check_answer('以下根據您提供的八位成員特質資料。\n\n'
+                       '- **（甲一）**：內容。\n\n- **（乙二）**：內容。'
+                       '\n\n- **（丙三）**：內容。\n\n- **（丁四）**：內容。',
+                       eight, q5, CALIB)
+    check('開場自報 8 位、名單 4 位 -> 記進稽核', res.stated_count == 8, res.stated_count)
+    # status 是 failed，但那是因為這個 fixture 沒有寫 q5 的段落名；重點是自報人數
+    # 沒有讓任何一個人被判成缺席。
+    check('自報人數不改判定：漏人與否只看段落，這裡人人都有',
+          res.missing_respondents == [], res.missing_respondents)
+    check('落差寫進 log_lines',
+          any('模型自報 8 位' in l for l in res.log_lines), res.log_lines)
+    ok = check_answer('以下根據您提供的四位成員特質資料。\n\n'
+                      '- **（甲一）**：內容。\n\n- **（乙二）**：內容。'
+                      '\n\n- **（丙三）**：內容。\n\n- **（丁四）**：內容。',
+                      eight, q5, CALIB)
+    check('數對了就不記', ok.stated_count is None
+          and not any('模型自報' in l for l in ok.log_lines), ok.stated_count)
+    check('單人不做這個檢查',
+          check_answer('以下針對這兩位。' + body, r1, q5, CALIB).stated_count is None)
+    check('稽核欄位帶得出 stated_count 與 respondents_check',
+          res.as_audit()['stated_count'] == 8
+          and res.as_audit()['respondents_check'] == 'by_section', res.as_audit())
 
     print('\n[5d] 廠商姓名格式：payload 帶空白與單位，模型寫乾淨的名字')
     vendor = [Respondent('柳 宇賸-人資發展課', 'R1', {'CIA_05': 'B'}),

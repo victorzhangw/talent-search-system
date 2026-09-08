@@ -20,7 +20,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), enc
 from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.log_assembler import (Respondent, assemble, check_audience,  # noqa: E402
                                            AudienceMismatch, SYSTEM_MARKER,
-                                           INSTRUCTION_MARKER, ROSTER_MARKER)
+                                           INSTRUCTION_MARKER, ROSTER_MARKER,
+                                           COVERAGE_CLAUSE)
 
 PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
                    'Traitty_調整_20260728＿final')
@@ -60,6 +61,23 @@ def parse_respondents(lines):
     return out
 
 
+def split_roster(actual):
+    """把 `[本輪判讀對象]` 區塊從產出的 LOG 裡拿掉，回傳 (其餘行, 區塊行)。
+
+    v7 範例是客戶在名單宣告存在之前寫的，所以那幾行在 expected 裡不可能有對應。逐行比對
+    是 DoD 第 1 條，不能因為多了一個區塊就整份放寬——所以在這裡把區塊「取出來」單獨檢查，
+    剩下的部分仍然要求 0 未解釋差異。這比在 classify() 裡放行整段安全：只要區塊的形狀跑掉
+    （多一行、少一行、位置不對），這裡就切不乾淨，剩下的行照樣會對不齊而爆掉。
+    """
+    try:
+        i = actual.index(ROSTER_MARKER)
+    except ValueError:
+        return actual, []
+    j = actual.index(INSTRUCTION_MARKER, i)
+    # 區塊與 [任務指令] 之間有一個空行，一起拿掉。
+    return actual[:i] + actual[j:], actual[i:j - 1]
+
+
 def classify(expected: str, actual: str) -> str:
     """'' when identical, otherwise the name of the known deviation, or 'UNEXPECTED'."""
     if expected == actual:
@@ -92,11 +110,19 @@ def main():
 
         respondents = parse_respondents(expected)
         log = assemble(respondents, question)
-        actual = log.to_log_text().split('\n')
+        actual, roster = split_roster(log.to_log_text().split('\n'))
 
         print(f'\n[{filename}]  {len(respondents)} respondent(s), idx={question["idx"]}')
-        check('line count matches', len(actual) == len(expected),
-              f'{len(actual)} vs {len(expected)}')
+        n = len(respondents)
+        check('the roster block is present and well formed',
+              len(roster) == (4 if n > 1 else 3) and roster[0] == ROSTER_MARKER
+              and roster[1].startswith(f'共 {n} 位：'), roster)
+        check('every respondent is named in the roster block',
+              all(r.name in roster[1] for r in respondents), roster[1] if roster else '')
+        check('multi carries the coverage clause, single does not',
+              (roster[-1] == COVERAGE_CLAUSE.format(n=n)) == (n > 1), roster[-1:])
+        check('line count matches once the roster block is taken out',
+              len(actual) == len(expected), f'{len(actual)} vs {len(expected)}')
 
         deviations = {}
         unexpected = []
@@ -171,8 +197,24 @@ def main():
           not re.search(r'RESP_\d+', free_multi.instruction.split(INSTRUCTION_MARKER)[0]))
     check('it tells the model to ignore rosters from earlier turns',
           '先前對話' in free.instruction)
-    check('題庫題 carries no roster block -- v7 diff must stay at 0 lines',
-          ROSTER_MARKER not in assemble(two, both).instruction)
+    # 2026-09-08 req e332a385：名單 11 位、11 份特質全送，模型寫「根據您提供的八位成員
+    # 特質資料」，逐人分析只寫 7 位。題庫題原本不加名單區塊是為了維持 v7 的 0 差異，
+    # 那份範例只有 2 個人——這個取捨在 11 人的規模下不成立。
+    quiz_multi = assemble(two, both).instruction
+    check('題庫題 also carries the roster block (req e332a385)',
+          quiz_multi.startswith(ROSTER_MARKER), repr(quiz_multi[:30]))
+    check('題庫題 multi is told to cover all N, without a hard quota',
+          COVERAGE_CLAUSE.format(n=2) in quiz_multi
+          and '資料不足以明確判讀' in quiz_multi)
+    check('the coverage clause never demands a fixed number of sections',
+          '必須輸出' not in quiz_multi and '不得省略或合併' in quiz_multi)
+    check('單人題庫題 gets the roster but no coverage clause',
+          ROSTER_MARKER in assemble(one, both).instruction
+          and '逐人分析' not in assemble(one, both).instruction)
+    check('自由提問 multi still gets no coverage clause (Victoria / 點名式提問)',
+          '逐人分析' not in assemble(two, None, user_query=q).instruction)
+    check('題庫題 instruction text itself is untouched',
+          quiz_multi.endswith(f'{INSTRUCTION_MARKER}\n{both["instruction_multi"]}'))
 
     print('\n[to_messages() vs to_log_text()]')
     log = assemble(one, both)

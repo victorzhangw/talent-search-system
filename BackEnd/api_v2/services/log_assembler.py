@@ -9,7 +9,7 @@
     #### 其他特質索引…            ← scoped questions only
     #### 交互作用——…              ← sub-blocks from the selector
     ---
-    [本輪判讀對象]                 ← free-form only, see roster_block()
+    [本輪判讀對象]                 ← 名單與人數，見 roster_block()
     [任務指令]
 
 Everything is joined by exactly one blank line, with one exception carried over from the
@@ -63,12 +63,23 @@ def log_label_for(index: int) -> str:
     return f'{LOG_LABEL_PREFIX}{index + 1:02d}'
 
 
-def roster_block(respondents: List['Respondent']) -> str:
-    """自由提問時宣告本輪名單的區塊，放在 `[任務指令]` 之前。
+# 題庫題多人時追加的一句。約束的是「不准漏人」，不是「湊滿格數」——
+# System 規範第 42 條是「缺席不臆測」，Q15 指令第十一節也寫了「若資料不足…不可假裝高度
+# 確定」。寫成「必須輸出 N 段」會和這兩條打架，模型面對資料稀薄的人會傾向硬湊；所以這裡
+# 明講「資料不足者仍須保留段落並說明只能判讀到什麼程度」，給它一條不違規的出路。
+COVERAGE_CLAUSE = (
+    '逐人分析的段落必須涵蓋以上全部 {n} 位，不得省略或合併；'
+    '若某位的資料不足以明確判讀，仍須為他保留段落，並說明目前只能判讀到什麼程度。'
+)
 
-    自由提問的 `[任務指令]` 就是使用者原句，payload 裡沒有任何一句話說「本輪要判讀的是
-    這 N 位」。而 messages 的順序是 system(資料) → history → user(指令)，歷史因此比資料區
-    更靠近提問——名單一變動，模型就照著歷史裡的舊名單作答：
+
+def roster_block(respondents: List['Respondent'],
+                 question: Optional[dict] = None) -> str:
+    """宣告本輪名單的區塊，放在 `[任務指令]` 之前。
+
+    payload 裡原本沒有任何一句話說「本輪要判讀的是這 N 位」。而 messages 的順序是
+    system(資料) → history → user(指令)，歷史因此比資料區更靠近提問——名單一變動，模型
+    就照著歷史裡的舊名單作答：
 
       * b004c655 / req 43c1f019：名單 7 位加到 8 位，回答漏掉的正好只有新增的那一位。
       * 1a534fca / req 4920eef8：名單 1 位加到 8 位，回答宣稱「僅 Howard Hsu 一位有資料，
@@ -80,14 +91,30 @@ def roster_block(respondents: List['Respondent']) -> str:
     只列姓名，不列 RESP_xx：把位置代號寫進指令，等於邀請模型把它抄進標題，而 4de8be30
     整串被截斷的起因正是模型寫出 `### 第一優先：Lim（受測者 | Lim | RESP_03）`。
 
-    只宣告名單，不要求「每人都要有獨立段落」：a6718cb3 的提問是「我是 Victoria，帶領一個
-    8 人的電話客服團隊」，Victoria 本人是提問者，不替她寫一段才是對的。覆蓋率屬於
-    `completeness_check` 的職責，不在這裡用指令硬逼。
+    **題庫題原本不加這個區塊**，理由是三份 v7 客戶範例都是題庫題，逐行比對必須維持 0 差異。
+    2026-09-08 req e332a385 推翻了這個取捨：名單 11 位、11 份特質全數送出，模型第一句寫的
+    是「根據您提供的八位成員特質資料」，第 2 節逐人分析只寫了 7 位。指令第九節其實寫了
+    「請逐一說明每個人」，但 payload 裡沒有名單可對，那句話沒有錨點——模型得自己數散落在
+    2500 行特質資料裡的 11 個 `### [受測者 …]` 標頭。客戶那份會議團隊範例只有 2 個人，
+    這個設計從來沒有在 11 人的規模下被驗證過。v7 逐行比對因此改成「先取出名單區塊、其餘
+    維持 0 差異」，見 `verify_log_assembler.py`。
+
+    多人題庫題才追加 `COVERAGE_CLAUSE`：
+
+      * 自由提問不加。a6718cb3 的提問是「我是 Victoria，帶領一個 8 人的電話客服團隊」，
+        Victoria 本人是提問者，不替她寫一段才是對的；點名式提問（「請只針對林慧嵐說明」）
+        更是只該寫一位。自由提問的覆蓋率屬於 `completeness_check`，不在這裡用指令硬逼。
+      * 單人題庫題不加：`instruction_single` 本來就是寫給一個人的，那句話沒有意義。
+      * 多人題庫題加。它的 `instruction_multi` 本來就規定每人一段，這句只是把「每人」換成
+        一個模型可以對照的數字。
     """
     names = '、'.join(r.name for r in respondents)
-    return (f'{ROSTER_MARKER}\n'
-            f'共 {len(respondents)} 位：{names}。\n'
-            f'以本節為準；先前對話若提到其他人選，一律不再視為本輪對象。')
+    lines = [ROSTER_MARKER,
+             f'共 {len(respondents)} 位：{names}。',
+             '以本節為準；先前對話若提到其他人選，一律不再視為本輪對象。']
+    if question is not None and len(respondents) > 1:
+        lines.append(COVERAGE_CLAUSE.format(n=len(respondents)))
+    return '\n'.join(lines)
 
 
 class AudienceMismatch(ValueError):
@@ -121,7 +148,7 @@ class AssembledLog:
                  injected_names=None, injected_labels=None,
                  log_labels=None, name_bound_ids=None):
         self.body = body                  # [SYSTEM PROMPT] … 【輸入數據】 …
-        # 題庫題是 `[任務指令]\n…`；自由提問前面還有一段 `[本輪判讀對象]`，見 roster_block()。
+        # `[本輪判讀對象]\n…\n\n[任務指令]\n…`，見 roster_block()。
         self.instruction = instruction
         self.audit = audit
         # What the exit scanner narrows itself to for this request (b §7 per-request
@@ -243,16 +270,14 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
                         SEPARATOR, DATA_HEADER] + blocks)
 
     # `free_form_input_contract` 寫的是「[任務指令]＝user_query 原文」，所以名單宣告是一個
-    # 平行的具名區塊，不動指令本身——`[任務指令]\n<user_query>` 仍然逐字存在。這和歷史區塊
-    # 放在 LOG 本體之外是同一種手法：加東西，但不改既有那段的內容。
-    #
-    # 題庫題不加。三份 v7 客戶範例全是題庫題，`verify_log_assembler.py` 對它們做逐行比對，
-    # 那份比對必須維持 0 差異。
+    # 平行的具名區塊，不動指令本身——`[任務指令]\n<user_query>` 仍然逐字存在。題庫題同理，
+    # `question[key]` 一字未改。加東西，但不改既有那段的內容。
     if question is None:
-        instruction_text = f'{roster_block(respondents)}\n\n{INSTRUCTION_MARKER}\n{user_query.strip()}'
+        body_text = f'{INSTRUCTION_MARKER}\n{user_query.strip()}'
     else:
         key = 'instruction_multi' if len(respondents) > 1 else 'instruction_single'
-        instruction_text = f'{INSTRUCTION_MARKER}\n{question[key]}'
+        body_text = f'{INSTRUCTION_MARKER}\n{question[key]}'
+    instruction_text = f'{roster_block(respondents, question)}\n\n{body_text}'
 
     audit = {
         'question_id': question['idx'] if question else None,
