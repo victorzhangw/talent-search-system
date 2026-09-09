@@ -38,16 +38,12 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
     INTEGRATION_MODE = os.getenv('INTEGRATION_MODE', 'REAL') # MOCK or REAL
     
-    # Database: Use absolute path to ensure consistency regardless of CWD
-    # Start from this file: .../BackEnd/api_v2/config/settings.py
-    _basedir = os.path.abspath(os.path.dirname(__file__)) 
-    _project_root = os.path.dirname(_basedir) # .../BackEnd/api_v2
-    _db_path = os.path.join(_project_root, 'app.db')
-    
-    # On Windows, path separator might need handling for SQLite URI if using pure path?
-    # SQLAlchemy handles Windows paths fine usually, but let's be safe.
-    DATABASE_URI = os.getenv('DATABASE_URI', f'sqlite:///{_db_path}')
-    
+    # 資料庫連線不在這裡。database/connection.py 的 get_db_url() 直接讀
+    # DB_USER / DB_PASSWORD / DB_HOST / DB_PORT / DB_NAME 組出 PostgreSQL URL，
+    # 從來不看 app.config。這裡以前有一個 DATABASE_URI（預設 sqlite:///app.db），
+    # 它不影響任何連線，只讓讀設定的人以為後端跑在 SQLite 上——scripts/uat_db_check.py
+    # 的註解就是為了澄清這件事而寫的。已移除，不要再加回來。
+
     # LLM Settings — default mirrors BackEnd/api_v2/.env (DeepSeek)
     LLM_API_KEY = os.getenv('LLM_API_KEY')                                     # 必填，無預設值：key 遺失時 rag_engine 會報錯而非靜默呼叫錯誤服務
     LLM_MODEL = os.getenv('LLM_MODEL', 'deepseek-v4-flash')

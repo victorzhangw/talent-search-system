@@ -71,8 +71,10 @@ def load_env():
 def load_local_env():
     """The DB the backend on this machine talks to.
 
-    Reads the same DB_* keys `database/connection.py:get_db_url()` reads -- deliberately
-    not DATABASE_URI, which .env.example advertises but that function ignores.
+    Reads the same DB_* keys `database/connection.py:get_db_url()` reads. There used to be
+    a rival `DATABASE_URI` (advertised by .env.example, defaulted to SQLite in
+    config/settings.py) that no connection ever consulted; it has been removed, and the
+    DB_* keys are now the only source.
     """
     env = read_env_file(LOCAL_ENV_PATH)
     return {'UAT_DB_HOST': env.get('DB_HOST', 'localhost'),
