@@ -23,6 +23,8 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'),
             encoding='utf-8-sig')
 
+from datetime import datetime                                         # noqa: E402
+
 import jwt                                                            # noqa: E402
 from flask import Flask                                               # noqa: E402
 from sqlalchemy import create_engine                                  # noqa: E402
@@ -31,6 +33,7 @@ from sqlalchemy.orm import sessionmaker                               # noqa: E4
 from api_v2.database.models import Base, DailySettlementRecord        # noqa: E402
 from api_v2.utils import traitty_api                                  # noqa: E402
 from api_v2.utils import upstream_env as ue                           # noqa: E402
+from api_v2 import scheduler                                          # noqa: E402
 from api_v2.scheduler import upstream_for_record                      # noqa: E402
 
 UAT = 'https://uat.example.test'
@@ -85,6 +88,42 @@ class Captured:
                 return {'status': True, 'summary': {'accepted': 1}}
 
         return Resp()
+
+
+def make_record(status='FAILED', env='default', retry_count=0, days_ago=1):
+    """一筆長得像真的扣點紀錄。`days_ago` 用來測 7 天掃描視窗。
+
+    `created_at` 固定為 2026-09-01 的偏移，讓 report_date 的斷言不隨執行日期漂移。
+    """
+    from datetime import timedelta
+    base = datetime(2026, 9, 1, 10, 30, 0)
+    return DailySettlementRecord(
+        user_id='x@example.com', plan_id=7, session_id='sess-1', message_id='42',
+        upstream_env=env, status=status, retry_count=retry_count,
+        created_at=base if days_ago == 1 else base - timedelta(days=days_ago))
+
+
+def run_job(app, session, capture, dry_run=False, limit=None):
+    """跑一輪 scheduler.process_pending_and_failed_records()，資料庫換成傳入的 session。
+
+    掃描視窗是相對 `datetime.utcnow()` 算的，而測試資料固定在 2026-09-01，所以這裡把
+    scheduler 的 `datetime` 換掉，讓「現在」永遠是 2026-09-02——否則這支腳本會在
+    2026-09-08 之後開始無聲地選不到任何紀錄，變成一個永遠通過但什麼都沒驗的測試。
+    """
+    class FrozenDatetime(datetime):
+        @classmethod
+        def utcnow(cls):
+            return datetime(2026, 9, 2, 12, 0, 0)
+
+    orig = (scheduler.get_db_session, scheduler.httpx.post, scheduler.datetime)
+    scheduler.get_db_session = lambda: session
+    scheduler.httpx.post = capture
+    scheduler.datetime = FrozenDatetime
+    try:
+        return scheduler.process_pending_and_failed_records(app, dry_run=dry_run,
+                                                            limit=limit)
+    finally:
+        (scheduler.get_db_session, scheduler.httpx.post, scheduler.datetime) = orig
 
 
 def token_claiming(env_value):
@@ -160,6 +199,63 @@ def main():
             env, base = upstream_for_record(rec)
             check(f'{bad!r} -> env={env}, base={base}',
                   env in ue.KNOWN_ENVS and env != 'prd' and base == UAT, (env, base))
+
+    print('\n[7] 補送作業跑一輪：成功的轉 SYNCED')
+    session, cap = fresh_db(), Captured(ok=True)
+    session.add(make_record(status='FAILED', env='prd', retry_count=1))
+    session.commit()
+    total, failed = run_job(app_with(True), session, cap)
+    rec = session.query(DailySettlementRecord).one()
+    check('處理 1 筆、失敗 0 筆', (total, failed) == (1, 0), (total, failed))
+    check('status -> SYNCED', rec.status == 'SYNCED', rec.status)
+    check('last_error 清空', rec.last_error == '', repr(rec.last_error))
+    check('打的是 PRD（紀錄的環境）', cap.calls[0]['url'].startswith(PRD), cap.calls[0]['url'])
+    check('report_date 用紀錄當初的日期，不是今天',
+          cap.calls[0]['json']['report_date'] == '2026-09-01',
+          cap.calls[0]['json']['report_date'])
+
+    print('\n[8] 補送作業跑一輪：失敗的累加 retry_count、截斷 last_error')
+    session, cap = fresh_db(), Captured(ok=False)
+    session.add(make_record(status='FAILED', env='prd', retry_count=1))
+    session.commit()
+    total, failed = run_job(app_with(True), session, cap)
+    rec = session.query(DailySettlementRecord).one()
+    check('處理 1 筆、失敗 1 筆', (total, failed) == (1, 1), (total, failed))
+    check('status 仍為 FAILED', rec.status == 'FAILED', rec.status)
+    check('retry_count 由 1 加到 2', rec.retry_count == 2, rec.retry_count)
+    check('last_error 截斷在 500 字以內（id 83/84 曾整頁 HTML 塞進來）',
+          len(rec.last_error or '') <= 500, len(rec.last_error or ''))
+
+    print('\n[9] --dry-run 不打上游也不寫資料庫')
+    session, cap = fresh_db(), Captured(ok=True)
+    session.add(make_record(status='FAILED', env='prd', retry_count=3))
+    session.commit()
+    total, failed = run_job(app_with(True), session, cap, dry_run=True)
+    rec = session.query(DailySettlementRecord).one()
+    check('回報有 1 筆待處理', (total, failed) == (1, 0), (total, failed))
+    check('完全沒有打上游', cap.calls == [], cap.calls)
+    check('status 沒有被改動', rec.status == 'FAILED', rec.status)
+    check('retry_count 沒有被改動', rec.retry_count == 3, rec.retry_count)
+
+    print('\n[10] 篩選條件：視窗外、重試用盡、已 SYNCED 的都不處理')
+    session, cap = fresh_db(), Captured(ok=True)
+    session.add(make_record(status='FAILED', days_ago=30))              # 視窗外
+    session.add(make_record(status='FAILED', retry_count=scheduler.MAX_RETRIES))  # 用盡
+    session.add(make_record(status='SYNCED'))                            # 已完成
+    session.add(make_record(status='PENDING'))                           # 該處理
+    session.commit()
+    total, failed = run_job(app_with(True), session, cap, dry_run=True)
+    check('4 筆裡只挑出 1 筆（PENDING 且在視窗內、重試未用盡）', total == 1, total)
+
+    print('\n[11] --limit 限制單輪筆數')
+    session, cap = fresh_db(), Captured(ok=True)
+    for _ in range(3):
+        session.add(make_record(status='PENDING'))
+    session.commit()
+    check('不給 limit -> 3 筆',
+          run_job(app_with(True), session, cap, dry_run=True)[0] == 3)
+    check('limit=2 -> 2 筆',
+          run_job(app_with(True), session, cap, dry_run=True, limit=2)[0] == 2)
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
