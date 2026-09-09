@@ -29,7 +29,7 @@ from api_v2.services.log_pipeline import (  # noqa: E402
     strip_duplicate_closer, strip_trailing_closer)
 from api_v2.services.question_table import table  # noqa: E402
 from api_v2.services.segment_gate import (  # noqa: E402
-    SegmentGate, STATUS_MANUAL_REVIEW)
+    SegmentGate, STATUS_MANUAL_REVIEW, STATUS_OK)
 
 CLOSER = '本分析旨在提供觀點與輔助，最終決策請結合多方資訊綜合考量。'
 
@@ -262,15 +262,24 @@ def main():
     check('傳給模型的理由只提缺段落，不提佐證',
           called and '缺少段落' in called[0] and '佐證' not in called[0], called)
 
-    print('\n[11] 自由提問超過字數 -> 不補生成（補下去只會更長）')
+    print('\n[11] 自由提問超過字數 -> 只記錄，不補生成也不判失敗（U10）')
+    # 補生成修不了超字（append 只會更長），所以它從來不該觸發；U10 之後連 status 都不動。
+    # 2026-09-09 的 prd UAT 14 筆自由提問全部超過 1000 字（最短 1022），其中 11 筆缺段、
+    # 漏人、佐證全乾淨——舊行為讓這 11 筆全部掛上 manual_review，那個狀態因此失去意義。
     called = []
+    checker = CompletenessChecker(r, None, table.calibration_traits)
     gate = SegmentGate(ExitScanner(injected_names=set(), injected_labels=set()),
-                       checker=CompletenessChecker(r, None, table.calibration_traits),
+                       checker=checker,
                        completer=lambda reason: called.append(reason) or '補生成的內容。')
     list(gate.run(['太長。' * 400 + '行為事例佐證。']))
     check('補生成沒有被呼叫', called == [], called)
-    check('status 是 manual_review', gate.result.status == STATUS_MANUAL_REVIEW,
+    check('status 是 ok（不再是 manual_review）', gate.result.status == STATUS_OK,
           gate.result.status)
+    audit = checker.finalize().as_audit()
+    check('但稽核記下超字了', audit['free_form_length_check'] == 'over_limit',
+          audit['free_form_length_check'])
+    check('也記下實際字數', isinstance(audit['char_count'], int) and audit['char_count'] > 1000,
+          audit['char_count'])
 
     print('\n[12] 只有 blocked 會通知使用者；manual_review 只進稽核日誌')
     src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',

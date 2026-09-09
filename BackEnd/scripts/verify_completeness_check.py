@@ -364,13 +364,30 @@ def main():
     check('自稱在前幾輪說過，後續輪次仍然豁免', res.missing_respondents == [],
           res.missing_respondents)
 
-    print('\n[6] Free-form: length only')
+    print('\n[6] Free-form: 字數只記錄，不判失敗（U10）')
+    # 超字曾經把 status 打成 failed。它從來沒有可行動的意義——補生成修不了（append 只會
+    # 更長），所以唯一的效果是讓 manual_review 對自由提問永遠亮著，把真正需要人看的
+    # 缺段與佐證問題淹掉。規格值保留，改記在 free_form_length_check。
     res = check_answer('短短的回答。', r1, None, CALIB)
-    check('short free-form answer passes', res.status == 'passed', res.char_count)
+    check('短回答 passed', res.status == 'passed', res.char_count)
+    check('短回答 free_form_length_check=passed',
+          res.free_form_length_check == 'passed', res.free_form_length_check)
     res = check_answer('字' * (FREE_FORM_MAX_CHARS + 1), r1, None, CALIB)
-    check(f'over {FREE_FORM_MAX_CHARS} chars -> failed', res.status == 'failed', res.char_count)
+    check(f'超過 {FREE_FORM_MAX_CHARS} 字仍然 passed（不再判失敗）',
+          res.status == 'passed', res.status)
+    check('但 free_form_length_check=over_limit',
+          res.free_form_length_check == 'over_limit', res.free_form_length_check)
+    check('char_count 記下實際字數', res.char_count == FREE_FORM_MAX_CHARS + 1,
+          res.char_count)
+    check('reason() 不再把超字列為失敗原因', '字' not in res.reason(), res.reason())
+    check('稽核紀錄帶得出這兩個欄位',
+          res.as_audit()['free_form_length_check'] == 'over_limit'
+          and res.as_audit()['char_count'] == FREE_FORM_MAX_CHARS + 1,
+          {k: res.as_audit()[k] for k in ('free_form_length_check', 'char_count')})
     res = check_answer('字' * 500 + ' \n' * 800, r1, None, CALIB)
-    check('whitespace is not counted', res.status == 'passed', res.char_count)
+    check('whitespace is not counted', res.char_count == 500, res.char_count)
+    check('題庫題不套字數檢查（n/a）',
+          check_answer('x' * 2000, r1, q5, CALIB).free_form_length_check == 'n/a')
     check('free-form is not section-checked', not check_answer('x', r1, None, CALIB).missing_sections)
 
     print('\n[7] Calibration evidence (社會期望反應 A 段)')

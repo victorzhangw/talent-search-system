@@ -32,6 +32,17 @@ from typing import Dict, List, Optional
 
 # b §8 evidence wordlist.
 EVIDENCE_TERMS = ('佐證', '行為事例', '工作樣本', '不以單次')
+# b §8 的自由提問字數上限。**只記錄，不判失敗**（U10）。
+#
+# 它從來沒有可行動的意義：超字屬於「補生成修不了」的失敗（append 只會更長，見
+# appendable_reason()），所以它唯一的效果就是把 status 打成 manual_review。而實測上
+# 幾乎每一筆真實回答都超過——全語料 75 筆自由提問 64 筆超過（85%，中位數 1489、
+# 最長 7559）；2026-09-09 的 prd UAT 14 筆全部超過（最短 1022），其中 11 筆缺段、
+# 漏人、佐證全部乾淨，唯一病因就是字數。結果是 manual_review 對自由提問永遠亮著，
+# 真正需要人看的缺段與佐證問題反而被淹沒。
+#
+# 規格值本身保留，並改以 `free_form_length_check` 記進稽核（passed / over_limit），
+# 所以「b §8 的字數檢查」仍然每一筆都查得到，只是不再影響 status。
 FREE_FORM_MAX_CHARS = 1000
 
 SKIP_LOG = '本題未做段落齊全檢查（原因：指令未定義固定段落標題）'
@@ -264,7 +275,8 @@ def expected_sections_for(question: Optional[dict], respondent_count: int):
 class CompletenessResult:
     __slots__ = ('status', 'sections_check', 'missing_sections', 'missing_respondents',
                  'char_count', 'calibration_evidence', 'log_lines',
-                 'respondents_appendable', 'stated_count', 'respondents_check')
+                 'respondents_appendable', 'stated_count', 'respondents_check',
+                 'free_form_length_check')
 
     def __init__(self):
         # `status` is the verdict for the whole answer; the two *_check fields are the
@@ -286,6 +298,9 @@ class CompletenessResult:
         # 覆蓋率是怎麼判的：by_section（回答照人分段，比段落標籤）／by_mention（沒有照人
         # 分段，只問有沒有寫到這個人）／n/a（單人）。寫進稽核，省得日後再重新推一次。
         self.respondents_check = 'n/a'
+        # b §8 的字數上限查了沒、過了沒。與 stated_count 同樣是「只記錄，不改 status」
+        # ——status 會牽動補生成與 manual_review，而超字兩者都幫不上忙（U10）。
+        self.free_form_length_check = 'n/a'     # passed | over_limit | n/a
 
     def as_audit(self) -> dict:
         return {
@@ -293,6 +308,7 @@ class CompletenessResult:
             'missing_sections': self.missing_sections,
             'missing_respondents': self.missing_respondents,
             'char_count': self.char_count,
+            'free_form_length_check': self.free_form_length_check,
             'calibration_evidence_check': self.calibration_evidence,
             'stated_count': self.stated_count,
             'respondents_check': self.respondents_check,
@@ -352,8 +368,7 @@ class CompletenessResult:
         bits = self._missing_bits(for_completion=False)
         if self.calibration_evidence == 'failed':
             bits.append('需加入佐證類措辭（' + '／'.join(EVIDENCE_TERMS) + '）')
-        if self.status == 'failed' and self.char_count and self.char_count > FREE_FORM_MAX_CHARS:
-            bits.append(f'回答超過 {FREE_FORM_MAX_CHARS} 字（目前 {self.char_count} 字）')
+        # 超字不再列入：它已經不是失敗（U10），`free_form_length_check` 會記錄它。
         return '；'.join(bits)
 
     def __repr__(self):
@@ -494,8 +509,9 @@ class CompletenessChecker:
         if self.question is None:
             result.sections_check = 'n/a'       # free-form has no fixed headings
             result.char_count = len(re.sub(r'\s', '', answer))
-            if result.char_count > FREE_FORM_MAX_CHARS:
-                result.status = 'failed'
+            # 只記錄，不動 status。見 FREE_FORM_MAX_CHARS 的註解（U10）。
+            result.free_form_length_check = (
+                'over_limit' if result.char_count > FREE_FORM_MAX_CHARS else 'passed')
         elif not self.expected:
             result.status = 'skipped'
             result.sections_check = 'skipped'
