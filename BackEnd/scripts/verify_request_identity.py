@@ -195,7 +195,7 @@ def main():
     seen.clear()
 
     body = {'query': '你好', 'session_id': 'IDENTITY_TEST', 'user_id': 'asker@example.com',
-            'mode': 'expert', 'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}}
+            'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}}
 
     saved_rag = chat_route.rag_service
     chat_route.rag_service = _StubRag()
@@ -292,7 +292,7 @@ def main():
 
     chat_endpoint = ('POST /chat/', 'POST', '/chat/',
                      {'query': '你好', 'session_id': 'IDENTITY_TEST',
-                      'user_id': 'someone@example.com', 'mode': 'expert',
+                      'user_id': 'someone@example.com',
                       'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}})
 
     chat_saved = chat_route.rag_service

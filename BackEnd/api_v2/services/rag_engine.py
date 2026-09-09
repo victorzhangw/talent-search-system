@@ -150,7 +150,7 @@ class RAGService:
         }
 
     def generate_response(self, query: str, candidate_ids: List[str], session_id: str,
-                         candidates_info: List[Dict] = None, trait_reports: Dict = None, mode: str = 'explanation',
+                         candidates_info: List[Dict] = None, trait_reports: Dict = None,
                          module_id: str = None, req_id: str = None, user_email: str = None):
         """
         Orchestrates the Full RAG Flow:
@@ -389,7 +389,7 @@ class RAGService:
                 return self._call_llm(sys_prompt, query, uc_id, session_id, req_id)
 
         # --- 自由提問路由：沿用既有 use_case + unified_rag_prompt ---
-        rag_logger.info(f"Free-form route: mode={mode}, Using Unified Intent Prompt")
+        rag_logger.info("Free-form route: Using Unified Intent Prompt")
 
         # Inject Special Prompt Content based on Unified AI Mode
         prompt_content_file = 'unified_rag_prompt.txt'

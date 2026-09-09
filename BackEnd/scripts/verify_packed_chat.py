@@ -56,7 +56,7 @@ class FakeRag:
 
 
 def _clean_dropped_total(rag, reports, basics):
-    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', 'expert', reports, basics, 'S14')
+    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', reports, basics, 'S14')
     list(packed)
     return packed.finish()['dropped_traits']['total']
 
@@ -84,7 +84,7 @@ def main():
 
     print('\n[1] Quick-question request is served by the packer')
     rag = FakeRag('1. 壓力情境下的典型反應模式\n以行為事例佐證。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S1')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S1')
     check('packer accepts', isinstance(packed, PackedStream))
     chunks = list(packed) if packed else []
     check('yields chunk-shaped objects',
@@ -96,7 +96,7 @@ def main():
 
     print('\n[2] Free-form request (no module) is served')
     rag = FakeRag('他在指導他人時通常有耐心。\n\n')
-    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', 'expert', reports, basics, 'S2')
+    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', reports, basics, 'S2')
     check('packer accepts free-form', isinstance(packed, PackedStream))
     list(packed)
     check('audit records a free-form question_id of None',
@@ -105,19 +105,16 @@ def main():
     print('\n[3] Falls back to the legacy path when it cannot serve')
     rag = FakeRag('x')
     check('unknown module_id -> None',
-          try_packed_stream(rag, 'no_such_module', '', 'expert', reports, basics, 'S3') is None)
+          try_packed_stream(rag, 'no_such_module', '', reports, basics, 'S3') is None)
     check('no trait reports -> None',
-          try_packed_stream(rag, 'mgmt_pressure', '', 'expert', {}, basics, 'S4') is None)
+          try_packed_stream(rag, 'mgmt_pressure', '', {}, basics, 'S4') is None)
     check('report without project_name_abbreviation -> None',
-          try_packed_stream(rag, 'mgmt_pressure', '', 'expert',
-                            {'C1': {'traits': [{'name': 'Hope', 'score': 80}]}},
+          try_packed_stream(rag, 'mgmt_pressure', '', {'C1': {'traits': [{'name': 'Hope', 'score': 80}]}},
                             basics, 'S5') is None)
     check('unresolvable trait names -> None',
-          try_packed_stream(rag, 'mgmt_pressure', '', 'expert',
-                            {'C1': trait_report([('NotARealTrait', 50)])}, basics, 'S6') is None)
+          try_packed_stream(rag, 'mgmt_pressure', '', {'C1': trait_report([('NotARealTrait', 50)])}, basics, 'S6') is None)
     check('audience mismatch -> None (legacy behaviour preserved)',
-          try_packed_stream(rag, 'recruit_interview', '', 'expert',
-                            {'C1': trait_report(traits), 'C2': trait_report(traits)},
+          try_packed_stream(rag, 'recruit_interview', '', {'C1': trait_report(traits), 'C2': trait_report(traits)},
                             basics + [{'candidate_id': 'C2', 'name': '林孟德'}],
                             'S7') is None)
     check('the model was never called on any fallback', rag.stream_calls == 0)
@@ -125,20 +122,20 @@ def main():
     print('\n[4] Status is surfaced so the route can notify the user')
     rag = FakeRag('1. 壓力情境下的典型反應模式\n他的 CIA_05 有問題。\n\n',
                   followup='他的 CIA_05 還是在。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S8')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S8')
     out = ''.join(ch.choices[0].delta.content for ch in packed)
     check('nothing leaked to the caller', 'CIA_05' not in out, out[:60])
     check('status is blocked', packed.status == 'blocked', packed.status)
 
     rag = FakeRag('1. 壓力情境下的典型反應模式\n以行為事例佐證。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S9')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S9')
     list(packed)
     check('a complete answer reports manual_review or ok, never blocked',
           packed.status in ('ok', 'manual_review'), packed.status)
 
     print('\n[5] finish() is idempotent (the route may call it after iteration)')
     rag = FakeRag('內容。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S10')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S10')
     list(packed)
     first = packed.finished
     second = packed.finish()
@@ -155,7 +152,7 @@ def main():
     prior = [{'role': 'user', 'content': '他抗壓性如何？'},
              {'role': 'assistant', 'content': '他在高壓情境下傾向維持穩定。'}]
     rag = FakeRag('內容。\n\n', history=prior)
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S_H')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S_H')
     list(packed)
     sent = rag.last_messages or []
     check('history is threaded into the messages', len(sent) == 2 + len(prior), len(sent))
@@ -164,7 +161,7 @@ def main():
           and sent[1:3] == prior and sent[-1]['role'] == 'user')
 
     rag = FakeRag('內容。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S_H2')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S_H2')
     list(packed)
     check('an empty history still yields a well-formed 2-message payload',
           rag.last_messages and len(rag.last_messages) == 2, len(rag.last_messages or []))
@@ -177,7 +174,7 @@ def main():
     before = os.path.getsize(log_path) if os.path.exists(log_path) else 0
 
     rag = FakeRag('內容。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', 'expert', reports, basics, 'S11')
+    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S11')
     check('packer served the request', isinstance(packed, PackedStream))
     written = ''
     if os.path.exists(log_path):
@@ -200,7 +197,7 @@ def main():
     check('分段（子區塊標頭）present', '#### ' in written, written.count('#### '))
 
     before = os.path.getsize(log_path) if os.path.exists(log_path) else 0
-    try_packed_stream(rag, 'no_such_module', '', 'expert', reports, basics, 'S12')
+    try_packed_stream(rag, 'no_such_module', '', reports, basics, 'S12')
     after = os.path.getsize(log_path) if os.path.exists(log_path) else 0
     check('a declined request logs no payload', after == before, f'{after - before} bytes')
 
@@ -211,7 +208,7 @@ def main():
     print('\n[13] Dropped traits are counted, per respondent')
     mixed = {'C1': trait_report(traits + [('NotARealTrait', 50), ('AlsoNotReal', 60)])}
     rag = FakeRag('他在指導他人時通常有耐心。\n\n')
-    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', 'expert', mixed, basics, 'S13')
+    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', mixed, basics, 'S13')
     check('a report with unresolvable traits is still served',
           isinstance(packed, PackedStream))
     list(packed)
@@ -257,7 +254,7 @@ def main():
 
     print('\n[15] 名單過濾接上 try_packed_stream')
     rag15 = FakeRag('內容。以行為事例佐證。\n\n')
-    packed15 = try_packed_stream(rag15, None, '排序', 'auto', stale, info3, 'S15',
+    packed15 = try_packed_stream(rag15, None, '排序', stale, info3, 'S15',
                                  candidate_ids=['C1', 'C3'])
     list(packed15)
     audit15 = packed15.finish()

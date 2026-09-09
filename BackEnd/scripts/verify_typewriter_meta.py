@@ -40,8 +40,11 @@ class _Chunk:
         self.choices = [type('C', (), {'delta': type('D', (), {'content': content})()})()]
 
 
-def meta_of(app, **overrides):
-    """Drive one request and hand back the parsed meta event."""
+def meta_of(app, payload_extra=None, **overrides):
+    """Drive one request and hand back the parsed meta event.
+
+    `payload_extra` 疊在 payload 上，用來測「舊版 widget 多送的欄位」。
+    """
     for key, value in overrides.items():
         app.config[key] = value
 
@@ -50,12 +53,12 @@ def meta_of(app, **overrides):
     token = pyjwt.encode({'sub': 'tester', 'email': 'tester@example.com',
                           'aud': 'traitty', 'exp': 4102444800},
                          secret, algorithm='HS256')
-    r = app.test_client().post(
-        '/chat/',
-        json={'query': '你好', 'session_id': 'TYPEWRITER_TEST',
-              'user_id': 'tester@example.com', 'mode': 'expert',
-              'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}},
-        headers={'Authorization': f'Bearer {token}'})
+    payload = {'query': '你好', 'session_id': 'TYPEWRITER_TEST',
+               'user_id': 'tester@example.com',
+               'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}}
+    payload.update(payload_extra or {})
+    r = app.test_client().post('/chat/', json=payload,
+                               headers={'Authorization': f'Bearer {token}'})
     body = r.get_data(as_text=True)
     for line in body.split('\n\n'):
         if line.startswith('data: '):
@@ -101,6 +104,17 @@ def main():
     before = src.index("typewriter = bool(current_app.config")
     check('讀取在 def generate() 之前', before < src.index('def generate():'),
           'config 讀取必須留在請求處理函式內')
+
+    print('\n[5] 相容性：舊版 widget 仍會送 mode，多的欄位必須被忽略而不是報錯')
+    # U4 把 mode 從 payload 移除了，但已經部署出去的 widget build 還會送。
+    # 前端不是後端能同步更新的東西，所以「多送一個欄位」必須永遠是安全的。
+    m = meta_of(app, payload_extra={'mode': 'expert'},
+                TYPEWRITER_ENABLED=True, TYPEWRITER_CHARS_PER_SEC=60)
+    check('帶著 mode 的請求照常回 meta', m is not None, m)
+    check('行為與不帶 mode 時相同',
+          m and m.get('typewriter') is True and m.get('typewriter_cps') == 60, m)
+    m2 = meta_of(app, payload_extra={'mode': 'auto', 'some_future_field': 123})
+    check('連沒見過的欄位也不影響', m2 is not None and m2.get('typewriter') is True, m2)
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0

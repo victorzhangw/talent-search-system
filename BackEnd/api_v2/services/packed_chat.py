@@ -258,7 +258,7 @@ class PackedStream:
         return audit
 
 
-def try_packed_stream(rag_service, module_id: Optional[str], query: str, mode: str,
+def try_packed_stream(rag_service, module_id: Optional[str], query: str,
                       trait_reports: dict, candidates_info, session_id, req_id=None,
                       candidate_ids=None) -> Optional[PackedStream]:
     """A PackedStream, or None to let the caller use the legacy path."""

@@ -124,7 +124,7 @@ def history_block(record):
 
 def turn(rag, session_id, query, reports, basics, req_id):
     from api_v2.services.packed_chat import try_packed_stream
-    return try_packed_stream(rag, None, query, 'free', reports, basics, session_id, req_id)
+    return try_packed_stream(rag, None, query, reports, basics, session_id, req_id)
 
 
 def main():

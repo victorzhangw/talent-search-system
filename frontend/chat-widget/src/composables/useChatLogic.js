@@ -1143,7 +1143,9 @@ export function useChatLogic(emit) {
         autoLoginError.value = `自動登入失敗，請重新整理頁面或聯繫管理員`
     }
 
-    const sendMessage = async (e, isQuick = false) => {
+    // 第二個參數 isQuick 已移除：它唯一的用途是算出 payload 的 mode，而 mode 是死的。
+    // 「這是不是快速提問」本來就由 currentModuleId 表示，不需要第二個來源。
+    const sendMessage = async (e) => {
         if (e && (e.shiftKey || e.isComposing)) return;
 
         const query = inputQuery.value.trim()
@@ -1200,11 +1202,9 @@ export function useChatLogic(emit) {
             // 而後端的守門是 candidates_info ⊆ trait_reports 單向檢查，擋不到截短。
             const activeCandidates = activeConversationCandidatesObjects.value
 
-            // Determine mode
-            // 1. Quick Questions -> Force 'expert'
-            // 2. Typed Input -> 'auto' (Let backend router decide)
-            const mode = isQuick ? 'expert' : 'auto';
-            // 快速提問時攜帶 module_id
+            // 快速提問時攜帶 module_id。這也是後端唯一用來分辨「題庫題／自由提問」的欄位——
+            // 以前還多送一個 mode（快速提問 'expert'、自由提問 'auto'），但後端從頭到尾
+            // 沒有依它分支過：rag_engine 把 mode 寫死成 'expert'，收到的值只出現在一行 log。
             const moduleId = currentModuleId.value || null;
 
             // 提問前換一張新 token——現在所有呼叫點都這樣做（authFetch），
@@ -1232,8 +1232,7 @@ export function useChatLogic(emit) {
                     })),
                     trait_reports: traitReports,
                     session_id: currentSessionId.value,
-                    user_id: currentUserEmail() || 'anonymous',
-                    mode: mode // Pass mode to backend
+                    user_id: currentUserEmail() || 'anonymous'
                 }),
                 signal: controller.signal
             })
@@ -1396,7 +1395,7 @@ export function useChatLogic(emit) {
             inputQuery.value = questionItem.label
             currentModuleId.value = questionItem.id || null
         }
-        sendMessage(null, true) // Pass true for isQuick
+        sendMessage(null)
     }
 
     onMounted(async () => {

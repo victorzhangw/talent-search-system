@@ -149,7 +149,6 @@ def ask(env, session_id, query, people, trait_reports, label, read_timeout=240,
         'trait_reports': trait_reports,
         'session_id': session_id,
         'user_id': EMAIL,
-        'mode': 'auto',
     }
     req = urllib.request.Request(BASE + '/chat/', json.dumps(body).encode(),
                                  {'Content-Type': 'application/json',

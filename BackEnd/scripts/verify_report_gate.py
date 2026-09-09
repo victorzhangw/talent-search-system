@@ -43,7 +43,7 @@ def main():
                 'latest_assessment': {'assessment_id': 900}}
     never_assessed = {'candidate_id': '77', 'name': '林孟德', 'latest_assessment': None}
     base = {'query': '他的溝通風格如何？', 'session_id': 'GATE_TEST',
-            'user_id': 'tester@example.com', 'mode': 'expert'}
+            'user_id': 'tester@example.com'}
 
     print('\n[1] 快速提問 + 報告未到 -> 409，且不呼叫 LLM')
     r = post({**base, 'module_id': 'mgmt_pressure', 'candidate_ids': ['56'],

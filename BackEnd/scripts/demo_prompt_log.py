@@ -109,8 +109,7 @@ def redirect_prompt_log():
 def turn(rag, session_id, module_id, query, reports, basics, note):
     from api_v2.services.packed_chat import try_packed_stream
     print(f'\n  -> {note}')
-    stream = try_packed_stream(rag, module_id, query, 'quick' if module_id else 'free',
-                               reports, basics, session_id)
+    stream = try_packed_stream(rag, module_id, query, reports, basics, session_id)
     if stream is None:
         check(note, False, 'try_packed_stream returned None (would fall back to the legacy path)')
         return None

@@ -305,7 +305,9 @@ def chat():
     session_id = data.get('session_id', 'default_session')
     user_id = data.get('user_id') # Copied from frontend config email
 
-    mode = data.get('mode', 'explanation') # Default to explanation if not provided
+    # payload 曾經還有一個 mode（'expert' / 'auto' / 'explanation'）。後端從頭到尾沒有依它
+    # 分支過——rag_engine 把 determined_mode 寫死成 'expert'，收到的值只出現在一行 log，
+    # 而打包器連讀都沒讀。已於 U4 移除；舊版 widget 仍會送這個欄位，多的鍵直接被忽略。
     module_id = data.get('module_id')  # 快速提問模組 ID（如 recruit_interview），自由提問時為 None
 
     print(f"[Chat] Received trait_reports for {len(trait_reports)} candidates, module_id={module_id}", flush=True)
@@ -371,7 +373,7 @@ def chat():
     typewriter_cps = int(current_app.config.get('TYPEWRITER_CHARS_PER_SEC', 60))
 
     print(f">>> [DEBUG] Candidate IDs: {candidate_ids}", flush=True)
-    print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}, Mode: {mode}", flush=True)
+    print(f">>> [DEBUG] Session ID: {session_id}, User ID: {user_id}", flush=True)
 
     def generate():
         print(">>> [DEBUG] Generator started", flush=True)
@@ -478,7 +480,7 @@ def chat():
             packed = None
             if current_app.config.get('USE_LOG_PACKER') and trait_reports:
                 from ..services.packed_chat import try_packed_stream
-                packed = try_packed_stream(rag_service, module_id, query, mode,
+                packed = try_packed_stream(rag_service, module_id, query,
                                            trait_reports, candidates_info, session_id,
                                            req_id, candidate_ids=candidate_ids)
 
@@ -491,7 +493,6 @@ def chat():
                         query, candidate_ids, session_id,
                         candidates_info=candidates_info,
                         trait_reports=trait_reports,
-                        mode=mode,
                         module_id=module_id,
                         req_id=req_id,
                         user_email=requester_email

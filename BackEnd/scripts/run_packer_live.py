@@ -172,8 +172,7 @@ def main():
 
         rag.packer_stream = timed_stream
 
-        packed = try_packed_stream(rag, args.module, args.free or '', 'expert',
-                                   reports, basics, 'LIVE')
+        packed = try_packed_stream(rag, args.module, args.free or '', reports, basics, 'LIVE')
         if packed is None:
             print('\npacker declined this request; the route would use the legacy path.')
             return 1

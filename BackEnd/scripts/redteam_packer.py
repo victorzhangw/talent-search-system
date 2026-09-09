@@ -104,8 +104,7 @@ def main():
                   f'{"module=" + module if module else "free: " + free[:40]}', flush=True)
 
             for run in range(1, args.repeat + 1):
-                packed = try_packed_stream(rag, module, free or '', 'expert',
-                                           reports, basics, f'RT{i}-{run}')
+                packed = try_packed_stream(rag, module, free or '', reports, basics, f'RT{i}-{run}')
                 if packed is None:
                     print('    packer declined', flush=True)
                     results.append({'case': label, 'run': run, 'status': 'declined'})
