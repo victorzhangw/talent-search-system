@@ -477,23 +477,6 @@ class CompletenessChecker:
                 n += 1
         return n
 
-    def _discussion_lines(self) -> List[str]:
-        """回答裡「在談某個人」的那些行，供 by_mention 比對。
-
-        `by_mention` 是給沒有照人分段的回答用的退路（見 finalize()）。退路不能退成
-        「名字出現過就算」——2026-09-08 req e332a385 的第 1 節有一條 bullet 一口氣列了
-        8 個名字，那是在列名單，不是在寫這 8 個人。所以一行點到 3 位以上就不算數。
-
-        門檻放在 3：兩個人的比較句（「王智弘與游品堯各有一套節奏」）是真的在談這兩位，
-        req 5017a070 整篇就是這樣寫的；再多就只可能是列舉。
-        """
-        out = []
-        for line in self.text.split('\n'):
-            flat = _WHITESPACE_RE.sub('', line)
-            if flat and self._roster_hits(flat) <= 2:
-                out.append(flat)
-        return out
-
     def _needs_evidence(self) -> bool:
         return any(r.scores.get(t) == 'A'
                    for r in self.respondents for t in self.calibration_traits)
@@ -546,7 +529,7 @@ class CompletenessChecker:
             # 種手法：b §8 明講從指令推導輸出結構是語意判斷，那就把判斷留在資料裡，程式
             # 只讀不推。19 題可多人的題目裡只有 Q15／Q21／Q22 是 True。
             #
-            # False 的題目退回「有沒有寫到這個人」（by_mention），而且**只記錄不補**——
+            # False 的題目退回「有沒有寫到這個人」（整篇比對），而且**只記錄不補**——
             # 2026-08-18 req 5017a070 那種照主題分段的合作題，硬接就是 E-12 的形狀。
             #
             # 題庫題的段落結構是題目指定的，所以「有沒有自己的標題」問得出來。自由提問沒有
@@ -564,12 +547,18 @@ class CompletenessChecker:
             if owned:
                 haystack = labels
                 result.respondents_check = 'by_section'
-            elif self.question is not None:
-                haystack = self._discussion_lines()
-                result.respondents_check = 'by_mention'
             else:
-                # 自由提問維持整篇比對：沒有指定輸出結構，一張表格、一份排序清單都是好
-                # 答案，全語料 29 筆多人回覆有 9 筆是這種形狀。
+                # 整篇比對：沒有指定逐人分段的題目，唯一問得出來的就是「有沒有寫到這個
+                # 人」。自由提問一直是這樣（沒有指定輸出結構，一張表格、一份排序清單都是
+                # 好答案，全語料 29 筆多人回覆有 9 筆是這種形狀）。
+                #
+                # 題庫題那一半原本走 `_discussion_lines()`——只認「一行點到 2 位以內」的
+                # 行，理由是「一行列 8 個名字是在列名單，不是在寫這些人」。那個理由來自
+                # `e332a385`，而 Unit D 之後 `e332a385`（Q15）走的是 `by_section`，
+                # 這條防線在它該防的地方已經用不到了；留著只在**組合題**上誤傷：
+                # 2026-09-09 req `57b052ba`（Q13、11 位）的回答把成員歸成「四種典型
+                # 樣態」，11 個名字全都寫到了，卻因為每行點到 3 位以上而判出 9 位缺席。
+                # 全語料掃過，那是唯一一筆差異——9 個全是誤判。
                 haystack = [_WHITESPACE_RE.sub('', answer)]
                 result.respondents_check = 'by_mention'
             if result.respondents_check == 'by_section':

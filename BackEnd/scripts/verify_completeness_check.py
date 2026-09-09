@@ -247,17 +247,21 @@ def main():
     res = check_answer('### 團隊合作價值\n\n王智弘帶來的是推進與品質把關。', two, qpp, CALIB)
     check('照主題分段但真的少一個人 -> 仍判得出來',
           res.missing_respondents == ['林孟德'], res.missing_respondents)
-    # by_mention 的退路不能退成「名字出現過就算」，否則 e332a385 那條列 8 人的 bullet
-    # 又會全部放行。一行點到 3 位以上就是在列名單，不是在寫這些人。
-    res = check_answer('### 觀察\n\n成員可分為甲一、乙二、丙三、丁四四組節奏。',
-                       eight, qpp, CALIB)
-    check('by_mention 下，只出現在名單列舉裡不算寫到',
-          res.missing_respondents == ['甲一', '乙二', '丙三', '丁四']
-          and res.respondents_check == 'by_mention',
+    # by_mention 一律整篇比對。原本題庫題那一半走「一行點到 2 位以內」的比法，理由是
+    # e332a385 那條列 8 人的 bullet 不該放行；Unit D 之後 e332a385（Q15）走 by_section，
+    # 那條防線在它該防的地方用不到了，留著只在組合題上誤傷——2026-09-09 req 57b052ba
+    # （Q13、11 位）把成員歸成「四種典型樣態」，11 個名字全寫到了卻判出 9 位缺席。
+    grouped = '### 觀察\n\n成員可分為甲一、乙二、丙三、丁四四組節奏。'
+    res = check_answer(grouped, eight, qpp, CALIB)
+    check('by_mention：歸類式的敘述也算寫到了',
+          res.missing_respondents == [] and res.respondents_check == 'by_mention',
           f'{res.missing_respondents} / {res.respondents_check}')
-    check('自由提問不受影響：整篇比對，寫在內文就算',
-          check_answer('成員可分為甲一、乙二、丙三、丁四四組節奏。',
-                       eight, None, CALIB).missing_respondents == [])
+    check('題庫題與自由提問的 by_mention 判法一致',
+          check_answer(grouped, eight, None, CALIB).missing_respondents
+          == res.missing_respondents)
+    check('真的整篇沒提到的人仍然抓得出來',
+          check_answer('### 觀察\n\n只談甲一與乙二。', eight, qpp, CALIB)
+          .missing_respondents == ['丙三', '丁四'])
 
     print('\n[5f] 模型自報人數（只記錄，不影響判定）')
     res = check_answer('以下根據您提供的八位成員特質資料。\n\n'
