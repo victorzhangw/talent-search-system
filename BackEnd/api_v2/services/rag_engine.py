@@ -24,15 +24,6 @@ class RAGService:
         with open(self.config_path, 'r', encoding='utf-8') as f:
             self.use_cases = json.load(f)
         
-        # 1.5 Load Mode Rules
-        rules_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'mode_rules.json')
-        if os.path.exists(rules_path):
-            with open(rules_path, 'r', encoding='utf-8') as f:
-                self.mode_rules = json.load(f)
-        else:
-             rag_logger.warning("mode_rules.json not found.")
-             self.mode_rules = {}
-
         # 1.6 Load Quick Modules Config（快速提問用）
         modules_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'quick_modules.json')
         if os.path.exists(modules_path):
