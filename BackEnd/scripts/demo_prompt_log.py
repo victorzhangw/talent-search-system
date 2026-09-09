@@ -12,7 +12,7 @@ third (no free-form / follow-up log) was never a defect at all -- the behaviour 
 implemented, the demonstration was simply missing. All three are claims about the
 **payload**, and the payload is written by `packed_chat.log_payload()` at line 153 of
 packed_chat.py -- *before* `PackedStream` is constructed and long before the model is
-called. So driving `try_packed_stream()` and never iterating the result produces a
+called. So driving `packed_stream()` and never iterating the result produces a
 byte-for-byte genuine prompts.log entry and sends nothing anywhere.
 
 What is real here and what is not:
@@ -22,7 +22,7 @@ What is real here and what is not:
     real  - log_payload() and the prompts.log formatter, i.e. the exact file the client reads
     stub  - the model (never called), and the conversation history (see _Rag.load_history)
 
-The history is synthetic because `try_packed_stream` loads it from the session store, and
+The history is synthetic because `packed_stream` loads it from the session store, and
 seeding three turns of real chat history would mean three real model calls. What the client
 asked to see is not the wording of the history but whether the **trait scope reverts to the
 full set on a follow-up**, and that is decided by `question is None`, which this drives for
@@ -63,7 +63,7 @@ def check(label, ok, detail=''):
 
 
 class _Rag:
-    """Everything `try_packed_stream` asks of a RAGService, and nothing more.
+    """Everything `packed_stream` asks of a RAGService, and nothing more.
 
     Deliberately not a real RAGService: that one builds an LLM client from the API key,
     and the whole point of this script is that no request can leave the machine even by
@@ -107,11 +107,11 @@ def redirect_prompt_log():
 
 
 def turn(rag, session_id, module_id, query, reports, basics, note):
-    from api_v2.services.packed_chat import try_packed_stream
+    from api_v2.services.packed_chat import packed_stream
     print(f'\n  -> {note}')
-    stream = try_packed_stream(rag, module_id, query, reports, basics, session_id)
+    stream = packed_stream(rag, module_id, query, reports, basics, session_id)
     if stream is None:
-        check(note, False, 'try_packed_stream returned None (would fall back to the legacy path)')
+        check(note, False, 'packed_stream returned None (would fall back to the legacy path)')
         return None
     # Not iterated on purpose: iterating is what calls the model. The payload is already
     # in prompts.log by now.

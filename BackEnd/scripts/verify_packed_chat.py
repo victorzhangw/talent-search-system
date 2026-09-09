@@ -19,7 +19,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), enc
 
 from sqlalchemy import text  # noqa: E402
 from api_v2.database.connection import get_db_engine  # noqa: E402
-from api_v2.services.packed_chat import (try_packed_stream, PackedStream,  # noqa: E402
+from api_v2.services.packed_chat import (packed_stream, PackedStream, PackerRefused,  # noqa: E402
                                          apply_roster)
 from api_v2.services.respondent_adapter import from_trait_reports  # noqa: E402
 
@@ -56,7 +56,7 @@ class FakeRag:
 
 
 def _clean_dropped_total(rag, reports, basics):
-    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', reports, basics, 'S14')
+    packed = packed_stream(rag, None, '他適合帶新人嗎？', reports, basics, 'S14')
     list(packed)
     return packed.finish()['dropped_traits']['total']
 
@@ -84,7 +84,7 @@ def main():
 
     print('\n[1] Quick-question request is served by the packer')
     rag = FakeRag('1. 壓力情境下的典型反應模式\n以行為事例佐證。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S1')
+    packed = packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S1')
     check('packer accepts', isinstance(packed, PackedStream))
     chunks = list(packed) if packed else []
     check('yields chunk-shaped objects',
@@ -96,46 +96,70 @@ def main():
 
     print('\n[2] Free-form request (no module) is served')
     rag = FakeRag('他在指導他人時通常有耐心。\n\n')
-    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', reports, basics, 'S2')
+    packed = packed_stream(rag, None, '他適合帶新人嗎？', reports, basics, 'S2')
     check('packer accepts free-form', isinstance(packed, PackedStream))
     list(packed)
     check('audit records a free-form question_id of None',
           packed.finish().get('question_id') is None and packed.finished)
 
-    print('\n[3] Falls back to the legacy path when it cannot serve')
+    print('\n[3] 打不了包就拒絕，不再安靜降級（U7 / 決策 D2）')
+    # 舊行為是回 None 讓呼叫端落到模組 prompt 那條路——沒有分段閘門、沒有出口掃描、
+    # 沒有齊全檢查。舊路徑移除後沒有地方可退，所以每一種情形都要有自己的錯誤碼，
+    # 而且模型一次都不能被呼叫到。
     rag = FakeRag('x')
-    check('unknown module_id -> None',
-          try_packed_stream(rag, 'no_such_module', '', reports, basics, 'S3') is None)
-    check('no trait reports -> None',
-          try_packed_stream(rag, 'mgmt_pressure', '', {}, basics, 'S4') is None)
-    check('report without project_name_abbreviation -> None',
-          try_packed_stream(rag, 'mgmt_pressure', '', {'C1': {'traits': [{'name': 'Hope', 'score': 80}]}},
-                            basics, 'S5') is None)
-    check('unresolvable trait names -> None',
-          try_packed_stream(rag, 'mgmt_pressure', '', {'C1': trait_report([('NotARealTrait', 50)])}, basics, 'S6') is None)
-    check('audience mismatch -> None (legacy behaviour preserved)',
-          try_packed_stream(rag, 'recruit_interview', '', {'C1': trait_report(traits), 'C2': trait_report(traits)},
-                            basics + [{'candidate_id': 'C2', 'name': '林孟德'}],
-                            'S7') is None)
-    check('the model was never called on any fallback', rag.stream_calls == 0)
+    refusals = []
+
+    def refused(label, *args):
+        try:
+            packed_stream(rag, *args)
+        except PackerRefused as e:
+            refusals.append(e)
+            return e.code
+        check(label, False, '沒有拋 PackerRefused')
+        return None
+
+    check('unknown module_id -> UNKNOWN_MODULE',
+          refused('unknown module_id', 'no_such_module', '', reports, basics, 'S3')
+          == 'UNKNOWN_MODULE')
+    check('no trait reports -> NO_RESPONDENTS',
+          refused('no trait reports', 'mgmt_pressure', '', {}, basics, 'S4')
+          == 'NO_RESPONDENTS')
+    check('report without project_name_abbreviation -> NO_RESPONDENTS',
+          refused('no project_name_abbreviation', 'mgmt_pressure', '',
+                  {'C1': {'traits': [{'name': 'Hope', 'score': 80}]}}, basics, 'S5')
+          == 'NO_RESPONDENTS')
+    check('unresolvable trait names -> NO_RESPONDENTS',
+          refused('unresolvable trait names', 'mgmt_pressure', '',
+                  {'C1': trait_report([('NotARealTrait', 50)])}, basics, 'S6')
+          == 'NO_RESPONDENTS')
+    check('audience mismatch -> AUDIENCE_MISMATCH（spec b 1.1 要求拒絕）',
+          refused('audience mismatch', 'recruit_interview', '',
+                  {'C1': trait_report(traits), 'C2': trait_report(traits)},
+                  basics + [{'candidate_id': 'C2', 'name': '林孟德'}], 'S7')
+          == 'AUDIENCE_MISMATCH')
+    check('每一種拒絕都帶著給使用者看的中文說明，不是只有代碼',
+          len(refusals) == 5 and all(e.message and not e.message.isascii()
+                                     for e in refusals),
+          [e.code for e in refusals])
+    check('the model was never called on any refusal', rag.stream_calls == 0)
 
     print('\n[4] Status is surfaced so the route can notify the user')
     rag = FakeRag('1. 壓力情境下的典型反應模式\n他的 CIA_05 有問題。\n\n',
                   followup='他的 CIA_05 還是在。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S8')
+    packed = packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S8')
     out = ''.join(ch.choices[0].delta.content for ch in packed)
     check('nothing leaked to the caller', 'CIA_05' not in out, out[:60])
     check('status is blocked', packed.status == 'blocked', packed.status)
 
     rag = FakeRag('1. 壓力情境下的典型反應模式\n以行為事例佐證。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S9')
+    packed = packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S9')
     list(packed)
     check('a complete answer reports manual_review or ok, never blocked',
           packed.status in ('ok', 'manual_review'), packed.status)
 
     print('\n[5] finish() is idempotent (the route may call it after iteration)')
     rag = FakeRag('內容。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S10')
+    packed = packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S10')
     list(packed)
     first = packed.finished
     second = packed.finish()
@@ -152,7 +176,7 @@ def main():
     prior = [{'role': 'user', 'content': '他抗壓性如何？'},
              {'role': 'assistant', 'content': '他在高壓情境下傾向維持穩定。'}]
     rag = FakeRag('內容。\n\n', history=prior)
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S_H')
+    packed = packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S_H')
     list(packed)
     sent = rag.last_messages or []
     check('history is threaded into the messages', len(sent) == 2 + len(prior), len(sent))
@@ -161,7 +185,7 @@ def main():
           and sent[1:3] == prior and sent[-1]['role'] == 'user')
 
     rag = FakeRag('內容。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S_H2')
+    packed = packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S_H2')
     list(packed)
     check('an empty history still yields a well-formed 2-message payload',
           rag.last_messages and len(rag.last_messages) == 2, len(rag.last_messages or []))
@@ -174,7 +198,7 @@ def main():
     before = os.path.getsize(log_path) if os.path.exists(log_path) else 0
 
     rag = FakeRag('內容。\n\n')
-    packed = try_packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S11')
+    packed = packed_stream(rag, 'mgmt_pressure', '', reports, basics, 'S11')
     check('packer served the request', isinstance(packed, PackedStream))
     written = ''
     if os.path.exists(log_path):
@@ -197,9 +221,12 @@ def main():
     check('分段（子區塊標頭）present', '#### ' in written, written.count('#### '))
 
     before = os.path.getsize(log_path) if os.path.exists(log_path) else 0
-    try_packed_stream(rag, 'no_such_module', '', reports, basics, 'S12')
+    try:
+        packed_stream(rag, 'no_such_module', '', reports, basics, 'S12')
+    except PackerRefused:
+        pass    # U7 之後拒絕是用拋的，不是回 None
     after = os.path.getsize(log_path) if os.path.exists(log_path) else 0
-    check('a declined request logs no payload', after == before, f'{after - before} bytes')
+    check('a refused request logs no payload', after == before, f'{after - before} bytes')
 
     # ---- 被丟棄的特質要出現在稽核紀錄裡 -------------------------------------------
     # 2026-08-31：235 個特質被丟棄，其中一份報告 79 個只有 18 個進得了 payload，而稽核
@@ -208,7 +235,7 @@ def main():
     print('\n[13] Dropped traits are counted, per respondent')
     mixed = {'C1': trait_report(traits + [('NotARealTrait', 50), ('AlsoNotReal', 60)])}
     rag = FakeRag('他在指導他人時通常有耐心。\n\n')
-    packed = try_packed_stream(rag, None, '他適合帶新人嗎？', mixed, basics, 'S13')
+    packed = packed_stream(rag, None, '他適合帶新人嗎？', mixed, basics, 'S13')
     check('a report with unresolvable traits is still served',
           isinstance(packed, PackedStream))
     list(packed)
@@ -252,9 +279,9 @@ def main():
     check('candidates_info 被前端截短時留下伺服器端信號',
           roster.get('candidates_info_short_by') == 2, roster)
 
-    print('\n[15] 名單過濾接上 try_packed_stream')
+    print('\n[15] 名單過濾接上 packed_stream')
     rag15 = FakeRag('內容。以行為事例佐證。\n\n')
-    packed15 = try_packed_stream(rag15, None, '排序', stale, info3, 'S15',
+    packed15 = packed_stream(rag15, None, '排序', stale, info3, 'S15',
                                  candidate_ids=['C1', 'C3'])
     list(packed15)
     audit15 = packed15.finish()

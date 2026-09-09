@@ -5,18 +5,20 @@ so this wraps the packer's cleared segments in that shape. One gated segment arr
 one chunk -- the typewriter effect becomes a client-side replay of verified text, which is
 the point of the segment gate: nothing reaches the browser until it has been scanned.
 
-`try_packed_stream` returns None whenever the packer cannot serve the request. That is the
-switch between the two paths: the caller falls through to the legacy module-prompt route
-untouched, so a request is never served by both.
+`packed_stream()` 服務不了的請求會拋 `PackerRefused`，不再回 None。
 
-Not served here, deliberately:
-  * requests without frontend trait reports -- the upstream-fetch merge still lives inside
-    `generate_response`, and duplicating it to serve a flagged-off path would be two
-    copies of the same resolution.
-  * module ids with no question mapping, and quick-question requests whose respondent
-    count contradicts the question's audience (b §1.1 says reject; the legacy route's
-    fallback quietly uses the other prompt instead, so falling through preserves today's
-    behaviour rather than changing it behind a flag).
+這是 U7（決策 D2）之後的語意改變。以前回 None 是「切換到舊路徑」的訊號：呼叫端會安靜地
+落到模組 prompt 那條路，而那條路沒有分段閘門、沒有出口掃描、沒有齊全檢查。舊路徑移除後
+沒有地方可以退，所以「打不了包」就是終局——必須讓使用者看到明確的錯誤，而不是拿到一份
+看起來正常、實際上沒有經過任何稽核的回答。
+
+拒絕的四種情形，各有自己的錯誤碼（見 `PackerRefused`）：
+  * 沒有可解析的受測者（含完全沒帶 trait_reports 的請求）
+  * `module_id` 不在題庫（`module_map` 在 import 時就驗過 22 個模組全部對得上，
+    所以這只會是客戶端送了未知的 id）
+  * 題目的 audience 與受測者人數不符——spec b §1.1 要求拒絕。舊路徑是安靜地改用另一份
+    prompt，這正是 D2 要終結的那種降級。
+  * 特質名稱對不上題庫、或 payload 組不出來
 """
 
 import json
@@ -31,6 +33,20 @@ from .focus_detect import detect_focus
 from .repeat_detect import measure as measure_repeat
 
 packer_logger = get_daily_logger('LogPacker', 'log_packer_audit.log')
+
+
+class PackerRefused(Exception):
+    """打包器無法服務這個請求。
+
+    `code` 給前端分辨用，`message` 是要顯示給使用者的中文說明。訊息刻意講清楚「為什麼」
+    而不只是「失敗了」——這些情形全部需要使用者做點什麼（重選人、換題目、聯繫管理員），
+    一句「系統錯誤」會讓他們只是重試。
+    """
+
+    def __init__(self, code: str, message: str):
+        super().__init__(f'{code}: {message}')
+        self.code = code
+        self.message = message
 
 # settings.py 的同名預設值。這裡只在讀不到 app config 時當退路，見 _history_cap_turns()。
 DEFAULT_HISTORY_CAP_TURNS = 6
@@ -258,16 +274,17 @@ class PackedStream:
         return audit
 
 
-def try_packed_stream(rag_service, module_id: Optional[str], query: str,
-                      trait_reports: dict, candidates_info, session_id, req_id=None,
-                      candidate_ids=None) -> Optional[PackedStream]:
-    """A PackedStream, or None to let the caller use the legacy path."""
+def packed_stream(rag_service, module_id: Optional[str], query: str,
+                  trait_reports: dict, candidates_info, session_id, req_id=None,
+                  candidate_ids=None) -> PackedStream:
+    """A PackedStream, or `PackerRefused` if this request cannot be packed."""
     try:
         question = module_map.question_for(module_id) if module_id else None
         if module_id and question is None:
-            packer_logger.info(f"session={session_id} module_id={module_id!r} has no question; "
-                               f"falling back to the legacy path")
-            return None
+            packer_logger.warning(f"session={session_id} module_id={module_id!r} has no question")
+            raise PackerRefused(
+                'UNKNOWN_MODULE',
+                '這個提問模組已不存在或尚未設定，請改用其他快速提問或直接輸入問題。')
 
         dropped = []
 
@@ -280,22 +297,26 @@ def try_packed_stream(rag_service, module_id: Optional[str], query: str,
                                        session_id)
         respondents = from_trait_reports(reports, candidates_info, on_skip=_skip)
         if not respondents:
-            packer_logger.info(f"session={session_id} no resolvable respondents; legacy path")
-            return None
+            packer_logger.warning(f"session={session_id} no resolvable respondents")
+            raise PackerRefused(
+                'NO_RESPONDENTS',
+                '請先選擇至少一位有評測資料的受測者，再提出問題。')
 
         pipeline = LogPipeline(respondents, question,
                                user_query=query if question is None else None,
                                history=rag_service.load_history(session_id),
                                followup_fn=rag_service.packer_followup)
     except AudienceMismatch as e:
-        # b §1.1 wants this rejected. The legacy route instead falls back to the other
-        # prompt; changing that is a product decision, not something to slip in behind a
-        # flag, so the legacy behaviour stands until the packer becomes the only path.
-        packer_logger.warning(f"session={session_id} audience mismatch: {e}; legacy path")
-        return None
+        # spec b §1.1 要求拒絕。舊路徑是安靜地改用另一份 prompt——那正是 D2 要終結的降級。
+        packer_logger.warning(f"session={session_id} audience mismatch: {e}")
+        raise PackerRefused(
+            'AUDIENCE_MISMATCH',
+            '這個提問只適用於目前選定的受測者人數以外的情況，請調整選取的人數或改用其他提問。')
     except (UnknownTrait, ValueError) as e:
-        packer_logger.warning(f"session={session_id} cannot pack: {e}; legacy path")
-        return None
+        packer_logger.warning(f"session={session_id} cannot pack: {e}")
+        raise PackerRefused(
+            'CANNOT_PACK',
+            '特質資料無法組裝成分析依據，請重新載入頁面後再試；若持續發生請聯繫管理員。')
 
     log_payload(pipeline, session_id, module_id, question, req_id, dropped)
     # 題庫題的「提問」是模組指令不是使用者的話，判「問誰」沒有意義，所以只在自由提問算。

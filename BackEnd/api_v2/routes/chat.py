@@ -292,8 +292,14 @@ def chat():
 
     # JWT validation — every /chat/ call requires a fresh short-lived token。
     # 驗證與其他路由共用同一段（utils/request_identity.py），避免兩邊的規則走鐘。
-    # `requester_email` 就是「這次是誰在問」，RAG 打上游要用這個身分（企業名稱、
-    # 候選人基本資料），不能像以前那樣一律用寫死的帳號。
+    #
+    # `requester_email` 曾經是「拿去打上游的身分」（企業名稱、候選人基本資料），由
+    # rag_engine.generate_response() 使用。U7 移除舊路徑之後，打包器只讀前端送來的
+    # trait_reports，/chat/ 已經不再用這個身分打任何上游，所以這裡只剩驗證的作用
+    # ——沒有 email 的 token 一律 401。
+    #
+    # 工單 T5：底下扣點用的仍是 payload 裡的 user_id（客戶端可自行填寫），不是這個
+    # 經過驗簽的 email。那是 U7 之前就存在的行為，本單元不夾帶修改。
     requester_email, auth_error = resolve_user_email()
     if auth_error:
         return auth_error
@@ -474,29 +480,25 @@ def chat():
 
             llm_start = time.time()
 
-            # LOG packer path (事項 16). Off by default. try_packed_stream returns None
-            # whenever it cannot serve the request, and then everything below runs
-            # exactly as before -- a request is never served by both paths.
-            packed = None
-            if current_app.config.get('USE_LOG_PACKER') and trait_reports:
-                from ..services.packed_chat import try_packed_stream
-                packed = try_packed_stream(rag_service, module_id, query,
-                                           trait_reports, candidates_info, session_id,
-                                           req_id, candidate_ids=candidate_ids)
-
+            # LOG 打包器是唯一的生成路徑（U7 / 決策 D2）。以前這裡還有一個 USE_LOG_PACKER
+            # 開關與一條舊的模組 prompt 路徑，打包器服務不了就安靜地落到那邊——而那邊沒有
+            # 分段閘門、沒有出口掃描、沒有齊全檢查。現在打不了包就是明確的錯誤：使用者會
+            # 看到為什麼，而不是拿到一份看起來正常、實際上沒經過任何稽核的回答。
+            from ..services.packed_chat import packed_stream, PackerRefused
             try:
-                if packed is not None:
-                    # Chunk-shaped, so the streaming loop below needs no changes.
-                    response_stream, use_case_id = packed, 'log_packer'
-                else:
-                    response_stream, use_case_id = rag_service.generate_response(
-                        query, candidate_ids, session_id,
-                        candidates_info=candidates_info,
-                        trait_reports=trait_reports,
-                        module_id=module_id,
-                        req_id=req_id,
-                        user_email=requester_email
-                    )
+                packed = packed_stream(rag_service, module_id, query,
+                                       trait_reports, candidates_info, session_id,
+                                       req_id, candidate_ids=candidate_ids)
+                # Chunk-shaped, so the streaming loop below needs no changes.
+                response_stream, use_case_id = packed, 'log_packer'
+            except PackerRefused as refusal:
+                print(f"[Packer Refused] {refusal.code}: {refusal.message}", flush=True)
+                conv_logger.warning(
+                    f"[REFUSED] REQ: {req_id} | SessionID: {session_id} | "
+                    f"UserID: {user_id} | Code: {refusal.code}")
+                yield f"data: {json.dumps({'type': 'error', 'code': refusal.code, 'message': refusal.message})}\n\n"
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                return
             except OperationalError as db_err:
                 print(f"[RAG DB Error] {db_err}", flush=True)
                 yield f"data: {json.dumps({'type': 'error', 'code': 'DB_UNAVAILABLE', 'message': '資料庫暫時無法連線，請通知管理員檢查後端服務。'})}\n\n"
@@ -539,21 +541,20 @@ def chat():
                 has_llm_error = True
                 yield f"data: {json.dumps({'type': 'error', 'code': 'STREAM_INTERRUPTED', 'message': '連線中斷，請稍後再試。'})}\n\n"
 
-            if packed is not None:
-                # Writes the structured audit record. Only `blocked` reaches the reader:
-                # there the gate stopped mid-answer, so what is on screen is truncated and
-                # would otherwise look finished -- the disclosure 丙-3 requires.
-                #
-                # `manual_review` is deliberately not shown. That answer ran to completion
-                # and its text is clean; what failed is a completeness rule (a section the
-                # completion pass could not supply, missing calibration wording, or an
-                # over-length free-form reply). Once 補生成 stopped firing for failures
-                # appending cannot fix, the status became common enough that the banner
-                # was appearing under answers with nothing visibly wrong with them. It
-                # stays in log_packer_audit.log, which is where a reviewer can act on it.
-                packer_audit = packed.finish()
-                if packer_audit.get('status') == STATUS_BLOCKED:
-                    yield f"data: {json.dumps({'type': 'notice', 'code': packer_audit['status'], 'message': '本次回覆在輸出中途停止，內容並不完整，請重新提問或聯繫管理員。'})}\n\n"
+            # Writes the structured audit record. Only `blocked` reaches the reader:
+            # there the gate stopped mid-answer, so what is on screen is truncated and
+            # would otherwise look finished -- the disclosure 丙-3 requires.
+            #
+            # `manual_review` is deliberately not shown. That answer ran to completion
+            # and its text is clean; what failed is a completeness rule (a section the
+            # completion pass could not supply, missing calibration wording, or an
+            # over-length free-form reply). Once 補生成 stopped firing for failures
+            # appending cannot fix, the status became common enough that the banner
+            # was appearing under answers with nothing visibly wrong with them. It
+            # stays in log_packer_audit.log, which is where a reviewer can act on it.
+            packer_audit = packed.finish()
+            if packer_audit.get('status') == STATUS_BLOCKED:
+                yield f"data: {json.dumps({'type': 'notice', 'code': packer_audit['status'], 'message': '本次回覆在輸出中途停止，內容並不完整，請重新提問或聯繫管理員。'})}\n\n"
 
             # Log Assistant Message & Usage
             prompt_tokens = 0

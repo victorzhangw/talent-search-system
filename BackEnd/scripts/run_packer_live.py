@@ -86,7 +86,7 @@ def main():
 
     with app.app_context():
         from api_v2.services.module_map import module_map
-        from api_v2.services.packed_chat import try_packed_stream
+        from api_v2.services.packed_chat import packed_stream
         from api_v2.services.respondent_adapter import from_trait_reports
         from api_v2.services.log_assembler import assemble
 
@@ -172,7 +172,7 @@ def main():
 
         rag.packer_stream = timed_stream
 
-        packed = try_packed_stream(rag, args.module, args.free or '', reports, basics, 'LIVE')
+        packed = packed_stream(rag, args.module, args.free or '', reports, basics, 'LIVE')
         if packed is None:
             print('\npacker declined this request; the route would use the legacy path.')
             return 1

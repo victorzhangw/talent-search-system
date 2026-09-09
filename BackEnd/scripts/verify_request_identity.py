@@ -35,7 +35,6 @@ from api_v2.routes import candidates as cand_route     # noqa: E402
 from api_v2.routes import init_proxy as init_route     # noqa: E402
 from api_v2.routes import reports as reports_route     # noqa: E402
 from api_v2.routes import chat as chat_route           # noqa: E402
-from api_v2.services.rag_engine import RAGService      # noqa: E402
 from api_v2.utils.upstream_env import ENV_CLAIM        # noqa: E402
 
 failures = []
@@ -59,22 +58,24 @@ BAD_TOKENS = [
 
 
 class _StubRag:
-    """/chat/ 的模型替身：只記下傳進來的身分，不呼叫模型。
+    """/chat/ 的模型替身：不呼叫模型。
 
     路由的 before_request 會在 rag_service 是 None 時自己建一個真的 RAGService，
-    在 MOCK 模式下那會去讀不存在的 mock_data.json 而 500——所以凡是要打 /chat/ 的
-    段落都要先把它換掉。
+    那會去連 LLM——所以凡是要打 /chat/ 的段落都要先把它換掉。
+
+    只需要打包器會用到的三個成員（U7 之後 RAGService 也就只剩這些）。
     """
 
-    seen = {}
     model_name = 'stub'
 
     def load_history(self, session_id):
         return []
 
-    def generate_response(self, *args, **kwargs):
-        _StubRag.seen.update(kwargs)
-        return iter([]), 'stub'
+    def packer_stream(self, messages):
+        return iter([])
+
+    def packer_followup(self, messages, instruction):
+        return ''
 
 
 class _FakeService:
@@ -186,13 +187,16 @@ def main():
         check('壞 token 一定帶著 error 回應', error is not None)
 
     print()
-    print('[5] /chat/ 把「這次是誰在問」傳給 RAG（E-9）')
-    # /chat/ 本來就驗簽、驗期、驗 aud，所以這裡的 token 要簽得對。
+    print('[5] /chat/ 的身分驗證（E-9）')
+    # 這一節原本驗的是「generate_response() 收到的 user_email 是發問者」。U7 之後
+    # generate_response 不存在了：打包器只用前端送來的 trait_reports，不打上游，
+    # 所以 /chat/ 這條路徑已經沒有任何「拿身分去打上游」的呼叫。
+    # 驗證因此收斂成兩件仍然成立的事：token 沒有 email 一律 401、合法 token 進得去。
+    #
+    # 注意（工單 T5）：/chat/ 的扣點仍然用 payload 裡的 user_id，不是 token 裡的 email。
+    # 那是 U7 之前就有的行為，本單元不夾帶修改。
     chat_ok = sign({'email': 'asker@example.com', 'aud': 'traitty', 'exp': 4102444800})
     chat_no_email = sign({'sub': 'tester', 'aud': 'traitty', 'exp': 4102444800})
-
-    seen = _StubRag.seen
-    seen.clear()
 
     body = {'query': '你好', 'session_id': 'IDENTITY_TEST', 'user_id': 'asker@example.com',
             'candidate_ids': [], 'candidates_info': [], 'trait_reports': {}}
@@ -205,29 +209,25 @@ def main():
         good, detail = is_401(resp)
         check('POST /chat/ <- 簽章正確但沒有 email 欄位 -> 401', good, detail)
 
-        app.test_client().post('/chat/', json=body,
-                               headers={'Authorization': 'Bearer ' + chat_ok})
-        check('generate_response() 收到的 user_email 是發問者',
-              seen.get('user_email') == 'asker@example.com', seen.get('user_email'))
+        resp_ok = app.test_client().post('/chat/', json=body,
+                                         headers={'Authorization': 'Bearer ' + chat_ok})
+        check('合法 token 通過驗證（不是 401）', resp_ok.status_code == 200,
+              resp_ok.status_code)
+        payload = resp_ok.get_data(as_text=True)
+        # 沒有受測者，所以打包器會拒絕——重點是它走到了打包器，而不是被擋在身分那一關。
+        check('沒有受測者時回 NO_RESPONDENTS 而不是靜默降級',
+              'NO_RESPONDENTS' in payload, payload[:200])
     finally:
         chat_route.rag_service = saved_rag
 
     print()
-    print('[6] RAG 沒有身分就不做事，也沒有寫死的預設身分')
+    print('[6] rag_engine 沒有寫死的預設身分')
     engine_src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
                                    'api_v2', 'services', 'rag_engine.py'),
                       encoding='utf-8').read()
     check('rag_engine.py 裡沒有 eva@wepredict.io', 'eva@wepredict.io' not in engine_src)
-
-    raised = None
-    try:
-        RAGService.generate_response(object(), 'q', [], 's')
-    except ValueError as e:
-        raised = str(e)
-    except Exception as e:
-        raised = type(e).__name__ + ': ' + str(e)
-    check('少了 user_email 就 raise ValueError（不是靜默用預設值）',
-          isinstance(raised, str) and 'user_email' in raised, raised)
+    check('rag_engine.py 已不再自己打上游（沒有 generate_upstream_token）',
+          'generate_upstream_token' not in engine_src)
 
     print()
     print('[7] 簽上游 token 的鑰匙跟著環境走（E-10）')

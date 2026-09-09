@@ -77,7 +77,7 @@ def main():
 
     with app.app_context():
         from api_v2.services.module_map import module_map
-        from api_v2.services.packed_chat import try_packed_stream
+        from api_v2.services.packed_chat import packed_stream
         from api_v2.services.respondent_adapter import from_trait_reports
         from api_v2.services.log_assembler import assemble
         from api_v2.services.exit_scanner import ExitScanner
@@ -104,7 +104,7 @@ def main():
                   f'{"module=" + module if module else "free: " + free[:40]}', flush=True)
 
             for run in range(1, args.repeat + 1):
-                packed = try_packed_stream(rag, module, free or '', reports, basics, f'RT{i}-{run}')
+                packed = packed_stream(rag, module, free or '', reports, basics, f'RT{i}-{run}')
                 if packed is None:
                     print('    packer declined', flush=True)
                     results.append({'case': label, 'run': run, 'status': 'declined'})

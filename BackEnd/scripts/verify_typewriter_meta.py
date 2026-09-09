@@ -5,8 +5,8 @@ event, so if the field silently stops being sent the widget falls back to pastin
 360-char blocks and nothing else in the system notices. That is exactly how the original
 `packed_chat` docstring ended up describing a client-side replay that was never built.
 
-No LLM is called: `generate_response` is stubbed, because what is under test is the
-transport of a config value, not the model.
+No LLM is called and no LOG is assembled: `packed_chat.packed_stream` is stubbed,
+because what is under test is the transport of a config value, not the model.
 """
 
 import json
@@ -23,6 +23,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'api_
 import jwt as pyjwt  # noqa: E402
 from api_v2.app import create_app  # noqa: E402
 from api_v2.routes import chat as chat_route  # noqa: E402
+from api_v2.services import packed_chat  # noqa: E402
 
 failures = []
 
@@ -76,9 +77,21 @@ def main():
     # so patching the class is not enough -- the instance is what gets called.
     chat_route.rag_service = type('Stub', (), {
         'model_name': 'stub',
-        'generate_response': lambda self, *a, **k: (iter([_Chunk('嗨')]), 'general_chat'),
         'load_history': lambda self, s: [],
+        'packer_stream': lambda self, m: iter([]),
+        'packer_followup': lambda self, m, i: '',
     })()
+
+    # 打包器是唯一的生成路徑（U7），而這支腳本要測的是 meta 事件而不是打包。
+    # chat.py 是在產生器內部才 import packed_stream 的，所以換掉模組屬性就會生效。
+    class _StubPacked:
+        def __iter__(self):
+            yield _Chunk('嗨')
+
+        def finish(self):
+            return {'status': 'ok'}
+
+    packed_chat.packed_stream = lambda *a, **k: _StubPacked()
 
     print('\n[1] 預設：meta 帶著逐字重播開關')
     m = meta_of(app)

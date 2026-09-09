@@ -9,7 +9,7 @@ Why this can run offline
 ------------------------
 Everything under test happens before the model is reached. `log_payload()` writes the
 record at packed_chat.py:153, *before* `PackedStream` is even constructed, so driving
-`try_packed_stream()` and never iterating the result produces a genuine record and sends
+`packed_stream()` and never iterating the result produces a genuine record and sends
 nothing anywhere. The one place a model would normally be called -- the stub's
 `packer_stream` -- raises instead, which is the assertion that this stayed true.
 
@@ -50,7 +50,7 @@ def check(label, ok, detail=''):
 
 
 class _Rag:
-    """Everything try_packed_stream asks of a RAGService, and nothing more."""
+    """Everything packed_stream asks of a RAGService, and nothing more."""
 
     def __init__(self, history=None):
         self._history = history or []
@@ -123,8 +123,8 @@ def history_block(record):
 
 
 def turn(rag, session_id, query, reports, basics, req_id):
-    from api_v2.services.packed_chat import try_packed_stream
-    return try_packed_stream(rag, None, query, reports, basics, session_id, req_id)
+    from api_v2.services.packed_chat import packed_stream
+    return packed_stream(rag, None, query, reports, basics, session_id, req_id)
 
 
 def main():

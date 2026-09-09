@@ -65,10 +65,10 @@ class Config:
     # 這個值只決定文字稀疏時看起來多快。
     TYPEWRITER_CHARS_PER_SEC = int(os.getenv('TYPEWRITER_CHARS_PER_SEC', 60))
 
-    # LOG 打包器（事項 01-16）。預設開啟：chat 走 assemble -> 分段閘門 -> 稽核。
-    # 舊路徑（模組 prompt + context_builder）仍保留為 fallback，兩者輸出格式不同、
-    # 不可同時生效；設 USE_LOG_PACKER=0 可退回舊路徑。
-    USE_LOG_PACKER = os.getenv('USE_LOG_PACKER', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+    # LOG 打包器（事項 01-16）曾經由 USE_LOG_PACKER 開關控制，關掉會退回舊的模組 prompt
+    # 路徑。U7（決策 D2）把舊路徑整段移除，打包器成為唯一路徑，開關也隨之消失——
+    # 沒有第二條路可退時，一個「要不要走這條」的旗標只會讓人以為還有退路。
+    # 打不了包的請求現在回明確錯誤（packed_chat.PackerRefused），不再安靜降級。
     # 歷史標題的 OpenCC 簡->繁安全網。預設關閉。
     # 簡->繁是一對多映射，所以它套在「本來就正確的繁體標題」上不是不動，而是改寫：
     # 游淑芬->遊淑芬、余明哲->餘明哲、范先生->範先生、干預->幹預、公布->公佈、了解->瞭解。

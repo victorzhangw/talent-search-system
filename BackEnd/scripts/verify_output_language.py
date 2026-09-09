@@ -72,9 +72,10 @@ def main():
     live, dead = [], []
     for p in files:
         name = os.path.basename(p)
-        # modules/ 底下是 `_route_by_module` 依 module_id 組出來的路徑，檔名不會逐一
-        # 出現在程式碼裡，所以整個目錄視為現行。
-        referenced = name in code or os.sep + 'modules' + os.sep in p
+        # U7 之前 modules/ 底下的 40 份 prompt 是 `_route_by_module` 依 module_id 組出
+        # 路徑載入的，檔名不會逐一出現在程式碼裡，所以整個目錄被視為現行。那條路徑與
+        # 那些檔案都已移除，現在單純看檔名有沒有出現在程式碼裡就夠了。
+        referenced = name in code
         (live if referenced else dead).append(p)
 
     check('至少找得到 log_system_prompt.txt', any(
