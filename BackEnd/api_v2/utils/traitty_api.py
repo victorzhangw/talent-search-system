@@ -60,8 +60,15 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str, message_i
     若帶有 message_id，則組合為 external_event_id，確保同一 session 內的每一次問答都是獨立扣點。
     """
     db = get_db_session()
-    
+
     event_id_str = f"{session_id}_{message_id}" if message_id else session_id
+
+    # 環境在建立紀錄「之前」解析，而且整個函式只解析這一次。
+    # 以前是先寫 PENDING、之後才 env_from_request()，於是「這筆打了哪裡」沒有被記下來，
+    # 補送時 scheduler 只能猜預設上游。同一次呼叫裡解析兩次也有風險：SSE 產生器是靠
+    # stream_with_context 保住 request context 的，兩次讀之間的任何情境變化都會讓
+    # 「記下來的環境」與「實際打的環境」對不上。
+    env = env_from_request()
 
     # 1. 建立 Pending 紀錄到資料庫
     record = DailySettlementRecord(
@@ -69,6 +76,7 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str, message_i
         plan_id=plan_id,
         session_id=session_id, # 單純存入 UUID
         message_id=message_id, # 獨立存入 message_id 確保資料乾淨
+        upstream_env=env,      # 補送要回到同一個上游，見 database/models.py
         status='PENDING'
     )
     try:
@@ -80,8 +88,7 @@ def submit_daily_settlement(email: str, plan_id: int, session_id: str, message_i
         # 如果寫入資料庫失敗，仍然繼續嘗試發送 API (盡量不影響扣抵邏輯)
         pass
 
-    # 2. 準備呼叫 API
-    env = env_from_request()
+    # 2. 準備呼叫 API（環境沿用上面記進紀錄的那一個）
     upstream_token = generate_upstream_token(email, env)
     base_url = upstream_base(env)
     url = f"{base_url}/v1/ai/usage/daily-settlement"

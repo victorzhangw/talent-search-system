@@ -11,16 +11,23 @@ def get_token_logger():
 
 token_logger = get_token_logger()
 
-def generate_upstream_token(user_email: str, env: str = None) -> str:
+def generate_upstream_token(user_email: str, env: str = None, *,
+                            trusted_env: bool = False) -> str:
     """
     Generates a fresh short-lived JWT token for calling Traitty API.
     Standardizes the logic previously scattered in auth.py.
 
     `env` 選的是要打哪一個上游（見 utils/upstream_env.py）。不同環境可能用不同的 shared
     secret，所以簽章用的鑰匙要跟著環境走，不能只換網址。
+
+    `trusted_env=True` 表示 `env` 來自伺服器端的紀錄（例如 daily_settlements.upstream_env
+    這種「這筆當初真的打過哪裡」的欄位），不是這次請求帶進來的。此時走
+    `upstream_secret_for()`，不再套 `ALLOW_UPSTREAM_ENV_SWITCH` 閘門——那個開關是用來擋
+    客戶端輸入的，不該回頭改寫已經發生過的事實。預設 False，所有既有呼叫點行為不變。
     """
-    from .upstream_env import upstream_secret
-    secret = upstream_secret(env)
+    from .upstream_env import upstream_secret, upstream_secret_for, normalize_stored_env
+    secret = (upstream_secret_for(normalize_stored_env(env)) if trusted_env
+              else upstream_secret(env))
     if secret == "traitty_ai_api":
         token_logger.warning("Using default insecure secret 'traitty_ai_api'. Set PARTY_A_PLUGIN_SECRET in .env")
     

@@ -138,6 +138,13 @@ class DailySettlementRecord(Base):
     plan_id = Column(Integer, nullable=False)
     session_id = Column(String(64), nullable=False) # external_event_id mapping base
     message_id = Column(String(255), nullable=True) # Optional message_id for deduplication
+    # 這筆扣點當初打的是哪一個上游（utils/upstream_env.py 的 KNOWN_ENVS）。
+    # 補送必須回到同一個上游：submit_daily_settlement() 走 env_from_request()，解得出 'prd'，
+    # 但這個欄位以前不存在，scheduler 一律用預設上游與預設 secret 重送，等於把線上帳務
+    # 送到 UAT（或用錯的 shared secret 拿到 401）。
+    # 與 scripts/migrations/2026-09-09_add_upstream_env_to_daily_settlements.sql 同步。
+    upstream_env = Column(String(16), nullable=False, default='default',
+                          server_default='default')
     status = Column(String(20), default='PENDING', index=True) # PENDING, SYNCED, FAILED
     retry_count = Column(Integer, default=0)
     last_error = Column(Text, nullable=True)

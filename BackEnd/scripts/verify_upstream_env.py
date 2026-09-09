@@ -120,6 +120,36 @@ def main():
         check('內容裡沒有 secret 字樣',
               not any('secret' in str(v).lower() for v in d.values()), d)
 
+    print('\n[8] 已記錄的環境（補送用）：不受 ALLOW_UPSTREAM_ENV_SWITCH 改寫')
+    # daily_settlements.upstream_env 記的是「這筆當初真的打過哪裡」。補送若沿用
+    # normalize_env()，開關在期間被關掉就會把 prd 改寫成 default，等於把線上帳務送到
+    # UAT。來源不是客戶端，所以不套那個閘門——但白名單仍然要套。
+    os.environ['PARTY_A_PLUGIN_SECRET'] = 'main-secret'
+    with app_with(False, prd_secret='prd-secret').test_request_context():
+        check('開關關閉時 normalize_env("prd") 仍收斂成 default（既有行為不變）',
+              ue.normalize_env('prd') == ue.ENV_DEFAULT)
+        check('但 normalize_stored_env("prd") 保留 prd',
+              ue.normalize_stored_env('prd') == 'prd', ue.normalize_stored_env('prd'))
+        check('upstream_base_for("prd") 是 PRD 網址', ue.upstream_base_for('prd') == PRD,
+              ue.upstream_base_for('prd'))
+        check('upstream_secret_for("prd") 是 PRD secret',
+              ue.upstream_secret_for('prd') == 'prd-secret')
+        t = generate_upstream_token('x@example.com', 'prd', trusted_env=True)
+        jwt.decode(t, 'prd-secret', algorithms=['HS256'], audience='traitty')
+        check('trusted_env=True 用 PRD secret 簽（開關關著也一樣）', True)
+        t2 = generate_upstream_token('x@example.com', 'prd')
+        jwt.decode(t2, 'main-secret', algorithms=['HS256'], audience='traitty')
+        check('trusted_env 預設 False：既有呼叫點行為完全不變', True)
+
+    print('\n[9] 已記錄的環境仍套白名單：欄位被寫髒不會變成任意上游')
+    with app_with(True).test_request_context():
+        for bad in ('http://evil.example.com', '//evil.example.com', '../prd',
+                    'staging', '', None, 'PRD; drop'):
+            got = ue.normalize_stored_env(bad)
+            check(f'{bad!r} -> {got}', got in ue.KNOWN_ENVS and got != 'prd', got)
+        check('大小寫與空白正規化："  PRD " -> prd',
+              ue.normalize_stored_env('  PRD ') == 'prd')
+
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0
 

@@ -50,6 +50,24 @@ def normalize_env(name: Optional[str]) -> str:
     return name if name in KNOWN_ENVS else ENV_DEFAULT
 
 
+def normalize_stored_env(name: Optional[str]) -> str:
+    """伺服器自己記下來的環境名（例如 daily_settlements.upstream_env）。
+
+    與 `normalize_env()` 的差別只有一個：**不套 `switching_allowed()` 閘門**。那個閘門存在
+    的理由是「不要讓客戶端決定後端打哪一個上游」，而這裡的來源不是客戶端，是這筆資料當初
+    真的打過的那個上游。
+
+    為什麼不能共用 `normalize_env()`：補送一筆 PRD 的扣點時，如果 `ALLOW_UPSTREAM_ENV_SWITCH`
+    在期間被關掉，`normalize_env('prd')` 會回 `default`，於是這筆線上帳務會被送到 UAT
+    （或用錯的 shared secret 拿到 401）。把「已經發生過的事實」交給一個為了擋輸入而設的開關
+    去改寫是錯的。
+
+    白名單仍然套用：認不得的值一律回 default，資料庫欄位被寫髒也不會變成任意上游。
+    """
+    name = str(name or '').strip().lower()
+    return name if name in KNOWN_ENVS else ENV_DEFAULT
+
+
 def _config(key: str) -> Optional[str]:
     try:
         return current_app.config.get(key)
@@ -57,19 +75,35 @@ def _config(key: str) -> Optional[str]:
         return os.getenv(key)
 
 
-def upstream_base(env: Optional[str] = None) -> Optional[str]:
-    """該環境的上游網址。PRD 沒設定就退回 default，不會半途指向空字串。"""
-    if normalize_env(env) == ENV_PRD:
+def upstream_base_for(env: str) -> Optional[str]:
+    """該環境的上游網址。`env` 必須是已正規化的值（KNOWN_ENVS 之一）。
+
+    PRD 沒設定就退回 default，不會半途指向空字串。
+    """
+    if env == ENV_PRD:
         return _config('TRAITTY_API_BASE_PRD') or _config('TRAITTY_API_BASE')
     return _config('TRAITTY_API_BASE')
 
 
-def upstream_secret(env: Optional[str] = None) -> str:
-    """簽上游 token 用的 shared secret。PRD 沒單獨設定就沿用主要那把。"""
+def upstream_secret_for(env: str) -> str:
+    """簽上游 token 用的 shared secret。`env` 必須是已正規化的值。
+
+    PRD 沒單獨設定就沿用主要那把。
+    """
     default = os.getenv('PARTY_A_PLUGIN_SECRET', 'traitty_ai_api')
-    if normalize_env(env) == ENV_PRD:
+    if env == ENV_PRD:
         return _config('PARTY_A_PLUGIN_SECRET_PRD') or default
     return default
+
+
+def upstream_base(env: Optional[str] = None) -> Optional[str]:
+    """給「來自請求」的環境名用的版本：先過 `normalize_env()` 的閘門再解析。"""
+    return upstream_base_for(normalize_env(env))
+
+
+def upstream_secret(env: Optional[str] = None) -> str:
+    """給「來自請求」的環境名用的版本：先過 `normalize_env()` 的閘門再解析。"""
+    return upstream_secret_for(normalize_env(env))
 
 
 def env_from_request() -> str:
