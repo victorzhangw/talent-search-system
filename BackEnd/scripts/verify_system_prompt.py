@@ -30,6 +30,36 @@ EXAMPLES = [os.path.join(PKG, f) for f in (
 
 KNOWN_DIVERGENCE_PREFIX = '15. 自濾授權'
 
+# E-17：客戶正本沒有規定輸出字體，而 2026-09-09 req cf3dcd60 整篇回答是簡體字
+# （2791 字裡簡體 259、繁體 32）。第 21 條是我們加的，措辭沿用客戶自己在
+# `prompts/modules/*.txt` 已經在用的說法。1-20 條一個字都沒動——那些編號被 v7 範例、
+# 驗收腳本與 a 文件互相引用（例如 `verify_log_assembler` 的 'a-doc rule 15 clause'），
+# 重編會全部連動。
+LANGUAGE_HEADING = '### 戊、輸出語言'
+LANGUAGE_RULE_PREFIX = '21. 所有輸出必須使用繁體中文'
+RULE_COUNT_A_DOC = '## 【全域輸出規範】（唯一正本，共 20 條；取代各題原本重複的禁止段與判讀規範段）'
+RULE_COUNT_STORED = RULE_COUNT_A_DOC.replace('共 20 條', '共 21 條')
+
+
+def strip_language_rule(lines):
+    """把第 21 條與它的小節標題取出來，並把條數還原成客戶正本的寫法。
+
+    取出來單獨檢查、其餘仍要求與 a 文件逐字相同——這樣只要增補的形狀跑掉（多一行、
+    少一行、位置不對），剩下的部分就會對不齊而爆掉，比整份放寬安全。
+    """
+    rest, taken = [], []
+    i = 0
+    while i < len(lines):
+        if lines[i] == LANGUAGE_HEADING:
+            taken = lines[i:i + 2]
+            if rest and not rest[-1].strip():
+                rest.pop()                 # 小節前面那個空行也是我們加的
+            i += 2
+            continue
+        rest.append(RULE_COUNT_A_DOC if lines[i] == RULE_COUNT_STORED else lines[i])
+        i += 1
+    return rest, taken
+
 failures = []
 
 
@@ -73,12 +103,14 @@ def main():
 
     print('\n[1] Stored file vs a-document 第一部分 (the defined source, b §5)')
     a = a_doc_section()
-    check('byte-identical', stored == a,
-          f'stored {len(stored)} lines, a-doc {len(a)} lines')
-    if stored != a:
+    base, language = strip_language_rule(stored)
+    check('byte-identical once the E-17 language rule is taken out', base == a,
+          f'base {len(base)} lines, a-doc {len(a)} lines')
+    if base != a:
         import difflib
-        for d in list(difflib.unified_diff(a, stored, 'a-doc', 'stored', lineterm=''))[:12]:
+        for d in list(difflib.unified_diff(a, base, 'a-doc', 'stored', lineterm=''))[:12]:
             print('       ', d[:150])
+    check('the only addition is the language section', len(language) == 2, language)
 
     print('\n[2] Structure')
     # Two independent numbered lists: 【系統角色與判讀引導】 1-6, then 【全域輸出規範】 1-20.
@@ -90,14 +122,27 @@ def main():
 
     check('判讀引導 numbered 1..6', numbers(stored[:split_at]) == list(range(1, 7)),
           numbers(stored[:split_at]))
-    check('全域輸出規範 numbered 1..20 (heading says 共 20 條)',
-          numbers(stored[split_at:]) == list(range(1, 21)), numbers(stored[split_at:]))
-    check('four category headings present',
+    check('全域輸出規範 numbered 1..21 (heading says 共 21 條)',
+          numbers(stored[split_at:]) == list(range(1, 22)), numbers(stored[split_at:]))
+    check('條數宣告與實際條數一致',
+          stored[split_at] == RULE_COUNT_STORED, stored[split_at])
+    check('five category headings present',
           [l for l in stored if l.startswith('### ')] == [
               '### 甲、禁止揭露（系統出口掃描器會攔截，命中即重寫）',
               '### 乙、語言紀律',
               '### 丙、資料使用規範（怎麼讀注入的資料）',
-              '### 丁、建議性輸出強化'])
+              '### 丁、建議性輸出強化',
+              LANGUAGE_HEADING])
+
+    print('\n[2b] E-17：輸出語言是硬性規定')
+    rule = next((l for l in stored if l.startswith(LANGUAGE_RULE_PREFIX)), '')
+    check('第 21 條存在且要求繁體中文', bool(rule), rule[:60])
+    check('明講是硬性規定', '硬性規定' in rule, rule[-60:])
+    # cf3dcd60 是第 8 則歷史之後才飄掉的，所以要把「不因輪次或歷史長度而改變」寫進去。
+    check('點名不因提問語言／輪次／歷史長度而改變',
+          '不因提問語言' in rule and '歷史長度' in rule, rule[-60:])
+    check('沿用客戶自己的措辭（台灣用語）', '台灣用語' in rule)
+    check('簡體字三個字有出現在規則裡', '簡體字' in rule)
     check('ends with the section separator', stored[-1] == '---', repr(stored[-1]))
     check('is a constant, not a template', '{' not in ''.join(stored))
 
@@ -107,11 +152,11 @@ def main():
     check('all three examples embed an identical System block',
           all(v == ref for v in sections.values()))
 
-    diffs = [(i, s, r) for i, (s, r) in enumerate(zip(stored, ref)) if s != r]
+    diffs = [(i, s, r) for i, (s, r) in enumerate(zip(base, ref)) if s != r]
     known = [d for d in diffs if d[1].startswith(KNOWN_DIVERGENCE_PREFIX)]
     unknown = [d for d in diffs if not d[1].startswith(KNOWN_DIVERGENCE_PREFIX)]
-    check('same line count as the examples', len(stored) == len(ref),
-          f'{len(stored)} vs {len(ref)}')
+    check('same line count as the examples once E-17 is taken out',
+          len(base) == len(ref), f'{len(base)} vs {len(ref)}')
     check('no unexpected difference from the examples', not unknown,
           [d[0] for d in unknown])
     if known:

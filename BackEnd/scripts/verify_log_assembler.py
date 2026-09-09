@@ -24,6 +24,10 @@ from api_v2.services.log_assembler import (Respondent, assemble, check_audience,
                                            COVERAGE_CLAUSE, CONTEXT_MARKER,
                                            CONTEXT_BLOCK)
 
+# E-17 的第 21 條與客戶正本的差異只定義一次，兩支腳本共用同一個函式。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from verify_system_prompt import strip_language_rule  # noqa: E402
+
 PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
                    'Traitty_調整_20260728＿final')
 
@@ -112,6 +116,10 @@ def main():
         respondents = parse_respondents(expected)
         log = assemble(respondents, question)
         actual, roster = split_roster(log.to_log_text().split('\n'))
+        # 三份 v7 範例是客戶在第 21 條存在之前產出的，所以那幾行在 expected 裡不可能有
+        # 對應。跟名單區塊同一種手法：取出來單獨檢查（見 verify_system_prompt.py 的
+        # [2b]），剩下的仍要求逐行 0 未解釋差異。
+        actual, language = strip_language_rule(actual)
 
         print(f'\n[{filename}]  {len(respondents)} respondent(s), idx={question["idx"]}')
         n = len(respondents)
@@ -126,7 +134,8 @@ def main():
               (len(roster) == 4 and roster[-1] == COVERAGE_CLAUSE.format(n=n)) == wants,
               f'per_person={question.get("per_person_sections")} n={n} '
               f'lines={len(roster)}')
-        check('line count matches once the roster block is taken out',
+        check('E-17 的輸出語言規則在每一份 payload 裡', len(language) == 2, language)
+        check('line count matches once the roster block and E-17 rule are taken out',
               len(actual) == len(expected), f'{len(actual)} vs {len(expected)}')
 
         deviations = {}

@@ -90,8 +90,14 @@ def main():
     s = next(i for i, l in enumerate(lines) if l.startswith('# 第一部分：'))
     e = next(i for i, l in enumerate(lines) if l.startswith('# 第二部分：'))
     a_section = '\n'.join(lines[s:e]).rstrip('\n')
-    check('System block is byte-identical to a-doc 第一部分',
-          load_system_prompt().rstrip('\n') == a_section)
+    # E-17 的第 21 條是我們加的具名增補，取出來之後其餘仍要求逐字相同。
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from verify_system_prompt import strip_language_rule
+    base, language = strip_language_rule(load_system_prompt().rstrip('\n').split('\n'))
+    check('System block is byte-identical to a-doc 第一部分 once E-17 is taken out',
+          '\n'.join(base) == a_section)
+    check('E-17 的輸出語言規則存在', len(language) == 2 and '繁體中文' in language[1])
     check('example reproduction is proven by verify_log_assembler',
           (pathlib.Path(os.path.dirname(__file__)) / 'verify_log_assembler.py').exists())
 
