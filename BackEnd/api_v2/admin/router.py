@@ -386,6 +386,8 @@ def upload_traits(current_user):
     if mismatch:
         return err('ROW_COUNT_MISMATCH', mismatch['message'], 422, details=mismatch)
 
+    endpoint_sheets = trait_importer.detect_endpoint_sheets(file_bytes)
+
     preview = {
         'trait_definitions': len(definitions),
         'trait_bands':       len(bands),
@@ -407,16 +409,32 @@ def upload_traits(current_user):
 
     try:
         trait_importer.apply_schema_migration()
-        trait_importer.write_traits_to_db(definitions, bands, interactions)
+        endpoint_report = trait_importer.write_traits_to_db(definitions, bands, interactions)
     except Exception as e:
         import traceback
         traceback.print_exc()
         return err('IMPORT_FAILED', f'DB write failed: {e}', 500)
 
+    # This path refreshes only the three trait tables. Say so when the workbook also
+    # carried endpoint sheets, so nobody assumes trait_endpoints was refreshed too.
+    notices = []
+    if endpoint_sheets:
+        notices.append(
+            f"檔案含 endpoint 工作表 {endpoint_sheets}，但此路徑不匯入 endpoint 資料；"
+            f"trait_endpoints 維持原有 {endpoint_report['endpoints_restored']} 筆。"
+            f"如需更新 endpoint，請改用 scripts/migrate_traits_from_excel.py。")
+    if endpoint_report['endpoints_dropped_trait_ids']:
+        notices.append(
+            f"已捨棄 {endpoint_report['endpoints_preserved'] - endpoint_report['endpoints_restored']} "
+            f"筆 endpoint：新 spec 已無這些 trait_id "
+            f"{endpoint_report['endpoints_dropped_trait_ids']}。")
+
     return ok({
         'preview': preview,
         'confirmed': True,
         'backup_file': os.path.basename(backup_path),
+        'endpoints': endpoint_report,
+        'notices': notices,
     })
 
 

@@ -20,8 +20,25 @@ from ..database.connection import get_db_engine
 
 BAND_SHEET_KEY = 'TraitSemanticBands'
 INTERACTION_SHEET_KEY = 'interaction_narrative'
+# V6.3+ specs carry these two. This path does not import them -- scripts/migrate_traits_from_excel.py
+# does -- but it reports their presence so the operator is not left assuming otherwise.
+ENDPOINT_SHEET_KEYS = ('09_endpoints', '10_endpoint_blocks')
 
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'scripts', 'backups')
+
+# Mirrors scripts/migrate_traits_from_excel.py. trait_endpoints is included because
+# TRUNCATE ... CASCADE on trait_definitions reaches it via trait_endpoints_trait_id_fkey.
+# Children are cleared before parents and parents re-inserted before children, so the
+# file can actually be replayed -- deleting trait_definitions first raises a FK violation.
+BACKUP_DELETE_ORDER = ('trait_endpoints', 'trait_bands', 'trait_interactions',
+                       'trait_definitions', 'endpoint_blocks')
+BACKUP_INSERT_ORDER = ('trait_definitions', 'endpoint_blocks', 'trait_bands',
+                       'trait_interactions', 'trait_endpoints')
+
+
+def _table_exists(conn, table_name):
+    return conn.execute(text("SELECT to_regclass(:t)"),
+                        {'t': table_name}).scalar() is not None
 
 COL = {
     'trait_id':                0,
@@ -256,13 +273,23 @@ def create_backup_sql(backup_dir=None):
 
     engine = get_db_engine()
     with engine.connect() as conn:
+        present = [t for t in BACKUP_INSERT_ORDER if _table_exists(conn, t)]
+
         with open(path, 'w', encoding='utf-8') as f:
-            f.write(f"-- Trait tables backup {ts}\nBEGIN;\n")
-            for table in ('trait_definitions', 'trait_bands', 'trait_interactions'):
+            f.write(f"-- Trait tables backup {ts}\n")
+            f.write("-- Restore order: children cleared first, parents inserted first.\n")
+            f.write("BEGIN;\n")
+            f.write("\n-- Clear children before parents (FK order)\n")
+            for table in BACKUP_DELETE_ORDER:
+                if table in present:
+                    f.write(f"DELETE FROM {table};\n")
+            for table in BACKUP_INSERT_ORDER:
+                if table not in present:
+                    continue
                 result = conn.execute(text(f"SELECT * FROM {table}"))
                 cols = list(result.keys())
-                rows = result.fetchall()
-                f.write(f"\n-- {table} ({len(rows)} rows)\nDELETE FROM {table};\n")
+                rows = result.mappings().fetchall()
+                f.write(f"\n-- {table} ({len(rows)} rows)\n")
                 for row in rows:
                     vals = ', '.join(_escape_sql_value(row[c]) for c in cols)
                     f.write(f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({vals});\n")
@@ -286,10 +313,61 @@ def apply_schema_migration():
         conn.commit()
 
 
+def _snapshot_endpoints(conn):
+    """Read trait_endpoints so its rows can survive the TRUNCATE ... CASCADE below."""
+    if not _table_exists(conn, 'trait_endpoints'):
+        return []
+    result = conn.execute(text("SELECT * FROM trait_endpoints"))
+    cols = list(result.keys())
+    return [dict(zip(cols, row)) for row in result.fetchall()]
+
+
+def _restore_endpoints(conn, rows, valid_trait_ids):
+    """Re-insert preserved endpoint rows. Returns (restored_count, dropped_trait_ids)."""
+    if not rows:
+        return 0, set()
+    keep = [r for r in rows if r.get('trait_id') in valid_trait_ids]
+    dropped = {r.get('trait_id') for r in rows if r.get('trait_id') not in valid_trait_ids}
+    for r in keep:
+        cols = [c for c in r if c != 'id']
+        conn.execute(text(
+            f"INSERT INTO trait_endpoints ({', '.join(cols)}) "
+            f"VALUES ({', '.join(':' + c for c in cols)})"),
+            {c: r[c] for c in cols})
+    return len(keep), dropped
+
+
+def detect_endpoint_sheets(file_bytes):
+    """Names of the endpoint sheets present in the workbook. V6.3+ specs ship both.
+
+    This path imports only the three trait tables, so a file that does carry endpoint
+    sheets still leaves trait_endpoints on its existing rows -- the caller reports that
+    rather than letting the operator assume the endpoint data was refreshed too.
+    """
+    if not OPENPYXL_AVAILABLE:
+        return []
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+    except Exception:
+        return []
+    try:
+        return [n for n in wb.sheetnames
+                if any(k.lower() in n.lower() for k in ENDPOINT_SHEET_KEYS)]
+    finally:
+        wb.close()
+
+
 def write_traits_to_db(definitions, bands, interactions):
-    """Truncate the three tables and bulk-insert parsed data."""
+    """Truncate the three tables and bulk-insert parsed data.
+
+    trait_endpoints is carried across the truncate: TRUNCATE ... CASCADE reaches it via
+    trait_endpoints_trait_id_fkey, and this path has no endpoint parser to reload it
+    from, so without the snapshot every upload silently destroyed those rows.
+    Returns a report dict describing what happened to them.
+    """
     engine = get_db_engine()
     with engine.begin() as conn:
+        preserved = _snapshot_endpoints(conn)
         conn.execute(text("TRUNCATE trait_interactions, trait_bands, trait_definitions CASCADE"))
 
         for d in definitions:
@@ -298,6 +376,10 @@ def write_traits_to_db(definitions, bands, interactions):
                     (trait_id, name_zh, name_en, dimension, definition, definition_en, hidden_anchor)
                 VALUES (:trait_id, :name_zh, :name_en, :dimension, :definition, :definition_en, :hidden_anchor)
             """), d)
+
+        # Endpoint rows depend on trait_definitions, so restore them now that it is back.
+        restored, dropped = _restore_endpoints(
+            conn, preserved, {d['trait_id'] for d in definitions})
 
         for b in bands:
             b2 = dict(b)
@@ -320,6 +402,12 @@ def write_traits_to_db(definitions, bands, interactions):
                     (primary_trait_id, primary_band, trigger_trait_id, trigger_band, narrative)
                 VALUES (:primary_trait_id, :primary_band, :trigger_trait_id, :trigger_band, :narrative)
             """), i)
+
+    return {
+        'endpoints_preserved': len(preserved),
+        'endpoints_restored': restored,
+        'endpoints_dropped_trait_ids': sorted(dropped),
+    }
 
 
 def list_backups(backup_dir=None):

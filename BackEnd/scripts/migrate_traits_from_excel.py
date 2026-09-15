@@ -280,7 +280,9 @@ def parse_excel(excel_path, require_endpoints=True):
     endpoint_sheet_name = _find_sheet(wb, ENDPOINT_SHEET_KEY)
     block_sheet_name = _find_sheet(wb, BLOCK_SHEET_KEY)
     if (not endpoint_sheet_name or not block_sheet_name) and not require_endpoints:
-        print("[Parse] WARNING: no endpoint sheets; existing endpoint rows left untouched.")
+        print("[Parse] WARNING: no endpoint sheets in this spec. The existing trait_endpoints "
+              "rows will be carried across the truncate and re-inserted; any row whose "
+              "trait_id is absent from the new spec is dropped and reported.")
         wb.close()
         print(f"[Parse] trait_definitions: {len(definitions)} records")
         print(f"[Parse] trait_bands:       {len(bands)} records")
@@ -289,9 +291,10 @@ def parse_excel(excel_path, require_endpoints=True):
     if not endpoint_sheet_name or not block_sheet_name:
         raise ValueError(
             f"Spec file has no '{ENDPOINT_SHEET_KEY}' / '{BLOCK_SHEET_KEY}' sheet "
-            f"(found: {sheets}). Use a V6.3+ spec, or pass --skip-endpoints to keep "
-            f"the existing endpoint rows untouched. Refusing to continue silently: "
-            f"a full migration would wipe trait_endpoints via TRUNCATE CASCADE.")
+            f"(found: {sheets}). Use a V6.3+ spec, or pass --skip-endpoints to preserve "
+            f"the existing trait_endpoints rows across the truncate. Refusing to continue "
+            f"silently: without either, TRUNCATE CASCADE would wipe trait_endpoints and "
+            f"nothing would reload it.")
 
     endpoints = parse_endpoint_sheet(wb[endpoint_sheet_name])
     blocks = parse_block_sheet(wb[block_sheet_name])
@@ -322,16 +325,37 @@ def _escape_sql_value(v):
     return f"'{s}'"
 
 
+# Backup covers every table a trait migration can clear. trait_endpoints is in the
+# list because TRUNCATE ... CASCADE on trait_definitions reaches it through
+# trait_endpoints_trait_id_fkey; leaving it out made the endpoint rows unrecoverable.
+#
+# FK graph among the five: trait_bands, trait_interactions and trait_endpoints all
+# reference trait_definitions, and trait_endpoints also references endpoint_blocks.
+# The restore therefore clears children before parents and re-inserts parents before
+# children -- emitting "DELETE FROM trait_definitions" first (as this did) fails
+# outright with a foreign key violation, so the backup could never be replayed.
+BACKUP_DELETE_ORDER = ('trait_endpoints', 'trait_bands', 'trait_interactions',
+                       'trait_definitions', 'endpoint_blocks')
+BACKUP_INSERT_ORDER = ('trait_definitions', 'endpoint_blocks', 'trait_bands',
+                       'trait_interactions', 'trait_endpoints')
+
+
+def _table_exists(conn, table_name):
+    from sqlalchemy import text as sa_text
+    return conn.execute(sa_text("SELECT to_regclass(:t)"),
+                        {'t': table_name}).scalar() is not None
+
+
 def backup_table(conn, table_name, f):
+    """Write the INSERT statements for one table. The DELETE is emitted separately."""
     from sqlalchemy import text as sa_text
     result = conn.execute(sa_text(f"SELECT * FROM {table_name}"))
     cols = list(result.keys())
     rows = result.mappings().fetchall()
+    col_list = ', '.join(cols)
     f.write(f"\n-- ========== {table_name} ({len(rows)} rows) ==========\n")
-    f.write(f"DELETE FROM {table_name};\n")
     for row in rows:
         values = ', '.join(_escape_sql_value(row[c]) for c in cols)
-        col_list = ', '.join(cols)
         f.write(f"INSERT INTO {table_name} ({col_list}) VALUES ({values});\n")
     print(f"[Backup] {table_name}: {len(rows)} rows written")
 
@@ -342,12 +366,22 @@ def create_backup(engine, backup_dir):
     path = os.path.join(backup_dir, f'trait_backup_{ts}.sql')
 
     with engine.connect() as conn:
+        present = [t for t in BACKUP_INSERT_ORDER if _table_exists(conn, t)]
+        missing = [t for t in BACKUP_INSERT_ORDER if t not in present]
+        if missing:
+            print(f"[Backup] WARNING: table(s) absent, not backed up: {missing}")
+
         with open(path, 'w', encoding='utf-8') as f:
             f.write(f"-- Trait tables backup generated {ts}\n")
+            f.write("-- Restore order: children cleared first, parents inserted first.\n")
             f.write("BEGIN;\n")
-            backup_table(conn, 'trait_definitions', f)
-            backup_table(conn, 'trait_bands', f)
-            backup_table(conn, 'trait_interactions', f)
+            f.write("\n-- Clear children before parents (FK order)\n")
+            for table_name in BACKUP_DELETE_ORDER:
+                if table_name in present:
+                    f.write(f"DELETE FROM {table_name};\n")
+            for table_name in BACKUP_INSERT_ORDER:
+                if table_name in present:
+                    backup_table(conn, table_name, f)
             f.write("\nCOMMIT;\n")
 
     print(f"[Backup] Written to: {path}")
@@ -448,10 +482,50 @@ def verify_endpoints(engine, endpoints):
     print("[Verify] Endpoint data consistent with spec.")
 
 
-def write_to_db(engine, definitions, bands, interactions):
+def _snapshot_endpoints(conn):
+    """Read trait_endpoints so its rows can survive the TRUNCATE ... CASCADE below."""
+    from sqlalchemy import text as sa_text
+    if not _table_exists(conn, 'trait_endpoints'):
+        return []
+    result = conn.execute(sa_text("SELECT * FROM trait_endpoints"))
+    cols = list(result.keys())
+    return [dict(zip(cols, row)) for row in result.fetchall()]
+
+
+def _restore_endpoints(conn, rows, valid_trait_ids):
+    """Re-insert preserved endpoint rows. Returns (restored_count, dropped_trait_ids).
+
+    A row whose trait_id is gone from the new spec cannot be restored -- trait_endpoints
+    has an FK to trait_definitions -- so it is dropped and reported. `id` is left out so
+    the serial regenerates; nothing references trait_endpoints.id.
+    """
+    from sqlalchemy import text as sa_text
+    if not rows:
+        return 0, set()
+    keep = [r for r in rows if r.get('trait_id') in valid_trait_ids]
+    dropped = {r.get('trait_id') for r in rows if r.get('trait_id') not in valid_trait_ids}
+    for r in keep:
+        cols = [c for c in r if c != 'id']
+        conn.execute(sa_text(
+            f"INSERT INTO trait_endpoints ({', '.join(cols)}) "
+            f"VALUES ({', '.join(':' + c for c in cols)})"),
+            {c: r[c] for c in cols})
+    return len(keep), dropped
+
+
+def write_to_db(engine, definitions, bands, interactions, preserve_endpoints=False):
     from sqlalchemy import text
 
     with engine.begin() as conn:
+        # TRUNCATE ... CASCADE reaches trait_endpoints through trait_endpoints_trait_id_fkey.
+        # When the spec carries no endpoint sheets there is nothing to reload it from
+        # afterwards, so snapshot the rows here and put them back inside this same
+        # transaction -- either the whole migration lands or none of it does.
+        preserved = None
+        if preserve_endpoints:
+            preserved = _snapshot_endpoints(conn)
+            print(f"[Write] Preserving {len(preserved)} trait_endpoints rows across the truncate.")
+
         # Truncate in FK-dependency order
         conn.execute(text("TRUNCATE trait_interactions, trait_bands, trait_definitions CASCADE"))
         print("[Write] Tables truncated.")
@@ -465,6 +539,15 @@ def write_to_db(engine, definitions, bands, interactions):
                     (:trait_id, :name_zh, :name_en, :dimension, :definition, :definition_en, :hidden_anchor)
             """), d)
         print(f"[Write] trait_definitions: {len(definitions)} rows inserted")
+
+        # Endpoint rows depend on trait_definitions, so restore them now that it is back.
+        if preserved is not None:
+            restored, dropped = _restore_endpoints(
+                conn, preserved, {d['trait_id'] for d in definitions})
+            print(f"[Write] trait_endpoints: {restored} rows restored")
+            if dropped:
+                print(f"[Write] WARNING: {len(preserved) - restored} endpoint row(s) dropped -- "
+                      f"trait_id absent from the new spec: {sorted(dropped)}")
 
         # Insert trait_bands
         for b in bands:
@@ -512,7 +595,10 @@ def main():
     parser.add_argument('--endpoints-only', action='store_true',
                         help='Load only 09_endpoints / 10_endpoint_blocks; leave the three trait tables untouched')
     parser.add_argument('--skip-endpoints', action='store_true',
-                        help='Allow a pre-V6.3 spec with no endpoint sheets; existing endpoint rows are left as-is')
+                        help='Allow a pre-V6.3 spec with no endpoint sheets. Existing '
+                             'trait_endpoints rows are preserved across the truncate and '
+                             're-inserted (ids are reassigned); rows whose trait_id is gone '
+                             'from the new spec are dropped and reported.')
     args = parser.parse_args()
 
     excel_path = os.path.abspath(args.excel)
@@ -565,10 +651,14 @@ def main():
     apply_endpoint_schema(engine)
 
     print("\n[Step 3] Writing new data...")
-    write_to_db(engine, definitions, bands, interactions)
+    # `endpoints is None` means --skip-endpoints: the spec has no endpoint sheets, so
+    # there is nothing to reload from and write_to_db must carry the existing rows over
+    # the truncate itself. Otherwise Step 4 below reloads them from the spec.
+    write_to_db(engine, definitions, bands, interactions,
+                preserve_endpoints=(endpoints is None))
 
-    # After write_to_db: TRUNCATE ... CASCADE has emptied trait_endpoints, so it
-    # must be reloaded in the same run.
+    # TRUNCATE ... CASCADE emptied trait_endpoints, so a spec that carries endpoint
+    # sheets must reload them in the same run.
     if endpoints is not None:
         print("\n[Step 4] Writing endpoint data...")
         write_endpoints(engine, endpoints, blocks)
