@@ -37,9 +37,12 @@ _NON_ALNUM_RE = re.compile(r'[^a-zA-Z0-9]')
 #
 # key 是 (測驗代號, 正規化後的廠商用字)，value 是正規化後的正本用字。
 VENDOR_NAME_ALIASES = {
-    # CSR_23。規格寫 Material Avoidance，廠商送 Materialism Avoidance。
-    # 每位 CSR 受測者固定因此丟掉一個特質；2026-09-04 一天 17 次。
-    ('CSR', 'materialismavoidance'): 'materialavoidance',
+    # CSR_23。方向在 0915 版規格後反過來了：客戶把正本從 Material Avoidance 改成
+    # Materialism Avoidance，也就是改成與廠商一致的用字。舊的對應（廠商字 -> 正本字）
+    # 會把廠商送來的正確名字改寫成已不存在的舊字，兩種拼法因此都對不上，CSR_23 又會
+    # 被靜默丟掉——正是這張表當初要解決的問題，只是方向相反。
+    # 現在改成把舊拼法對應到正本，讓新舊兩種廠商用字都命中。
+    ('CSR', 'materialavoidance'): 'materialismavoidance',
 }
 
 
