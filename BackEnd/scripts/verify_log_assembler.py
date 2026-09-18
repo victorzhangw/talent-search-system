@@ -28,13 +28,17 @@ from api_v2.services.log_assembler import (Respondent, assemble, check_audience,
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from verify_system_prompt import strip_language_rule  # noqa: E402
 
-PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
-                   'Traitty_調整_20260728＿final')
+# 2026-09-18：與 verify_system_prompt.py 一起改指 0917。這支是逐行 0 差異比對，而
+# [SYSTEM PROMPT] 區塊就在被比對的範圍內——規則八一改，基準不跟著換就必然紅。
+# 已實測：V7 的 42 列敘事變更沒有一列出現在這三份範例裡，所以換範例不會把敘事差異
+# 一起帶進來。
+PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0917',
+                   'Traitty_調整_20260917')
 
 CASES = [
-    ('新版LOG範例_匡列型_壓力題_v7.txt', '如何面對困難、壓力、挑戰'),
-    ('新版LOG範例_全人型_雙測驗_v7.txt', '個人使用說明書(主管)'),
-    ('新版LOG範例_多人型_會議團隊_v7.txt', '打造高效會議團隊'),
+    ('07_新版LOG範例_匡列型_壓力題_v8_260917.txt', '如何面對困難、壓力、挑戰'),
+    ('06_新版LOG範例_全人型_雙測驗_v8_260917.txt', '個人使用說明書(主管)'),
+    ('08_新版LOG範例_多人型_會議團隊_v8_260917.txt', '打造高效會議團隊'),
 ]
 
 RESPONDENT_RE = re.compile(r'^### \[受測者 \| (.+?) \| (.+?)\]$')

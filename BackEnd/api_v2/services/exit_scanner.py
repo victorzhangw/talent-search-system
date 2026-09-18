@@ -2,6 +2,7 @@ r"""Scan an LLM answer for internal markers before it reaches the user (事項 0
 
 Three layers, from `exit_scanner_wordlist_v6_2.json`:
 
+  reminder mask   規範乙-8 的制式提醒句先遮罩再掃，見 ROLE_FIT_REMINDER。
   hard patterns   9 always-on regexes: trait ids, band codes, 聯動/連動 scaffolding,
                   score leaks, Chinese band-zone wording, HR decisions, labelling
                   verdicts, demographics, integrity verdicts.
@@ -37,6 +38,46 @@ _CONFIG = os.path.join(os.path.dirname(__file__), '..', 'config',
 
 # 詞 + optional adverb run + degree term, or one of the explicit suffixes.
 DEGREE_GUARD = r'(?=[很較相對更]{0,3}[偏程度分高低強弱]|傾向|指標|區間)'
+
+# 全域輸出規範乙-8（2026-09-17 客戶更新）要求的制式提醒句。適任／排序類提問出現時，
+# 模型必須原句附上這一段。
+#
+# 為什麼要遮罩：`hr_decision` 攔的是 `適合擔任[^，。；]{0,8}(職|主管|經理|崗位)`，而模型
+# 寫這句提醒時幾乎一定會複述題意（「關於是否適合擔任區域主管一職…」）。命中之後
+# `banned_terms()` 會把命中的字串丟回去要模型別再寫，模型很可能連提醒句一起拿掉——
+# 新規則被既有的攔截機制自己消掉。實測過提醒句本身：九條 hard_patterns 全部 0 命中，
+# 危險的是它周圍的複述。
+#
+# 遮罩字元用 \x00 而不是空白：`band_code` 的樣式是 `[ABC]\s*[段屬]`，拿空白當遮罩等於
+# 在答案裡插入 `\s`，有機會讓遮罩前後的字湊成一次假命中。\x00 不出現在任何一條
+# hard_patterns、不是 \s、也不在特質名與 band 標籤裡。等長替換，`Hit.start` 不會失真。
+ROLE_FIT_REMINDER = ('不可將AI回答用於人選擔任某職務或角色是否適任及排序順位之單一參考，'
+                     '需多方驗證後決策')
+_REMINDER_MASK = '\x00'
+
+
+def mask_reminder(answer: str):
+    """把制式提醒句換成等長遮罩，回傳 (遮罩後的字串, [(起, 迄), ...])。
+
+    只遮罩逐字相同的那一段。模型寫出語意相同但措辭不同的版本時不在此列——那種情況
+    由 `completeness_check` 的決策提醒檢查處理，不是掃描器的事。
+    """
+    if not answer or ROLE_FIT_REMINDER not in answer:
+        return answer, []
+    spans = []
+    out = []
+    i = 0
+    n = len(ROLE_FIT_REMINDER)
+    while True:
+        j = answer.find(ROLE_FIT_REMINDER, i)
+        if j < 0:
+            out.append(answer[i:])
+            break
+        out.append(answer[i:j])
+        out.append(_REMINDER_MASK * n)
+        spans.append((j, j + n))
+        i = j + n
+    return ''.join(out), spans
 
 
 class Hit:
@@ -150,6 +191,9 @@ class ExitScanner:
     def scan(self, answer: str) -> List[Hit]:
         if not answer:
             return []
+        # 規範乙-8 的制式提醒句不受掃描 -- 見 ROLE_FIT_REMINDER。位移不變，所以
+        # `Hit.start` 仍然指向原字串的位置。
+        answer, _ = mask_reminder(answer)
         hits: List[Hit] = []
         for rule_id, rx in self.wl.hard_patterns:
             for m in rx.finditer(answer):

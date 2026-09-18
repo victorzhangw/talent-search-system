@@ -83,9 +83,11 @@ def main():
 
     print('\n[DoD 1] 重現範例：【輸入數據】一致，[SYSTEM PROMPT] 與 a 文件一字不差')
     from api_v2.services.log_system_prompt import load_system_prompt
-    a_doc = pathlib.Path(os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
-                                      'Traitty_調整_20260728＿final',
-                                      'a_LOG完成版模板_v2_20260727.md')).read_text(encoding='utf-8')
+    # 2026-09-18：與 verify_system_prompt.py / verify_log_assembler.py 一起改指 0917。
+    # 客戶在 0917 更新了全域輸出規範第 8 條，a 文件出了新版；基準留在 0730 就必然對不上。
+    a_doc = pathlib.Path(os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0917',
+                                      'Traitty_調整_20260917',
+                                      'a_LOG完成版模板_v2_20260917.md')).read_text(encoding='utf-8')
     lines = a_doc.split('\n')
     s = next(i for i, l in enumerate(lines) if l.startswith('# 第一部分：'))
     e = next(i for i, l in enumerate(lines) if l.startswith('# 第二部分：'))

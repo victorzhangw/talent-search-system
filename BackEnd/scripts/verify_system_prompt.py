@@ -19,13 +19,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from api_v2.services.log_system_prompt import load_system_prompt  # noqa: E402
 
-PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
-                   'Traitty_調整_20260728＿final')
-A_DOC = os.path.join(PKG, 'a_LOG完成版模板_v2_20260727.md')
+# 2026-09-18：改指 0917 交付包。客戶在 0917 更新了全域輸出規範第 8 條（加上適任／
+# 排序提問時的制式提醒句），a 文件與三份範例都跟著出了新版；比對基準若還停在 0730，
+# 規則八一改就必然對不上。
+PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0917',
+                   'Traitty_調整_20260917')
+A_DOC = os.path.join(PKG, 'a_LOG完成版模板_v2_20260917.md')
 EXAMPLES = [os.path.join(PKG, f) for f in (
-    '新版LOG範例_匡列型_壓力題_v7.txt',
-    '新版LOG範例_全人型_雙測驗_v7.txt',
-    '新版LOG範例_多人型_會議團隊_v7.txt',
+    '07_新版LOG範例_匡列型_壓力題_v8_260917.txt',
+    '06_新版LOG範例_全人型_雙測驗_v8_260917.txt',
+    '08_新版LOG範例_多人型_會議團隊_v8_260917.txt',
 )]
 
 KNOWN_DIVERGENCE_PREFIX = '15. 自濾授權'
