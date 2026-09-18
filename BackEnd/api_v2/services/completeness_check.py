@@ -47,6 +47,11 @@ FREE_FORM_MAX_CHARS = 1000
 
 SKIP_LOG = '本題未做段落齊全檢查（原因：指令未定義固定段落標題）'
 UNSPLIT_LOG = '本題 expected_sections 尚未拆分 single/multi，退回使用單一欄位'
+# 「刻意留空」與「資料沒填」原本走同一條路徑、log 同一句話，於是 Q2／Q6／Q11 這種
+# 「指令明明有編號段落、只是沒人填進資料」的情況，會被讀成「本題指令未定義固定段落
+# 標題」——一個與事實相反的理由。區分依據是 `expected_sections_note`：有 note 表示
+# 內容方確認過這題沒有固定段落（Q14／Q15／Q22），沒有 note 而為空就是資料缺口。
+DATA_GAP_LOG = '本題 expected_sections 未填，段落齊全檢查未執行（資料缺口，非指令特性）'
 
 # Leading ordinal/bullet/markdown noise that a heading may carry.
 _HEADING_PREFIX_RE = re.compile(
@@ -284,7 +289,8 @@ class CompletenessResult:
         # `expected_sections_check` would make a calibration miss look like a missing
         # section, which is what the first version of this did.
         self.status = 'passed'                  # passed | failed | skipped
-        self.sections_check = 'passed'          # passed | failed | skipped | n/a
+        # data_gap 只進稽核，不改 status——它是資料維運訊號，不是這一筆回答的品質問題。
+        self.sections_check = 'passed'          # passed | failed | skipped | data_gap | n/a
         self.missing_sections: List[str] = []
         self.missing_respondents: List[str] = []
         self.char_count: Optional[int] = None
@@ -514,8 +520,12 @@ class CompletenessChecker:
                 'over_limit' if result.char_count > FREE_FORM_MAX_CHARS else 'passed')
         elif not self.expected:
             result.status = 'skipped'
-            result.sections_check = 'skipped'
-            result.log_lines.append(SKIP_LOG)
+            if (self.question or {}).get('expected_sections_note'):
+                result.sections_check = 'skipped'       # 內容方確認過：本題無固定段落
+                result.log_lines.append(SKIP_LOG)
+            else:
+                result.sections_check = 'data_gap'      # 資料沒填，不是題目特性
+                result.log_lines.append(DATA_GAP_LOG)
         else:
             if self._fallback_note:
                 result.log_lines.append(self._fallback_note)

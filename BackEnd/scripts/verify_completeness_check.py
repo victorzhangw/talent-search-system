@@ -140,15 +140,24 @@ def main():
     print('\n[4] 事項 13: single/multi split with a reported fallback')
     single, note = expected_sections_for(q5, 1)
     multi, note_m = expected_sections_for(q5, 2)
-    # expected_sections_multi 已補齊，所以多人不再退回單人清單——這正是 req f1d36fbb
-    # 六段全滅的根因。單人版尚未拆分（expected_sections_single 仍是 None），還是走退路，
-    # 而那條退路必須繼續被記錄下來。
+    # 兩邊都已拆分（U6a 補上了 expected_sections_single），所以正常資料不再走退路。
+    # 多人退回單人清單正是 req f1d36fbb 六段全滅的根因；單人退路則是每一筆單人題庫題
+    # 都會記一行 UNSPLIT_LOG，把稽核灌滿噪音。
     check('多人已拆分 -> 用多人清單、不記退回', note_m is None and multi == q5['expected_sections_multi'],
           f'{note_m!r} {multi}')
     check('多人清單確實與單人不同', multi != single, f'{multi} vs {single}')
-    check('單人尚未拆分 -> 仍走退路並記錄', note == UNSPLIT_LOG and single == q5['expected_sections'])
-    check('the fallback is recorded in the result log',
-          UNSPLIT_LOG in check_answer(full, r1, q5, CALIB).log_lines)
+    check('單人已拆分 -> 不再走退路', note is None and single == q5['expected_sections_single'],
+          f'{note!r} {single}')
+    check('正常請求不再出現 UNSPLIT_LOG',
+          UNSPLIT_LOG not in check_answer(full, r1, q5, CALIB).log_lines)
+    # 退路本身保留：舊格式的資料（沒有 single/multi 欄）仍要退回單一欄位並記錄，
+    # 否則哪天資料倒退就會靜默地不做檢查。
+    legacy = {k: v for k, v in q5.items()
+              if k not in ('expected_sections_single', 'expected_sections_multi')}
+    legacy_secs, legacy_note = expected_sections_for(legacy, 1)
+    check('舊格式資料仍走退路並記錄',
+          legacy_note == UNSPLIT_LOG and legacy_secs == q5['expected_sections'],
+          f'{legacy_note!r}')
     split_q = dict(q5, expected_sections_single=['甲'], expected_sections_multi=['乙', '丙'])
     check('split fields are preferred when present',
           expected_sections_for(split_q, 1)[0] == ['甲']
