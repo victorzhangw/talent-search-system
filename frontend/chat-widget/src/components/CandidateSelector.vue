@@ -147,6 +147,26 @@ const emit = defineEmits(['change', 'load-more'])
 const selectedIds = ref([...props.initialSelectedIds])
 const searchQuery = ref('')
 
+// 看過的人就記著，不隨 `props.candidates` 被取代而遺失。
+//
+// `props.candidates` 是分頁清單，`fetchCandidates(false)` 會整個取代它。已選取的人
+// 一旦不在當前清單裡，下面那些標籤就只剩 `getCandidateName()` 回的 'Unknown'——
+// 使用者看到自己選的六個人變成六個「Unknown」，而選取本身其實還在。
+//
+// 這條在搜尋改成後端過濾之後會從「偶爾」變成「一定會發生」：搜尋結果只有命中的人，
+// 已選而未命中的人必然不在清單裡。所以先把這個底補起來，再接搜尋。
+const seenCandidates = ref(new Map())
+
+watch(() => props.candidates, (list) => {
+    if (!Array.isArray(list)) return
+    // 累積，不取代——這個 Map 的用途就是「曾經看過」。
+    const next = new Map(seenCandidates.value)
+    for (const c of list) {
+        if (c && c.id != null) next.set(String(c.id), c)
+    }
+    seenCandidates.value = next
+}, { immediate: true, deep: true })
+
 // Filter Logic
 const filteredCandidates = computed(() => {
     const query = searchQuery.value.toLowerCase().trim()
@@ -161,7 +181,9 @@ const filteredCandidates = computed(() => {
 })
 
 const getCandidateName = (id) => {
-    const cand = props.candidates.find(c => c.id === id);
+    // 先看當前清單（資料較新），再退回曾經看過的那一份。兩邊都沒有才是真的不知道。
+    const cand = props.candidates.find(c => c.id === id)
+        || seenCandidates.value.get(String(id))
     return cand ? cand.name : 'Unknown';
 }
 
