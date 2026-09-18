@@ -105,8 +105,16 @@ def _is_valid_trait_id(trait_id):
     return bool(trait_id and re.match(r'^[A-Z]{2,6}_\d{2,3}$', str(trait_id).strip()))
 
 
-def parse_band_sheet(ws):
+def parse_band_sheet(ws, fallback_version=None):
     """
+    Args:
+        fallback_version: written to trait_bands.version when the sheet's own 版本 column
+            is empty. The column has been blank in every spec shipped so far (V7: all 998
+            rows None), which is why "which spec is loaded?" could only be answered by
+            diffing 2,389 narratives against each candidate file. The cell still wins when
+            it has a value -- if the source of truth ever starts filling it, a CLI flag
+            must not silently override it.
+
     Returns:
         definitions: dict[trait_id] → dict  (one per unique trait)
         bands:       list of dict            (one per trait × band)
@@ -164,7 +172,7 @@ def parse_band_sheet(ws):
             'report_wording_friendly': _cell(row, COL['report_wording_friendly']),
             'ai_guidance':            {'do': ai_do_list, 'dont': ai_dont_list,
                                        'do_raw': ai_do_raw, 'dont_raw': ai_dont_raw},
-            'version':                _cell(row, COL['version']),
+            'version':                _cell(row, COL['version']) or fallback_version,
             'trait_project':          _extract_project(trait_id),
         })
 
@@ -254,7 +262,7 @@ def _find_sheet(wb, key):
     return None
 
 
-def parse_excel(excel_path, require_endpoints=True):
+def parse_excel(excel_path, require_endpoints=True, spec_version=None):
     print(f"[Parse] Opening: {excel_path}")
     wb = openpyxl.load_workbook(excel_path, read_only=True, data_only=True)
     sheets = wb.sheetnames
@@ -271,7 +279,7 @@ def parse_excel(excel_path, require_endpoints=True):
     print(f"[Parse] Using band sheet: '{band_sheet_name}'")
     print(f"[Parse] Using interaction sheet: '{interaction_sheet_name}'")
 
-    definitions, bands = parse_band_sheet(wb[band_sheet_name])
+    definitions, bands = parse_band_sheet(wb[band_sheet_name], fallback_version=spec_version)
     interactions = parse_interaction_sheet(wb[interaction_sheet_name])
 
     # Endpoint sheets (V6.3+). Their absence must be loud: trait_endpoints has an
@@ -599,6 +607,11 @@ def main():
                              'trait_endpoints rows are preserved across the truncate and '
                              're-inserted (ids are reassigned); rows whose trait_id is gone '
                              'from the new spec are dropped and reported.')
+    parser.add_argument('--spec-version', default=None,
+                        help='Value written to trait_bands.version when the sheet has no '
+                             '版本 column value (it never has). Defaults to the Excel '
+                             'basename. Use something a human can act on, e.g. '
+                             'V7.1-20260918.')
     args = parser.parse_args()
 
     excel_path = os.path.abspath(args.excel)
@@ -606,8 +619,17 @@ def main():
         print(f"[ERROR] File not found: {excel_path}")
         sys.exit(1)
 
+    # No flag given: fall back to the file's own name. Worse than a curated string, far
+    # better than NULL -- it still names the file the rows came from.
+    spec_version = args.spec_version or os.path.splitext(os.path.basename(excel_path))[0]
+
     definitions, bands, interactions, endpoints, blocks = parse_excel(
-        excel_path, require_endpoints=not args.skip_endpoints)
+        excel_path, require_endpoints=not args.skip_endpoints, spec_version=spec_version)
+
+    stamped = sum(1 for b in bands if b.get('version') == spec_version)
+    print(f"[Migrate] spec_version={spec_version} "
+          f"definitions={len(definitions)} bands={len(bands)} "
+          f"interactions={len(interactions)} stamped={stamped}/{len(bands)}")
 
     if args.dry_run:
         print("\n[DRY RUN] Parsed counts:")
@@ -664,7 +686,8 @@ def main():
         write_endpoints(engine, endpoints, blocks)
         verify_endpoints(engine, endpoints)
 
-    print(f"\n[DONE] Migration complete. Backup saved at: {backup_path}")
+    print(f"\n[DONE] Migration complete. spec_version={spec_version}. "
+          f"Backup saved at: {backup_path}")
 
 
 if __name__ == '__main__':

@@ -22,11 +22,21 @@ Two deliberate deviations from the pack, both measured against all 2,389 rows:
     every row while doing nothing -- but it would silently eat a leading '[' if a
     narrative ever had one. The field it was meant to patch is fixed at the source now
     (ai_guidance.do_raw), so the workaround is unnecessary here.
-  * A defensive fallback for the chained lead-in form
-    「與 CIA_06 (條理性) C 與 CIA_07 (完美主義) A：…」, which the pack's pattern does not
-    match (it requires 「聯動：」). That form appears 4 times in the V6.1 spec and 0 times
-    in V6.2/V6.3, so it is dormant -- but if the 08 sheet is ever regenerated with it,
-    the pack's rule alone would pass the lead-in straight through into the payload.
+  * The chained lead-in form 「與 CIA_06 (條理性) C 與 CIA_07 (完美主義) A：…」 used to be
+    handled by a regex written here, because the pack had no rule for it. It is now
+    `strip_chained_opening` in the pack, where b's 「語意都住在引用的資料表裡」 says it
+    belongs; nothing is hard-coded here any more. It stays dormant (0 rows in V6.3/V7,
+    4 in V6.1) but is kept as a defence: the client's 2026-09-17 V7 fixed those 4 rows,
+    and a rule that only exists because the data currently happens to be clean is the
+    kind that gets deleted right before the data stops being clean.
+
+  * `rewrite_band_zone_zhong` (added V7-20260918) rewrites the band sense of 「中段」.
+    V7 replaced 19 `B 段` and 3 `B 屬` with 「中段」, which the exit scanner's `band_code`
+    (`[ABC]\s*段`) and `band_zone_zh` (`[高中低](分區|分組|分群|區間)`) both miss -- so the
+    change swapped a wording that would have been caught and rewritten for one that
+    reaches the reader untouched. The rule is deliberately narrow (sentence-initial,
+    followed by one of five observed continuations): 5 rows use 「中段」 in its everyday
+    sense (「在任務中段設確認點」) and a whole-word block would eat them.
 """
 
 import json
@@ -36,12 +46,13 @@ import re
 _CONFIG = os.path.join(os.path.dirname(__file__), '..', 'config', 'regex_pack_v6_2.json')
 
 # Applied in this order; ids not listed here are not narrative rules.
-NARRATIVE_RULE_IDS = ('strip_opening_clause', 'strip_paren_codes',
+# `strip_chained_opening` runs immediately after `strip_opening_clause`: the standard
+# form is stripped first, and whatever is left that still opens with a trait id is the
+# chained form. `rewrite_band_zone_zhong` runs before the id/paren strippers because it
+# keys off sentence punctuation those rules do not touch.
+NARRATIVE_RULE_IDS = ('strip_opening_clause', 'strip_chained_opening',
+                      'rewrite_band_zone_zhong', 'strip_paren_codes',
                       'strip_trait_id_refs', 'strip_empty_parens')
-
-# Requires a trait id before the colon, so it cannot truncate a body that merely
-# happens to start with 「與」.
-CHAINED_OPENING_RE = re.compile(r'^與\s*[A-Z]{3}_\d+.*?[：:]\s*')
 
 
 class NarrativeCleaner:
@@ -60,10 +71,8 @@ class NarrativeCleaner:
         if not narrative:
             return narrative
         text = narrative
-        for rid, rx, repl in self.rules:
+        for _rid, rx, repl in self.rules:
             text = rx.sub(repl, text)
-            if rid == 'strip_opening_clause':
-                text = CHAINED_OPENING_RE.sub('', text)
         return text.strip()
 
 
