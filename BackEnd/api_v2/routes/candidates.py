@@ -17,55 +17,6 @@ def get_service():
         return RealIntegrationService()
     return MockIntegrationService()
 
-@bp.route('/', methods=['GET'])
-def list_candidates():
-    # In real scenario, enterprise_code comes from resolved session/token
-    enterprise_code = request.args.get('enterprise_code', 'ACME-TW')
-    
-    # 1. Extract Frontend Identity (Email)
-    # Note: In a production app, we would verify the signature of the incoming Session Token.
-    # Here we assume the frontend sends a valid JWT and we just extract the email to impersonate/forward.
-    # 身分只認這次請求帶的 token，而且驗簽、驗期、驗 aud。解不出來就回 401，
-    # 不再退回任何預設帳號（0905 文件 E-7 / E-11）。
-    user_email, auth_error = resolve_user_email()
-    if auth_error:
-        return auth_error
-
-    upstream_token = generate_upstream_token(user_email, env_from_request())
-
-    service = get_service()
-    
-    # Extract Pagination Params
-    try:
-        limit = int(request.args.get('limit', 20))
-        offset = int(request.args.get('offset', 0))
-    except (ValueError, TypeError):
-        limit = 20
-        offset = 0
-
-    # Pass token if supported (Real Service) and params
-    try:
-        if isinstance(service, RealIntegrationService):
-            # returns { 'data': [...], 'page': ... }
-            result = service.get_candidates(upstream_token, limit=limit, offset=offset)
-            candidates = result.get('data', [])
-            page_info = result.get('page', {})
-        else:
-            # returns { 'data': [...], 'page': ... }
-            result = service.get_candidates(enterprise_code, limit=limit, offset=offset)
-            candidates = result.get('data', [])
-            page_info = result.get('page', {})
-    except Exception as e:
-        print(f"ERROR: Failed to fetch candidates: {e}")
-        return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503, details=str(e))
-
-    if candidates and len(candidates) > 0:
-        print(f"DEBUG: Successfully fetched {len(candidates)} candidates.", flush=True)
-
-    return ok(candidates, meta={'page': page_info})
-
-
-
 # 上游 `GET /v1/candidates/` 的 limit 上限。2026-09-19 對 UAT 實測：送 200 或 500，
 # 回來的 `page.limit` 都是 100、資料也只有 100 筆——**超限是靜默改寫，不報錯**。
 # 所以 `limit=500` 這種寫法讀起來像「一次取回全部」，實際只拿得到前 100 位：超過
@@ -120,6 +71,73 @@ def fetch_all_candidates(service, upstream_token, found_enough=None):
               f"incomplete.", flush=True)
 
     return ordered, by_id
+
+
+@bp.route('/', methods=['GET'])
+def list_candidates():
+    # In real scenario, enterprise_code comes from resolved session/token
+    enterprise_code = request.args.get('enterprise_code', 'ACME-TW')
+    
+    # 1. Extract Frontend Identity (Email)
+    # Note: In a production app, we would verify the signature of the incoming Session Token.
+    # Here we assume the frontend sends a valid JWT and we just extract the email to impersonate/forward.
+    # 身分只認這次請求帶的 token，而且驗簽、驗期、驗 aud。解不出來就回 401，
+    # 不再退回任何預設帳號（0905 文件 E-7 / E-11）。
+    user_email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
+
+    upstream_token = generate_upstream_token(user_email, env_from_request())
+
+    service = get_service()
+    
+    # Extract Pagination Params
+    try:
+        limit = int(request.args.get('limit', 20))
+        offset = int(request.args.get('offset', 0))
+    except (ValueError, TypeError):
+        limit = 20
+        offset = 0
+
+    # 第一頁一律以上游允許的最大筆數取回，不管呼叫端要了幾筆。
+    #
+    # 為什麼：widget 的搜尋框是 client-side 過濾（CandidateSelector.vue 的
+    # filteredCandidates），搜尋字串從來不會送到後端。母體就是已經載入的那幾筆，
+    # 所以使用者搜尋一個還沒被捲出來的人，畫面會顯示「查無結果」——人其實在。
+    # 把第一頁撐到 100，母體大五倍，100 人以內的企業等於一次載完。
+    #
+    # 不會弄壞捲動分頁：widget 的 offset 記帳用的是**實際回傳長度**
+    # （useChatLogic.js: candidateOffset = offset + newCandidates.length），
+    # hasMore 也是拿回傳長度與 total 比，所以第一頁回 100 之後，第二頁照樣
+    # 從 offset=100 抓 20 筆。順帶還少打幾次請求：容器沒撐滿時的自動補抓
+    # （checkAndFillContainer）在 100 筆之後就不會連續觸發了。
+    #
+    # 這一步的天花板是上游的 100（見 UPSTREAM_PAGE_MAX）。超過 100 人的企業，
+    # 搜尋仍只涵蓋前 100 位；要根治得讓前端把搜尋字串送上來、後端轉給上游的 q 參數
+    # （swagger: 「搜尋姓名/email/職務（模糊）」，已實測可用）。
+    if offset == 0:
+        limit = UPSTREAM_PAGE_MAX
+
+    # Pass token if supported (Real Service) and params
+    try:
+        if isinstance(service, RealIntegrationService):
+            # returns { 'data': [...], 'page': ... }
+            result = service.get_candidates(upstream_token, limit=limit, offset=offset)
+            candidates = result.get('data', [])
+            page_info = result.get('page', {})
+        else:
+            # returns { 'data': [...], 'page': ... }
+            result = service.get_candidates(enterprise_code, limit=limit, offset=offset)
+            candidates = result.get('data', [])
+            page_info = result.get('page', {})
+    except Exception as e:
+        print(f"ERROR: Failed to fetch candidates: {e}")
+        return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503, details=str(e))
+
+    if candidates and len(candidates) > 0:
+        print(f"DEBUG: Successfully fetched {len(candidates)} candidates.", flush=True)
+
+    return ok(candidates, meta={'page': page_info})
 
 
 @bp.route('/by-ids', methods=['GET'])
