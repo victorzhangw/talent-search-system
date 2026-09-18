@@ -115,8 +115,13 @@ def main():
     print('\n[DoD 3] 完整性檢查掛上（子集寬鬆判定＋佐證措辭）')
     check('subset test, extra headings allowed',
           'not in heading_set' in src['completeness_check.py'])
+    # 2026-09-18（U5-5）：b §8 的詞表補了「交叉驗證」「多方驗證」，配合 V7 匯入——
+    # V7 把三個校準特質 K 欄的「以行為事例佐證」改成「資訊可信度需交叉驗證」，
+    # 四個舊詞一個不剩。這條斷言的用意是「程式的詞表要與 b §8 逐字相同」，所以
+    # 期望值跟著 b 文件一起更新，而不是放寬成子集比對。
     check('evidence wordlist is the b §8 one',
-          "EVIDENCE_TERMS = ('佐證', '行為事例', '工作樣本', '不以單次')"
+          "EVIDENCE_TERMS = ('佐證', '行為事例', '工作樣本', '不以單次', "
+          "'交叉驗證', '多方驗證')"
           in src['completeness_check.py'])
 
     print('\n[DoD 4] 出口掃描掛上，per-request 動態縮小，紅隊殘留 0')
