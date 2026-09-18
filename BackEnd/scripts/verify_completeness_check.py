@@ -348,12 +348,12 @@ def main():
           res.missing_respondents == [], res.missing_respondents)
     res = check_answer('## 游 雅鳳-FDA\n\n內容。', zheng, None, CALIB,
                        user_query='再一次排序')
-    check('沒有自稱就照常判缺人', res.missing_respondents == ['鄭 皓仁'],
+    check('沒有自稱就照常判缺人', res.missing_respondents == ['鄭皓仁'],
           res.missing_respondents)
     res = check_answer('## 游 雅鳳-FDA\n\n內容。', zheng, None, CALIB,
                        user_query='我是主管。請分析鄭皓仁。')
     check('自稱跨句不算（逗號句號後的姓名不豁免）',
-          res.missing_respondents == ['鄭 皓仁'], res.missing_respondents)
+          res.missing_respondents == ['鄭皓仁'], res.missing_respondents)
     # 使用者只在第一輪自我介紹，之後直接問「我照前面的建議…」。只看本輪的話，
     # a6718cb3 與 6920b8fb 的後續輪次會把提問者本人判成漏掉的分析對象。
     res = check_answer('## 游 雅鳳-FDA\n\n內容。', zheng, None, CALIB,

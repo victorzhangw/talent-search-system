@@ -38,6 +38,7 @@ from typing import Dict, List, Optional
 
 from .interaction_selector import select_interactions
 from .log_system_prompt import load_system_prompt
+from .name_normalize import display_name, name_variants, resolve_roster_names
 from .question_table import QuestionTable
 from .trait_blocks import TraitBlockRenderer
 from .trait_splitter import split_traits, INDEX_HEADER
@@ -163,10 +164,15 @@ class UnknownTrait(ValueError):
 
 
 class Respondent:
-    __slots__ = ('name', 'respondent_id', 'scores', 'tests')
+    # `raw_name` 是廠商原字串，只進稽核；`name` 是顯示形態，進 payload。
+    # 正規化放在建構子而不是 respondent_adapter：production 只有 to_respondents() 一個
+    # 建構點，但 scripts/verify_*.py 有十幾個，放這裡才會一起涵蓋——而 verify_completeness_check
+    # 的 fixture 本來就帶著 `柳 宇賸-人資發展課`、`游 雅鳳-FDA` 這些真實格式。
+    __slots__ = ('name', 'raw_name', 'respondent_id', 'scores', 'tests')
 
     def __init__(self, name: str, respondent_id: str, scores: Dict[str, str], tests=None):
-        self.name = name
+        self.raw_name = name
+        self.name = display_name(name)
         self.respondent_id = respondent_id
         self.scores = scores
         self.tests = tests or sorted({t.split('_')[0] for t in scores})
@@ -255,6 +261,10 @@ def _respondent_block(respondent: Respondent, question: Optional[dict],
         # The real candidate_id stays here; only the payload sees the position token.
         'respondent_id': respondent.respondent_id,
         'log_label': log_label,
+        # 廠商原字串留在稽核裡，payload 送的是顯示形態。兩者不同時才記，省得每一筆
+        # 都多一個重複欄位。
+        **({'raw_name': respondent.raw_name}
+           if respondent.raw_name != respondent.name else {}),
         'traits_total': len(respondent.scores),
         'full_blocks': len(split.full),
         'index_lines': len(split.index),
@@ -286,6 +296,9 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
     if question is None and not (user_query or '').strip():
         raise ValueError('free-form mode requires user_query')
     check_audience(respondents, question)
+    # 顯示姓名撞名時全體退回原字串（見 name_normalize.resolve_roster_names）。
+    # 必須在組任何區塊之前跑：標頭、名單、出口掃描的識別碼都要看到同一個名字。
+    name_collision = resolve_roster_names(respondents)
 
     renderer = renderer or TraitBlockRenderer()
     blocks, audits = [], []
@@ -298,7 +311,10 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
         blocks.append(text)
         audits.append(audit)
         log_labels.add(label)
-        name_bound_ids.add((r.name, str(r.respondent_id)))
+        # 顯示形態與原字串都收：payload 現在送的是顯示形態，但原字串的形狀
+        # （`邱 佳玲-聯醫（620）`）不該因此失去防守。
+        for variant in name_variants(r.raw_name):
+            name_bound_ids.add((variant, str(r.respondent_id)))
         scoped_by_id[r.respondent_id] = split_traits(r.scores, question).scoped_ids
         for trait_id, band in r.scores.items():
             names.add(renderer.name_zh(trait_id))
@@ -323,6 +339,7 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
     instruction_text = '\n\n'.join(blocks)
 
     audit = {
+        'display_name_collision': name_collision,
         'question_id': question['idx'] if question else None,
         'question_type': 'free' if question is None
                          else ('whole_person' if QuestionTable.is_whole_person(question)
