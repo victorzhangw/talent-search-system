@@ -170,14 +170,28 @@ def apply_roster(trait_reports, candidate_ids, candidates_info, session_id):
     回傳 (要用的 reports, 稽核用的 roster 記錄)。
     """
     reports = trait_reports or {}
+    # `candidate_ids` 沒送來時維持原行為：順序就是 trait_reports 的插入序，而且說出來。
     audit = {'source': 'trait_reports', 'requested': None, 'used': len(reports),
-             'dropped': []}
+             'dropped': [], 'ordered_by': 'trait_reports_insertion'}
     if candidate_ids:
         wanted = {str(c) for c in candidate_ids}
-        kept = {k: v for k, v in reports.items() if str(k) in wanted}
+        # 依 `candidate_ids` 的順序重建，不是依 `trait_reports` 的 dict 插入順序。
+        # 位置代號 RESP_nn 是照這個順序指派的（log_assembler.log_label_for），而
+        # `trait_reports` 的順序取決於前端怎麼組那個物件——同一份名單換一條建構路徑
+        # 就可能整組換位，離線重放同一筆請求會拿到不同的代號。綁在前端送來的名單
+        # 順序上之後，「名單尾端加人 -> 既有號碼不變、新人拿下一個號」自然成立。
+        #
+        # key 先正規化成字串再取：原本的寫法用 `str(k) in wanted` 比對，正是因為
+        # `reports` 的 key 不保證已經是字串，所以這裡不能直接 `reports[str(c)]`。
+        by_id = {str(k): v for k, v in reports.items()}
+        seen, kept = set(), {}
+        for cid in (str(c) for c in candidate_ids):
+            if cid in by_id and cid not in seen:      # candidate_ids 可能有重複
+                seen.add(cid)
+                kept[cid] = by_id[cid]
         dropped = sorted(str(k) for k in reports if str(k) not in wanted)
         audit = {'source': 'candidate_ids', 'requested': len(wanted),
-                 'used': len(kept), 'dropped': dropped}
+                 'used': len(kept), 'dropped': dropped, 'ordered_by': 'candidate_ids'}
         if dropped:
             packer_logger.warning(
                 f"session={session_id} dropped {len(dropped)} stale trait report(s) not in "

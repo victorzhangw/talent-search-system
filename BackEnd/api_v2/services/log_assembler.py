@@ -339,6 +339,10 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
     instruction_text = '\n\n'.join(blocks)
 
     audit = {
+        # 人可讀的位置代號對照。`respondents[].log_label` 與 `respondent_id` 早就都在，
+        # 但少了姓名，排錯時還要再查一次是誰。
+        'roster_map': [f'{log_label_for(i)}={r.respondent_id} {r.name}'
+                       for i, r in enumerate(respondents)],
         'display_name_collision': name_collision,
         'question_id': question['idx'] if question else None,
         'question_type': 'free' if question is None
