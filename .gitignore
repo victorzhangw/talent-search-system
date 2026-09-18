@@ -93,3 +93,8 @@ htmlcov/
 BackEnd/scripts/backups/
 BackEnd/scripts/redteam_run.log
 BackEnd/scripts/redteam_result.json
+
+# verify_all.py 的執行輸出（每次跑都會產生一個時戳目錄）
+BackEnd/scripts/verify_all_logs/
+BackEnd/scripts/verify_logs/
+BackEnd/scripts/coverage_logs/
