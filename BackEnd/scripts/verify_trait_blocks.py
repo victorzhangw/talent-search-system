@@ -19,11 +19,15 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), enc
 
 from api_v2.services.trait_blocks import TraitBlockRenderer, DO_PREFIX, DONT_PREFIX  # noqa: E402
 
-PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
-                   'Traitty_調整_20260728＿final')
-EXAMPLES = ['新版LOG範例_匡列型_壓力題_v7.txt',
-            '新版LOG範例_全人型_雙測驗_v7.txt',
-            '新版LOG範例_多人型_會議團隊_v7.txt']
+# 2026-09-18：客戶簽核通過後改指 V7 產出的 v9 範例。原 v8 範例的敘事是 V6.2
+# 產出的，而 DB 已匯入 V7，基準與資料不同版本就不可能綠。新範例由
+# scripts/regen_log_examples.py 以同一批受測者、同一題重跑產生，總行數與原範例
+# 完全相同（294 / 860 / 1139），差異只有內容文字。
+PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0918',
+                   '範例_V7_已簽核')
+EXAMPLES = ['07_新版LOG範例_匡列型_壓力題_v9_V7.txt',
+            '06_新版LOG範例_全人型_雙測驗_v9_V7.txt',
+            '08_新版LOG範例_多人型_會議團隊_v9_V7.txt']
 
 HEADER_RE = re.compile(r'^\[特質 \| ([A-Z]{3}_\d+)_([ABC]) \| (.+)\]$')
 INDEX_RE = re.compile(r'^- ([A-Z]{3}_\d+)_([ABC])｜')

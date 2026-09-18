@@ -25,14 +25,22 @@ from api_v2.services.trait_blocks import TraitBlockRenderer  # noqa: E402
 from api_v2.services.interaction_selector import (select_interactions, candidates,  # noqa: E402
                                                   SPARSE_FOOTNOTE, _all_rows)
 
-PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
-                   'Traitty_調整_20260728＿final')
-B_DOC = os.path.join(PKG, 'b_打包規則_v2_20260727.md')
+# 2026-09-18：客戶簽核通過後改指 V7 產出的 v9 範例。原 v8 範例的敘事是 V6.2
+# 產出的，而 DB 已匯入 V7，基準與資料不同版本就不可能綠。新範例由
+# scripts/regen_log_examples.py 以同一批受測者、同一題重跑產生，總行數與原範例
+# 完全相同（294 / 860 / 1139），差異只有內容文字。
+PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0918',
+                   '範例_V7_已簽核')
+# b 文件跟著規格走，不跟著範例走——原本兩者剛好同目錄，所以共用一個 PKG；範例搬到
+# docs/0918 之後這個耦合就斷了（第一次改指時 B_DOC 跟著跑掉，FileNotFoundError）。
+SPEC_PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0917',
+                        'Traitty_調整_20260917')
+B_DOC = os.path.join(SPEC_PKG, 'b_打包規則_v3_20260917.md')
 
 CASES = [
-    ('新版LOG範例_匡列型_壓力題_v7.txt', '如何面對困難、壓力、挑戰'),
-    ('新版LOG範例_全人型_雙測驗_v7.txt', '個人使用說明書(主管)'),
-    ('新版LOG範例_多人型_會議團隊_v7.txt', '打造高效會議團隊'),
+    ('07_新版LOG範例_匡列型_壓力題_v9_V7.txt', '如何面對困難、壓力、挑戰'),
+    ('06_新版LOG範例_全人型_雙測驗_v9_V7.txt', '個人使用說明書(主管)'),
+    ('08_新版LOG範例_多人型_會議團隊_v9_V7.txt', '打造高效會議團隊'),
 ]
 
 RESPONDENT_RE = re.compile(r'^### \[受測者 \| ')

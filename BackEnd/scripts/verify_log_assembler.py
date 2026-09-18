@@ -32,19 +32,22 @@ from verify_system_prompt import strip_language_rule  # noqa: E402
 # [SYSTEM PROMPT] 區塊就在被比對的範圍內——規則八一改，基準不跟著換就必然紅。
 # 已實測：V7 的 42 列敘事變更沒有一列出現在這三份範例裡，所以換範例不會把敘事差異
 # 一起帶進來。
-PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0917',
-                   'Traitty_調整_20260917')
+# 2026-09-18：客戶簽核通過後改指 V7 產出的 v9 範例。原 v8 範例的敘事是 V6.2
+# 產出的，而 DB 已匯入 V7，基準與資料不同版本就不可能綠。新範例由
+# scripts/regen_log_examples.py 以同一批受測者、同一題重跑產生，總行數與原範例
+# 完全相同（294 / 860 / 1139），差異只有內容文字。
+PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0918',
+                   '範例_V7_已簽核')
 
 CASES = [
-    ('07_新版LOG範例_匡列型_壓力題_v8_260917.txt', '如何面對困難、壓力、挑戰'),
-    ('06_新版LOG範例_全人型_雙測驗_v8_260917.txt', '個人使用說明書(主管)'),
-    ('08_新版LOG範例_多人型_會議團隊_v8_260917.txt', '打造高效會議團隊'),
+    ('07_新版LOG範例_匡列型_壓力題_v9_V7.txt', '如何面對困難、壓力、挑戰'),
+    ('06_新版LOG範例_全人型_雙測驗_v9_V7.txt', '個人使用說明書(主管)'),
+    ('08_新版LOG範例_多人型_會議團隊_v9_V7.txt', '打造高效會議團隊'),
 ]
 
 RESPONDENT_RE = re.compile(r'^### \[受測者 \| (.+?) \| (.+?)\]$')
 TRAIT_RE = re.compile(r'^\[特質 \| ([A-Z]{3}_\d+)_([ABC]) \| ')
 INDEX_RE = re.compile(r'^- ([A-Z]{3}_\d+)_([ABC])｜')
-POSITION_LABEL_RE = re.compile(r'RESP_\d{2}')
 
 # Known, documented deviations. Anything outside these must match exactly.
 SPA_PREFIXES = ('可用於：', '禁止：')
@@ -98,14 +101,14 @@ def classify(expected: str, actual: str) -> str:
         return 'example-file annotation after [SYSTEM PROMPT]'
     if expected.startswith('15. 自濾授權') and actual.startswith('15. 自濾授權'):
         return 'a-doc rule 15 clause (examples predate it)'
-    e_head, a_head = RESPONDENT_RE.match(expected), RESPONDENT_RE.match(actual)
-    if e_head and a_head and e_head.group(1) == a_head.group(1) \
-            and POSITION_LABEL_RE.fullmatch(a_head.group(2)):
-        # Same format, same name, different ID token. The examples' own tokens are ad-hoc
-        # placeholders -- RESP_R2, RESP_TEAM_01, RESP_R3_DUAL, one scheme per file -- so
-        # there is nothing here to reproduce. We mint a position token instead, because
-        # filling this field with the real candidate_id put 「許品優（55）」 into answers.
-        return 'respondent ID token (examples use ad-hoc placeholders)'
+    # 2026-09-18 移除：受測者 ID 佔位符的容忍條款。
+    #
+    # 舊的 v7/v8 範例各自用一套示意代號（RESP_R2、RESP_TEAM_01、RESP_R3_DUAL），與打包器
+    # 實際輸出的位置代號對不上，所以這裡放行過。簽核通過的 v9 範例用的就是系統實際輸出的
+    # RESP_01/RESP_02，沒有東西需要容忍了——留著等於在這個欄位上永久放棄比對。
+    #
+    # 位置代號的由來仍要記著：這一欄曾經填真實 candidate_id，模型把數字當成姓名的一部分
+    # 寫出「許品優（55）」，而出口掃描抓的是「數字＋分」與 band 樣式，裸數字不符任何一條。
     return 'UNEXPECTED'
 
 
