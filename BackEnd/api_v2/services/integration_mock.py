@@ -19,13 +19,25 @@ class MockIntegrationService(IntegrationServiceInterface):
             'enterprise_name': self.data['enterprise_name']
         }
 
-    def get_candidates(self, auth_key: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+    def get_candidates(self, auth_key: str, limit: int = 20, offset: int = 0,
+                       q: str = None) -> Dict[str, Any]:
         all_candidates = self.data['candidates']
-        sliced = all_candidates[offset : offset + limit]
-        
+
+        # 比對欄位刻意與上游一致（swagger:「搜尋姓名/email/職務（模糊）」），否則 MOCK
+        # 與 REAL 的搜尋結果會不一樣，而測試幾乎都跑在 MOCK 上。
+        needle = (q or '').strip().lower()
+        if needle:
+            def hit(c):
+                return any(needle in str(c.get(f) or '').lower()
+                           for f in ('name', 'email', 'position'))
+            all_candidates = [c for c in all_candidates if hit(c)]
+
+        sliced = all_candidates[offset: offset + limit]
+
         return {
             "data": sliced,
             "page": {
+                # 帶 q 時回篩選後的總數，與上游一致。
                 "total": len(all_candidates),
                 "limit": limit,
                 "offset": offset

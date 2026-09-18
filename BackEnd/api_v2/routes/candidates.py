@@ -27,29 +27,46 @@ UPSTREAM_PAGE_MAX = 100
 # 留在迴圈裡；真的撞到就停下來並記一筆警告。
 MAX_UPSTREAM_PAGES = 50
 
+# 搜尋時的翻頁上限，刻意比 MAX_UPSTREAM_PAGES 小很多（100 × 10 = 1000 筆）。
+#
+# 搜尋通常只命中少數人，所以 loop 幾乎都是一次就完（實測 q='吳' -> total=4）。但
+# 廣泛的關鍵字例外：`q='@'` 在 UAT 命中全部 37 人，email 全中；換成幾千人的企業，
+# 一個 'a' 就可能翻二十幾頁。與其讓一次搜尋打二十幾次上游，不如回傳前 1000 筆並
+# 告訴使用者「結果太多，請講精確一點」。
+SEARCH_MAX_PAGES = 10
 
-def _fetch_candidate_page(service, upstream_token, limit, offset):
+
+def _fetch_candidate_page(service, upstream_token, limit, offset, q=None):
     """一頁。Real 走 token，Mock 走 enterprise_code，其餘參數相同。"""
     if isinstance(service, RealIntegrationService):
-        return service.get_candidates(upstream_token, limit=limit, offset=offset)
-    return service.get_candidates("ACME-TW", limit=limit, offset=offset)
+        return service.get_candidates(upstream_token, limit=limit, offset=offset, q=q)
+    return service.get_candidates("ACME-TW", limit=limit, offset=offset, q=q)
 
 
-def fetch_all_candidates(service, upstream_token, found_enough=None):
-    """把上游的人選清單取回，必要時跨頁。回傳 (依序的 list, {str(id): candidate})。
+def fetch_all_candidates(service, upstream_token, found_enough=None, q=None,
+                         max_pages=None):
+    """把上游的人選清單取回，必要時跨頁。
+    回傳 (依序的 list, {str(id): candidate}, 是否被上限截斷)。
 
     `found_enough(by_id)` 回傳 True 時提前結束——「找某幾位」的呼叫端不必翻完整份，
     而絕大多數人就落在第一頁，所以常見情況仍然只打一次上游。
 
+    `q` 是上游的模糊搜尋。**帶了 `q` 之後 `page.total` 是篩選後的總數**（實測
+    q='吳' -> total=4），所以同一套 loop 直接就能把「符合搜尋的全部」翻完，而且翻的
+    頁數取決於命中筆數、不是企業人數。
+
     不用 `limit=500` 一次要完：見 `UPSTREAM_PAGE_MAX` 的說明，那是靜默截斷。
     """
+    limit_pages = max_pages or MAX_UPSTREAM_PAGES
     by_id = {}
     ordered = []
     offset = 0
     total = None
+    truncated = False
 
-    for _ in range(MAX_UPSTREAM_PAGES):
-        resp = _fetch_candidate_page(service, upstream_token, UPSTREAM_PAGE_MAX, offset)
+    for _ in range(limit_pages):
+        resp = _fetch_candidate_page(service, upstream_token, UPSTREAM_PAGE_MAX,
+                                     offset, q=q)
         rows = resp.get('data') or []
         if total is None:
             total = (resp.get('page') or {}).get('total')
@@ -66,11 +83,12 @@ def fetch_all_candidates(service, upstream_token, found_enough=None):
         if not rows or (total is not None and offset >= total):
             break
     else:
-        print(f"WARNING: fetch_all_candidates stopped at {MAX_UPSTREAM_PAGES} pages "
-              f"({len(ordered)} candidates, upstream total={total}); the list may be "
-              f"incomplete.", flush=True)
+        truncated = True
+        print(f"WARNING: fetch_all_candidates stopped at {limit_pages} pages "
+              f"({len(ordered)} candidates, upstream total={total}, q={q!r}); "
+              f"the list is incomplete.", flush=True)
 
-    return ordered, by_id
+    return ordered, by_id, truncated
 
 
 @bp.route('/', methods=['GET'])
@@ -98,6 +116,34 @@ def list_candidates():
     except (ValueError, TypeError):
         limit = 20
         offset = 0
+
+    # 有搜尋字串就把符合的全部取回，不分頁。
+    #
+    # 為什麼可以這樣做而不怕爆量：帶了 `q` 之後上游的 `page.total` 是**篩選後**的
+    # 總數（2026-09-19 實測：q='吳' -> total=4、q='陳' -> total=2、q='zzz' -> total=0），
+    # 所以 loop 的次數取決於命中筆數、不是企業人數。搜尋通常一次就翻完。
+    #
+    # 為什麼不沿用分頁：前端的搜尋是把結果整份拿去顯示，分頁回去等於把「找得到卻
+    # 看不到」的老問題換個地方重演。搜尋的語意本來就是「符合的都給我」。
+    #
+    # `q` 是空字串時視同沒帶（上游行為相同，實測 total 皆為 37）。
+    search_q = (request.args.get('q') or '').strip()
+    if search_q:
+        try:
+            rows, _, truncated = fetch_all_candidates(
+                service, upstream_token, q=search_q, max_pages=SEARCH_MAX_PAGES)
+        except Exception as e:
+            print(f"ERROR: Failed to search candidates (q={search_q!r}): {e}")
+            return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503,
+                       details=str(e))
+
+        page_info = {'total': len(rows), 'limit': len(rows), 'offset': 0,
+                     'q': search_q}
+        if truncated:
+            # 撞到上限時明講，別讓呼叫端把「前 1000 筆」當成「全部」。
+            page_info['truncated'] = True
+            page_info['max_results'] = SEARCH_MAX_PAGES * UPSTREAM_PAGE_MAX
+        return ok(rows, meta={'page': page_info})
 
     # 第一頁一律以上游允許的最大筆數取回，不管呼叫端要了幾筆。
     #
@@ -169,7 +215,7 @@ def list_candidates_by_ids():
     # 對話的鎖定名單時會安靜地掉人。改成跨頁取回，並在湊齊要找的人之後就停。
     wanted = {str(i) for i in requested_ids}
     try:
-        _, by_id = fetch_all_candidates(
+        _, by_id, _ = fetch_all_candidates(
             service, upstream_token,
             found_enough=lambda m: wanted.issubset(m.keys()))
     except Exception as e:
@@ -205,7 +251,7 @@ def get_candidate_report(candidate_id):
     # 並在找到目標之後立刻停：絕大多數人在第一頁，常見情況仍然只打一次上游。
     # TODO: 上游若補上 get-by-id，這整段就可以不用先抓清單。
     try:
-        candidates, _ = fetch_all_candidates(
+        candidates, _, _ = fetch_all_candidates(
             service, upstream_token,
             found_enough=lambda m: str(candidate_id) in m)
     except Exception as e:

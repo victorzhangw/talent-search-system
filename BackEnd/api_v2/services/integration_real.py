@@ -20,7 +20,8 @@ class RealIntegrationService(IntegrationServiceInterface):
             "Accept": "application/json"
         }
 
-    def get_candidates(self, auth_key: str, limit: int = 20, offset: int = 0) -> dict:
+    def get_candidates(self, auth_key: str, limit: int = 20, offset: int = 0,
+                       q: str = None) -> dict:
         """
         Fetch candidates from Traitty API using the provided JWT.
         Endpoint: GET /v1/candidates/
@@ -35,6 +36,10 @@ class RealIntegrationService(IntegrationServiceInterface):
         url = f"{self.base_url}/v1/candidates/"
         headers = self._get_headers(token)
         params = {"limit": limit, "offset": offset}
+        # 空字串不送：上游對 q='' 與不帶 q 的行為相同（實測 total 皆為 37），
+        # 但不送比較不會讓人誤以為「搜尋過但沒結果」。
+        if (q or '').strip():
+            params["q"] = q.strip()
         
         max_retries = 3
         timeout_seconds = 30.0  # Increased from 15.0 to 30.0
