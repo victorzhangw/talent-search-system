@@ -197,8 +197,11 @@
                                         :disabled="false"
                                         :total-count="totalCandidatesCount"
                                         :initial-selected-ids="selectedCandidateIds"
+                                        :search-truncated="candidateSearchTruncated"
+                                        :search-max-results="candidateSearchMaxResults"
                                         @change="handleSelectionChange"
                                         @load-more="loadMoreCandidates"
+                                        @search="searchCandidates"
                                     />
                                 </div>
                                 <div class="modal-footer">
@@ -356,8 +359,11 @@
                                     :total-count="totalCandidatesCount"
                                     :initial-selected-ids="addModalInitialIds"
                                     :locked-ids="activeConversationCandidateIds"
+                                    :search-truncated="candidateSearchTruncated"
+                                    :search-max-results="candidateSearchMaxResults"
                                     @change="handleAddCandidateChange"
                                     @load-more="loadMoreCandidates"
+                                    @search="searchCandidates"
                                 />
                             </div>
                             <div class="modal-footer">
@@ -492,6 +498,9 @@ const {
     openReport,
     handleLoginSuccess,
     loadMoreCandidates,
+    searchCandidates,
+    candidateSearchTruncated,
+    candidateSearchMaxResults,
     handleSelectionChange,
     lockSelectionAndStart: logicLockSelection,
     resetAndReselect: logicResetAndReselect,

@@ -169,6 +169,12 @@ export function useChatLogic(emit) {
     const totalCandidatesCount = ref(0)
     const PAGE_LIMIT = 20
 
+    // 搜尋狀態。空字串＝沒在搜尋，走原本的分頁。
+    const candidateSearchQuery = ref('')
+    // 後端因命中太多而截斷（meta.page.truncated），要讓使用者知道看到的不是全部。
+    const candidateSearchTruncated = ref(false)
+    const candidateSearchMaxResults = ref(0)
+
     // Theme Logic
     const themes = ['light', 'midnight']
     const themeIndex = ref(0)
@@ -853,8 +859,19 @@ export function useChatLogic(emit) {
     }, { deep: true })
 
     const loadMoreCandidates = () => {
+        // 搜尋時後端已經把命中的全部回來了，沒有下一頁可翻。
+        if (candidateSearchQuery.value) return
         if (isLoadingCandidates.value || !hasMoreCandidates.value) return
         fetchCandidates(true)
+    }
+
+    /** 搜尋字串變了（CandidateSelector 已 debounce 過）。空字串＝回到分頁模式。 */
+    const searchCandidates = (query) => {
+        const next = (query || '').trim()
+        if (next === candidateSearchQuery.value) return
+        candidateSearchQuery.value = next
+        // 兩個方向都要重抓：有字串就取命中的全部，清空就回到第一頁。
+        fetchCandidates(false)
     }
 
     const fetchCandidates = async (isLoadMore = false) => {
@@ -867,8 +884,12 @@ export function useChatLogic(emit) {
 
             // Using LIMIT and OFFSET
             const offset = isLoadMore ? candidateOffset.value : 0
-            // Corrected to use query params
-            const res = await authFetch(`${apiBaseUrl}/candidates/?limit=${PAGE_LIMIT}&offset=${offset}`)
+            // 有搜尋字串就交給後端（上游的 q：姓名/email/職務 模糊比對），它會把命中的
+            // 全部跨頁取回；沒有就照原本的分頁走。
+            const q = candidateSearchQuery.value
+            const qs = q ? `&q=${encodeURIComponent(q)}` : ''
+            const res = await authFetch(
+                `${apiBaseUrl}/candidates/?limit=${PAGE_LIMIT}&offset=${offset}${qs}`)
             const resp = await res.json()
 
             let rawList = []
@@ -883,6 +904,11 @@ export function useChatLogic(emit) {
             }
 
             totalCandidatesCount.value = total
+
+            // 截斷旗標只有搜尋模式才有意義。
+            const pageMeta = resp.meta?.page || {}
+            candidateSearchTruncated.value = Boolean(q && pageMeta.truncated)
+            candidateSearchMaxResults.value = pageMeta.max_results || 0
 
             const newCandidates = rawList.map(c => ({
                 ...c,
@@ -905,8 +931,11 @@ export function useChatLogic(emit) {
             candidateOffset.value = offset + newCandidates.length
 
             // Update HasMore
-            // If we received fewer than limit, or total reached
-            if (newCandidates.length < PAGE_LIMIT || candidates.value.length >= total) {
+            // 搜尋模式沒有下一頁——後端一次把命中的全部回來了。
+            if (q) {
+                hasMoreCandidates.value = false
+            } else if (newCandidates.length < PAGE_LIMIT || candidates.value.length >= total) {
+                // If we received fewer than limit, or total reached
                 hasMoreCandidates.value = false
             } else {
                 hasMoreCandidates.value = true
@@ -1488,6 +1517,10 @@ export function useChatLogic(emit) {
         openReport,
         handleLoginSuccess,
         loadMoreCandidates,
+        searchCandidates,
+        candidateSearchQuery,
+        candidateSearchTruncated,
+        candidateSearchMaxResults,
         handleSelectionChange,
         restoreSessionState,
         lockSelectionAndStart,

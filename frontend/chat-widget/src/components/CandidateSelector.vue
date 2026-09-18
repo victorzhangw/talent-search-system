@@ -30,7 +30,7 @@
         <div class="toolbar-actions">
             <!-- Stats -->
             <div class="list-stats">
-               <span v-if="searchQuery">搜尋結果: {{ filteredCandidates.length }} 筆</span>
+               <span v-if="searchQuery">搜尋結果: {{ filteredCandidates.length }} 筆<template v-if="searchTruncated">（僅顯示前 {{ searchMaxResults }} 筆，請輸入更精確的關鍵字）</template></span>
                <span v-else>已顯示 {{ candidates.length }} / 共 {{ totalCount }} 筆</span>
                
                <span class="centered-selected-text">選取人才 ({{ selectedIds.length }})</span>
@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 
 const props = defineProps({
   candidates: {
@@ -140,10 +140,18 @@ const props = defineProps({
   lockedIds: {
       type: Array,
       default: () => []  // 已鎖定（已在對話中）的候選人 ID，顯示為鎖定且不可再選
+  },
+  searchTruncated: {
+      type: Boolean,
+      default: false    // 後端因命中太多而截斷（meta.page.truncated）
+  },
+  searchMaxResults: {
+      type: Number,
+      default: 0
   }
 })
 
-const emit = defineEmits(['change', 'load-more'])
+const emit = defineEmits(['change', 'load-more', 'search'])
 const selectedIds = ref([...props.initialSelectedIds])
 const searchQuery = ref('')
 
@@ -167,17 +175,25 @@ watch(() => props.candidates, (list) => {
     seenCandidates.value = next
 }, { immediate: true, deep: true })
 
-// Filter Logic
-const filteredCandidates = computed(() => {
-    const query = searchQuery.value.toLowerCase().trim()
-    if (!query) return props.candidates
-    
-    return props.candidates.filter(c => {
-        const nameMatch = (c.name || '').toLowerCase().includes(query)
-        const posMatch = (c.position || '').toLowerCase().includes(query)
-        const emailMatch = (c.email || '').toLowerCase().includes(query)
-        return nameMatch || posMatch || emailMatch
-    })
+// 搜尋交給後端（上游的 q：姓名/email/職務 模糊比對），這裡不再自己過濾。
+//
+// 原本是 client-side 過濾 props.candidates，母體就是已經載入的那幾筆——使用者搜尋
+// 一個還沒被捲出來的人，畫面顯示「查無結果」，人其實在。後端拿到 q 之後會把命中的
+// 全部取回（跨頁），所以 props.candidates 已經是完整結果；再過濾一次只會有害：
+// 上游若在某個我們手上沒有的欄位命中，這裡反而會把它濾掉。
+const filteredCandidates = computed(() => props.candidates)
+
+// 打字時每個字都打一次後端太吵，等使用者停手再送。
+let searchTimer = null
+const SEARCH_DEBOUNCE_MS = 350
+
+watch(searchQuery, (val) => {
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => emit('search', (val || '').trim()), SEARCH_DEBOUNCE_MS)
+})
+
+onBeforeUnmount(() => {
+    if (searchTimer) clearTimeout(searchTimer)
 })
 
 const getCandidateName = (id) => {
