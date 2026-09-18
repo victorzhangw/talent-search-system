@@ -203,7 +203,13 @@ def main():
 
         audit = packed.finish()
         print('\n' + '=' * 70)
-        print(f'segments={n}  first={first_at:.1f}s  total={total:.1f}s')
+        # 一個 segment 都沒釋出時 first_at 仍是 None，無條件格式化會把「沒有輸出」
+        # 這個診斷結果變成 TypeError，反而看不到發生什麼事。
+        if n == 0:
+            print(f'segments=0（沒有任何內容被釋出）  total={total:.1f}s')
+            print('  raw tokens=%s chars=%s' % (raw['tokens'], raw['chars']))
+        else:
+            print(f'segments={n}  first={first_at:.1f}s  total={total:.1f}s')
         if seg_sizes:
             cap = packed._pipeline.gate.segmenter.max_chars
             # A first segment well under the cap means it was cut by a blank line, and

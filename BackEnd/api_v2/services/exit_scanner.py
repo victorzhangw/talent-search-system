@@ -54,29 +54,33 @@ DEGREE_GUARD = r'(?=[很較相對更]{0,3}[偏程度分高低強弱]|傾向|指�
 ROLE_FIT_REMINDER = ('不可將AI回答用於人選擔任某職務或角色是否適任及排序順位之單一參考，'
                      '需多方驗證後決策')
 _REMINDER_MASK = '\x00'
+# 模型不會逐字照抄。2026-09-18 的實測輸出寫的是「不可將 AI 回答用於…」，而制式句是
+# 「不可將AI回答用於…」——差在英文縮寫兩側各一個空白，逐字比對就此落空，遮罩等於沒開。
+# 所以改成允許字元之間出現任意空白（半形、全形都算），遮罩長度仍等於實際命中的長度，
+# `Hit.start` 不會失真。
+_REMINDER_RE = re.compile(r'\s*'.join(re.escape(ch) for ch in ROLE_FIT_REMINDER))
 
 
 def mask_reminder(answer: str):
     """把制式提醒句換成等長遮罩，回傳 (遮罩後的字串, [(起, 迄), ...])。
 
-    只遮罩逐字相同的那一段。模型寫出語意相同但措辭不同的版本時不在此列——那種情況
-    由 `completeness_check` 的決策提醒檢查處理，不是掃描器的事。
+    比對允許字元之間有空白（見 `_REMINDER_RE`），但仍要求逐字同序。模型寫出語意相同
+    而措辭不同的版本時不在此列——那種情況由 `completeness_check` 的決策提醒檢查處理，
+    不是掃描器的事。
     """
-    if not answer or ROLE_FIT_REMINDER not in answer:
+    if not answer:
         return answer, []
     spans = []
     out = []
     i = 0
-    n = len(ROLE_FIT_REMINDER)
-    while True:
-        j = answer.find(ROLE_FIT_REMINDER, i)
-        if j < 0:
-            out.append(answer[i:])
-            break
-        out.append(answer[i:j])
-        out.append(_REMINDER_MASK * n)
-        spans.append((j, j + n))
-        i = j + n
+    for m in _REMINDER_RE.finditer(answer):
+        out.append(answer[i:m.start()])
+        out.append(_REMINDER_MASK * (m.end() - m.start()))
+        spans.append((m.start(), m.end()))
+        i = m.end()
+    if not spans:
+        return answer, []
+    out.append(answer[i:])
     return ''.join(out), spans
 
 
