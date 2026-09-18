@@ -97,7 +97,7 @@ def _is_template_row(row):
     return any(isinstance(c, str) and c.strip().startswith('//') for c in row)
 
 
-def _parse_band_sheet(ws):
+def _parse_band_sheet(ws, fallback_version=None):
     definitions = {}
     bands = []
     skipped = []
@@ -147,7 +147,7 @@ def _parse_band_sheet(ws):
             'report_wording_friendly': _cell(row, COL['report_wording_friendly']),
             'ai_guidance':            {'do': ai_do, 'dont': ai_dont,
                                        'do_raw': ai_do_raw, 'dont_raw': ai_dont_raw},
-            'version':                _cell(row, COL['version']),
+            'version':                _cell(row, COL['version']) or fallback_version,
             'trait_project':          _extract_project(trait_id),
         })
     return list(definitions.values()), bands, total_rows, skipped
@@ -195,10 +195,16 @@ def _find_sheet(wb, key):
     return None
 
 
-def parse_excel_bytes(file_bytes):
+def parse_excel_bytes(file_bytes, spec_version=None):
     """
     Parse Excel from bytes (for API upload).
     Returns (definitions, bands, interactions, error, mismatch).
+
+    `spec_version` is written to trait_bands.version when the sheet's own 版本 column
+    is empty -- which it has been in every spec shipped so far (V7: all 998 rows None).
+    Without it this path leaves the column NULL and "which spec is loaded?" can only
+    be answered by diffing 2,389 narratives, which is exactly what the CLI's
+    --spec-version was added to stop. The cell still wins when it has a value.
     `mismatch` is None when parsed row counts match the Excel data row counts,
     otherwise a dict describing which rows were skipped and why.
     """
@@ -216,7 +222,8 @@ def parse_excel_bytes(file_bytes):
         return None, None, None, f'Cannot find sheets for: {missing}. Found: {wb.sheetnames}', None
 
     try:
-        definitions, bands, band_total, band_skipped = _parse_band_sheet(wb[band_name])
+        definitions, bands, band_total, band_skipped = _parse_band_sheet(
+            wb[band_name], fallback_version=spec_version)
         interactions, interaction_total, interaction_skipped = _parse_interaction_sheet(wb[interaction_name])
     except Exception as e:
         return None, None, None, f'Parse error: {e}', None

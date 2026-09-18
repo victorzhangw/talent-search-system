@@ -378,7 +378,13 @@ def upload_traits(current_user):
         return err('INVALID_FILE', 'Only .xlsx files are accepted', 400)
 
     file_bytes = file.read()
-    definitions, bands, interactions, parse_error, mismatch = trait_importer.parse_excel_bytes(file_bytes)
+    # 上傳檔名當版本戳記的預設值。02 分頁的「版本」欄歷來都是空的，不給就會在
+    # trait_bands.version 留下 NULL，於是「庫內是哪一版」只能靠比對 2389 列敘事
+    # 才答得出來——CLI 的 --spec-version 就是為了終結這件事。比人工輸入的版本字串
+    # 差，比 NULL 好：它至少指得出資料來自哪一個檔案。
+    spec_version = os.path.splitext(os.path.basename(file.filename or ''))[0] or None
+    definitions, bands, interactions, parse_error, mismatch = trait_importer.parse_excel_bytes(
+        file_bytes, spec_version=spec_version)
 
     if parse_error:
         return err('PARSE_ERROR', parse_error, 422)
