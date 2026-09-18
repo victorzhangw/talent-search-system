@@ -64,6 +64,64 @@ def list_candidates():
 
     return ok(candidates, meta={'page': page_info})
 
+
+
+# 上游 `GET /v1/candidates/` 的 limit 上限。2026-09-19 對 UAT 實測：送 200 或 500，
+# 回來的 `page.limit` 都是 100、資料也只有 100 筆——**超限是靜默改寫，不報錯**。
+# 所以 `limit=500` 這種寫法讀起來像「一次取回全部」，實際只拿得到前 100 位：超過
+# 100 人的企業會安靜地掉人，而且沒有任何錯誤訊息可查。
+UPSTREAM_PAGE_MAX = 100
+
+# 跨頁取回的安全上限（100 × 50 = 5000 人）。壞掉的 `page.total` 不該把伺服器
+# 留在迴圈裡；真的撞到就停下來並記一筆警告。
+MAX_UPSTREAM_PAGES = 50
+
+
+def _fetch_candidate_page(service, upstream_token, limit, offset):
+    """一頁。Real 走 token，Mock 走 enterprise_code，其餘參數相同。"""
+    if isinstance(service, RealIntegrationService):
+        return service.get_candidates(upstream_token, limit=limit, offset=offset)
+    return service.get_candidates("ACME-TW", limit=limit, offset=offset)
+
+
+def fetch_all_candidates(service, upstream_token, found_enough=None):
+    """把上游的人選清單取回，必要時跨頁。回傳 (依序的 list, {str(id): candidate})。
+
+    `found_enough(by_id)` 回傳 True 時提前結束——「找某幾位」的呼叫端不必翻完整份，
+    而絕大多數人就落在第一頁，所以常見情況仍然只打一次上游。
+
+    不用 `limit=500` 一次要完：見 `UPSTREAM_PAGE_MAX` 的說明，那是靜默截斷。
+    """
+    by_id = {}
+    ordered = []
+    offset = 0
+    total = None
+
+    for _ in range(MAX_UPSTREAM_PAGES):
+        resp = _fetch_candidate_page(service, upstream_token, UPSTREAM_PAGE_MAX, offset)
+        rows = resp.get('data') or []
+        if total is None:
+            total = (resp.get('page') or {}).get('total')
+
+        for c in rows:
+            cid = str(c.get('candidate_id'))
+            if cid not in by_id:
+                by_id[cid] = c
+                ordered.append(c)
+
+        if found_enough and found_enough(by_id):
+            break
+        offset += len(rows)
+        if not rows or (total is not None and offset >= total):
+            break
+    else:
+        print(f"WARNING: fetch_all_candidates stopped at {MAX_UPSTREAM_PAGES} pages "
+              f"({len(ordered)} candidates, upstream total={total}); the list may be "
+              f"incomplete.", flush=True)
+
+    return ordered, by_id
+
+
 @bp.route('/by-ids', methods=['GET'])
 def list_candidates_by_ids():
     """
@@ -87,17 +145,19 @@ def list_candidates_by_ids():
 
     # No get-by-id upstream call is exercised in production yet, so reuse the same
     # proven "fetch list, filter in Python" approach as get_candidate_report below.
+    #
+    # 原本寫的是 `limit=500`，讀起來像「一次取回全部」——實際上上游把超過 100 的
+    # limit 靜默改寫成 100（見 UPSTREAM_PAGE_MAX），所以超過 100 人的企業，還原歷史
+    # 對話的鎖定名單時會安靜地掉人。改成跨頁取回，並在湊齊要找的人之後就停。
+    wanted = {str(i) for i in requested_ids}
     try:
-        if isinstance(service, RealIntegrationService):
-            resp = service.get_candidates(upstream_token, limit=500)
-        else:
-            resp = service.get_candidates("ACME-TW", limit=500)
-        all_candidates = resp.get('data', [])
+        _, by_id = fetch_all_candidates(
+            service, upstream_token,
+            found_enough=lambda m: wanted.issubset(m.keys()))
     except Exception as e:
         print(f"ERROR: Failed to fetch candidate list for by-ids: {e}")
         return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503, details=str(e))
 
-    by_id = {str(c.get('candidate_id')): c for c in all_candidates}
     found = []
     missing = []
     for cid in requested_ids:
@@ -122,15 +182,14 @@ def get_candidate_report(candidate_id):
     service = get_service()
 
     # 2. Find Assessment ID for this Candidate
-    # Note: This limits us to finding candidates within the first 100 results.
-    # TODO: Implement Get-By-ID in Upstream or Service to avoid fetching list.
+    # 原本只取第一頁 100 筆，原始碼自己也註明了「This limits us to finding candidates
+    # within the first 100 results」——第 101 位以後的人選，報告就查不到。改成跨頁，
+    # 並在找到目標之後立刻停：絕大多數人在第一頁，常見情況仍然只打一次上游。
+    # TODO: 上游若補上 get-by-id，這整段就可以不用先抓清單。
     try:
-        if isinstance(service, RealIntegrationService):
-            resp = service.get_candidates(upstream_token, limit=100)
-            candidates = resp.get('data', [])
-        else:
-            resp = service.get_candidates("ACME-TW", limit=100)
-            candidates = resp.get('data', [])
+        candidates, _ = fetch_all_candidates(
+            service, upstream_token,
+            found_enough=lambda m: str(candidate_id) in m)
     except Exception as e:
         print(f"ERROR: Failed to fetch candidate list for report: {e}")
         return err('UPSTREAM_UNAVAILABLE', 'Upstream service unavailable', 503, details=str(e))
