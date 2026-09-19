@@ -86,6 +86,36 @@ _WHITESPACE_RE = re.compile(r'\s+')
 # 只收「有對應 ASCII 的」那幾個；、。「」等中文標點沒有等價物，維持原樣。
 _FULLWIDTH_PUNCT = str.maketrans('？！（），；', '?!(),;')
 
+# 整個標題被一組括號包起來的情形：`【主要領導風格】`。
+#
+# 2026-09-19 req 8ead624a 逼出這一條，而且它是**必然**發生而不是偶然：Q21 的指令用
+# 【】定義六個段落（「【企業任用與發展建議】請直接給 HR / 主管可採取的建議…」），模型
+# 照著寫，而 `expected_sections` 存的是無括號的版本。normalize_heading() 不剝括號，
+# 於是六段全部判缺 -> 補生成把整份報告重寫一次 -> 使用者看到 5420 字裡每一段都出現兩次。
+#
+# 只剝「成對且包住整個標題」的括號，所以 `（2項）` 這種半截的、或內文裡的括號不受影響。
+# 兩側一起處理，normalize_heading 的另一端（expected_sections）也走同一個函式，所以
+# 資料寫有括號或沒括號都能對上。
+_WRAPPING_BRACKETS = (
+    ('【', '】'), ('〔', '〕'), ('［', '］'), ('[', ']'),
+    ('《', '》'), ('〈', '〉'), ('「', '」'), ('『', '』'),
+)
+
+
+def _strip_wrapping_brackets(text: str) -> str:
+    changed = True
+    while changed and len(text) >= 2:
+        changed = False
+        for lo, hi in _WRAPPING_BRACKETS:
+            if text.startswith(lo) and text.endswith(hi):
+                inner = text[len(lo):-len(hi)].strip()
+                # 內層還有同一個閉括號就不是「包住整個標題」，例如 `【A】與【B】`。
+                if inner and hi not in inner and lo not in inner:
+                    text = inner
+                    changed = True
+                    break
+    return text
+
 # A line carrying an explicit heading marker: markdown hash, bold wrapper, bullet, or an
 # ordinal prefix. The section test can afford to look at every line because it demands an
 # exact match; the respondent-name test cannot, because it matches on substring -- a prose
@@ -150,6 +180,8 @@ def is_marked_heading(line: str) -> bool:
 def normalize_heading(line: str) -> str:
     """Strip numbering, bullets, markdown emphasis and trailing colons.
 
+    也剝掉包住整個標題的成對括號（`【主要領導風格】`），見 `_strip_wrapping_brackets`。
+
     Also collapses runs of whitespace, the spacing/width of a slash, and the width of the
     punctuation that has an ASCII equivalent -- so 「同組織 / 專案角色分配建議」 and
     「同組織／專案角色分配建議」 are the same heading, and so are 「共同或個別?」 and
@@ -159,6 +191,9 @@ def normalize_heading(line: str) -> str:
     """
     text = _BOLD_RE.sub('', line).strip()
     text = _HEADING_PREFIX_RE.sub('', text, count=1)
+    text = _HEADING_SUFFIX_RE.sub('', text)
+    # 括號要在去掉編號與尾標點之後才剝，`1. 【主要領導風格】` 這種才處理得到。
+    text = _strip_wrapping_brackets(text)
     text = _HEADING_SUFFIX_RE.sub('', text)
     text = _WHITESPACE_RE.sub(' ', text)
     text = _SLASH_RE.sub('/', text)
