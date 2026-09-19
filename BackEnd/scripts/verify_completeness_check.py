@@ -486,10 +486,53 @@ def main():
                if (q.get('expected_sections') or []) and (q.get('instruction_multi') or '').strip()
                and q.get('expected_sections_multi') is None]
     check('有多人版指令且有段落清單的題目都已拆分', not unsplit, f'尚未拆分: {unsplit}')
+    # 原本這裡只比 `'## ' + sec`，而那一種寫法恰好兩側對稱，所以 2026-09-19 的
+    # 「段落名以數字開頭就配不上」漏了過去。改成逐題實跑 CompletenessChecker，
+    # 涵蓋模型常見的各種標題寫法。
+    print('\n[11] 段落名對各種標題寫法都命中（正向）')
+    FORMATS = ('{}', '## {}', '### {}', '## 1. {}', '## 一、{}', '**{}**',
+               '- {}', '#### 四、{}', '## 4. {}', '## 1. {}：說明')
+
+    class _R:
+        def __init__(self, name):
+            self.name = name
+
+    miss_total = 0
     for q in table.all():
-        for sec in q.get('expected_sections_multi') or []:
-            check(f"idx {q['idx']} 的多人段落名可被正規化命中：{sec[:16]}",
-                  normalize_heading('## ' + sec) == normalize_heading(sec))
+        for field, n_resp in (('expected_sections_single', 1),
+                              ('expected_sections_multi', 3)):
+            expected = q.get(field) or []
+            if not expected:
+                continue
+            for fmt in FORMATS:
+                body = ''.join(fmt.format(s) + '\n內容內容\n' for s in expected)
+                chk = CompletenessChecker([_R(f'人{i}') for i in range(n_resp)], q)
+                chk.observe(body)
+                missing = chk.finalize().missing_sections
+                if missing:
+                    miss_total += 1
+                    print(f"    idx {q['idx']} {field} 寫法 {fmt!r} -> 缺 {missing}")
+    check('每一題的段落清單在各種標題寫法下都全數命中', not miss_total,
+          f'{miss_total} 組合判缺')
+
+    print('\n[12] 只寫其中一段時，其餘仍判得出缺（反向，防過度放寬）')
+    false_pass = 0
+    for q in table.all():
+        for field, n_resp in (('expected_sections_single', 1),
+                              ('expected_sections_multi', 3)):
+            expected = q.get(field) or []
+            if len(expected) < 2:
+                continue
+            for i, only in enumerate(expected, 1):
+                chk = CompletenessChecker([_R(f'人{j}') for j in range(n_resp)], q)
+                chk.observe(f'## {i}. {only}\n內容內容\n')
+                undetected = (set(expected) - {only}) - set(chk.finalize().missing_sections)
+                if undetected:
+                    false_pass += 1
+                    print(f"    idx {q['idx']} {field} 只寫「{only}」"
+                          f' 卻讓 {sorted(undetected)} 也算通過')
+    check('沒寫的段落不會因為比對放寬而被誤判成有寫', not false_pass,
+          f'{false_pass} 處誤判')
 
     print(f"\n{'[DONE] all checks passed' if not failures else '[FAILED] ' + '; '.join(failures)}")
     return 1 if failures else 0

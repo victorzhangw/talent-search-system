@@ -79,6 +79,9 @@ _COLON_SPLIT_RE = re.compile(r'[:：]')
 # 「4. 同組織 / 專案角色分配建議」與「管理 Do / Don't」，模型輸出常見的是全形無空格的
 # 「同組織／專案角色分配建議」——不收斂的話，這種條目就跟「（2項）」一樣永遠不會命中。
 _SLASH_RE = re.compile(r'\s*[/／]\s*')
+# 只剝 markdown 的標記（`#`、`>`、前導空白），不碰清單編號。見
+# `normalize_heading_keep_numbering()`。
+_MARK_PREFIX_RE = re.compile(r'^[#>\s]*')
 _WHITESPACE_RE = re.compile(r'\s+')
 # 同理，標點是全形還是半形也不是段落名的一部分。指令裡寫的是半形——
 # 「2. 需要結構或空間?」「2. 共同或個別?」——而模型在中文句子裡幾乎都會輸出全形「？」。
@@ -191,6 +194,11 @@ def normalize_heading(line: str) -> str:
     """
     text = _BOLD_RE.sub('', line).strip()
     text = _HEADING_PREFIX_RE.sub('', text, count=1)
+    return _normalize_tail(text)
+
+
+def _normalize_tail(text: str) -> str:
+    """`normalize_heading` 與 `normalize_heading_keep_numbering` 共用的後半段。"""
     text = _HEADING_SUFFIX_RE.sub('', text)
     # 括號要在去掉編號與尾標點之後才剝，`1. 【主要領導風格】` 這種才處理得到。
     text = _strip_wrapping_brackets(text)
@@ -198,6 +206,38 @@ def normalize_heading(line: str) -> str:
     text = _WHITESPACE_RE.sub(' ', text)
     text = _SLASH_RE.sub('/', text)
     return text.translate(_FULLWIDTH_PUNCT).strip()
+
+
+def normalize_heading_keep_numbering(line: str) -> str:
+    """同 `normalize_heading`，但**不剝清單編號**。
+
+    `_HEADING_PREFIX_RE` 把「開頭的數字」一律當成清單序號，而且只套用一次。
+    段落名本身以數字或中文數字開頭時，這兩件事湊起來會讓比對永遠配不上：
+
+        期望 `90天期間管理的策略`  -> 沒有 markdown 前綴，序號槽吃掉 `90` -> `天期間管理的策略`
+        模型 `## 4. 90 天期間管理的策略` -> 序號槽被 `4.` 佔掉，`90` 留下 -> `90 天期間管理的策略`
+
+    於是模型**加了標題編號反而判缺**，只有寫成不帶任何編號的裸行才會通過——正好相反。
+    2026-09-19 14:40 req 的 Q8 就是這樣：模型明明寫了 `## 4. 90 天期間管理的策略`，
+    稽核仍記成缺段。受影響的還有 Q8 的 `31–60 天`／`61–90 天` 與 Q10 的 `一句話總結`
+    （`一` 被當成中文序號）。
+
+    修法不是把編號剝得更兇——那會把 `31–60 天` 與 `61–90 天` 一起啃成 `天`，兩段撞在一起。
+    改成：**期望側只剝 markdown 標記、保留編號**，模型側兩種形態都收進候選，
+    比對時再用 `section_key()` 去掉空白。實測全 22 題 0 碰撞、0 跨段誤判、0 回歸。
+    """
+    text = _BOLD_RE.sub('', line).strip()
+    text = _MARK_PREFIX_RE.sub('', text, count=1)
+    return _normalize_tail(text)
+
+
+def section_key(text: str) -> str:
+    """段落比對用的鍵：去掉所有空白。
+
+    模型在數字／英文與中文之間習慣加一個空白（`90 天`、`管理 Do / Don't`），
+    而正本寫的是 `90天`。這個差異不是段落名的一部分。
+    """
+    return _WHITESPACE_RE.sub('', text or '')
 
 
 def heading_candidates(line: str) -> List[str]:
@@ -522,6 +562,17 @@ class CompletenessChecker:
         # 標籤），見 `_section_labels()`。
         cands = heading_candidates(line)
         self._headings.extend(cands)
+        # 段落名自己以數字開頭時，剝掉編號的那一版配不上正本，所以保留編號的寫法
+        # 也一起收。只進 `_headings`（供段落比對），不進 `_marked_candidates`——
+        # `_section_labels()` 取的是最短候選，而保留編號的一定不短於剝掉的，
+        # 混進去不會改變它取到誰，但沒有理由讓它多繞一圈。
+        kept = normalize_heading_keep_numbering(line)
+        if kept:
+            self._headings.append(kept)
+            if is_marked_heading(line):
+                label = _COLON_SPLIT_RE.split(kept, 1)[0].strip()
+                if label and label != kept:
+                    self._headings.append(label)
         if is_marked_heading(line) and cands:
             self._marked_candidates.append((line, cands))
 
@@ -590,7 +641,7 @@ class CompletenessChecker:
         # appendable_reason()。
         result.respondents_appendable = self.per_person
         answer = self.text
-        heading_set = set(self._headings)
+        heading_set = {section_key(h) for h in self._headings}
 
         if self.question is None:
             result.sections_check = 'n/a'       # free-form has no fixed headings
@@ -609,8 +660,9 @@ class CompletenessChecker:
         else:
             if self._fallback_note:
                 result.log_lines.append(self._fallback_note)
-            result.missing_sections = [s for s in self.expected
-                                       if normalize_heading(s) not in heading_set]
+            result.missing_sections = [
+                s for s in self.expected
+                if section_key(normalize_heading_keep_numbering(s)) not in heading_set]
             if result.missing_sections:
                 result.status = 'failed'
                 result.sections_check = 'failed'

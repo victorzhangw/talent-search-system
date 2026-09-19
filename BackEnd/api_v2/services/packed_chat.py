@@ -304,8 +304,13 @@ def packed_stream(rag_service, module_id: Optional[str], query: str,
 
         def _skip(reason, ctx):
             dropped.append((reason, ctx))
+            # 用 json.dumps 而不是直接內插 dict：這一行與 :278 的稽核記錄同一個
+            # logger，也同樣以 ` | {...}` 收尾，而任何按 `\| (\{.*\})$` 撈稽核的
+            # 工具都會連這一行一起撈到。Python 的 dict repr 是單引號，解析會失敗
+            # ——2026-09-19 當天的 log 就有 36／142 行是這樣被靜默丟掉的。
             packer_logger.warning(f"session={session_id} skipped trait: "
-                                  f"reason={reason} | {ctx}")
+                                  f"reason={reason} | "
+                                  f"{json.dumps(ctx, ensure_ascii=False, default=str)}")
 
         reports, roster = apply_roster(trait_reports, candidate_ids, candidates_info,
                                        session_id)
