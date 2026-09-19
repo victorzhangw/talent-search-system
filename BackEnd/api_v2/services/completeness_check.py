@@ -370,7 +370,24 @@ class CompletenessResult:
 
     def _missing_bits(self, for_completion: bool) -> List[str]:
         bits = []
-        if self.missing_sections:
+        # 段落缺漏**只記錄，不補生成**（2026-09-19，比照 E-12 對「漏人」下的判斷）。
+        #
+        # 補生成的前提是「缺段落＝缺內容」。真實請求打破了這個前提：2026-09-19 10:23
+        # 的 Q13，模型用自己的編號結構寫（「一、傳達任務或指令時」「二、給予回饋時」），
+        # 內容一應俱全，只是標題名稱與 expected_sections 不同。檢查判缺兩段，補生成就把
+        # 「交辦附理由、把確認排進流程、聚焦行為與結果、給具體下一步」換個標題再寫一次
+        # ——使用者讀到同樣的建議兩遍。而字面真的不同，任何正規化都救不了。
+        #
+        # E-12 當初對「漏人」的結論一模一樣：傷害來自「自動硬接」，不是來自「判定缺漏」。
+        # 所以拿掉的是補這個動作：missing_sections 照樣寫進稽核、reason() 照樣說得出缺
+        # 哪幾段、status 仍是 failed（落在 manual_review）。真的缺段落依然看得見，只是
+        # 不自動補，使用者得自己再問一次。
+        #
+        # 代價寫在這裡，不要之後再重新發現一次：真的少寫一段時，以前會自動補、現在不會。
+        # 換來的是「內容其實都在、只是標題不同」時不再重複一遍。要恢復自動補，前提是
+        # 檢查先學會「這段內容在不在」而不是「這個標題在不在」——那是語意判斷，
+        # b §8 明講不做。
+        if self.missing_sections and not for_completion:
             bits.append('缺少段落：' + '、'.join(self.missing_sections))
         if self.missing_respondents and (self.respondents_appendable or not for_completion):
             bits.append('缺少獨立段落的受測者：' + '、'.join(self.missing_respondents))

@@ -107,21 +107,24 @@ def main():
           msgs[-1]['role'] == 'assistant' and 'CIA_05' in msgs[-1]['content'])
     check('rewrite turn still carries the payload', msgs[0]['role'] == 'system')
 
-    print('\n[5] Missing section -> completion follow-up')
+    print('\n[5] Missing section -> 只記錄，不補生成（2026-09-19）')
+    # 段落缺漏不再觸發補生成，理由見 completeness_check._missing_bits()：
+    # 補生成的前提是「缺段落＝缺內容」，而 2026-09-19 10:23 的真實請求打破了它——
+    # 模型用自己的編號結構寫，內容一應俱全，補生成把同樣的建議換個標題又寫一次。
     partial = ''.join(f'{i + 1}. {s}\n以行為事例佐證。\n\n'
                       for i, s in enumerate(sections[:-1]))
     prompts.clear()
     pipe = LogPipeline(r1, q5, followup_fn=followup)
     out = ''.join(pipe.stream(lambda m: tokens(partial)))
-    check('the missing section was appended', sections[-1] in out)
-    check('status ok', pipe.result.status == STATUS_OK)
-    check('counted as a completeness retry, not a leakage one',
-          pipe.result.audit['retry_count'] == {'leakage': 0, 'completeness': 1},
+    check('缺的段落不再被自動補上', sections[-1] not in out)
+    check('沒有呼叫補生成', not prompts, prompts[0][1][:40] if prompts else '')
+    check('沒有計為 completeness retry',
+          pipe.result.audit['retry_count'] == {'leakage': 0, 'completeness': 0},
           pipe.result.audit['retry_count'])
-    check('completion prompt says what is missing',
-          prompts and sections[-1] in prompts[0][1], prompts[0][1] if prompts else None)
-    check('completion prompt forbids repeating earlier sections',
-          '不要重寫或重複已經輸出過的段落' in prompts[0][1])
+    check('但缺哪幾段仍寫進稽核', pipe.result.audit['missing_sections'] == [sections[-1]],
+          pipe.result.audit['missing_sections'])
+    check('status 落在 manual_review（不是靜默放行）',
+          pipe.result.status != STATUS_OK, pipe.result.status)
 
     print('\n[6] Unfixable leak blocks the rest')
     pipe = LogPipeline(r1, q5, followup_fn=lambda m, i: '他的 CIA_05 還是在。\n\n')

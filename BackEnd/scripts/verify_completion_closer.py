@@ -151,15 +151,20 @@ def verify_rewrite_closer():
     print('\n[20] 補充內容排在結語句之前，不是之後')
     # strip_duplicate_closer 的 docstring 記著這個取捨：已釋出的段落不能收回，所以結語句
     # 必然停在第一輪的結尾、補充落在它後面。延後釋出把這個取捨也解掉了。
-    q = table.get('如何面對困難、壓力、挑戰')
-    sections = q['expected_sections'] or []
-    r = [Respondent('王智弘', 'R1', {'CIA_05': 'B'})]
-    partial = ''.join(f'{i + 1}. {s}\n內容。\n\n' for i, s in enumerate(sections[:-1]))
-    gate = SegmentGate(scanner, checker=CompletenessChecker(r, q, table.calibration_traits),
-                       completer=lambda reason: f'{len(sections)}. {sections[-1]}\n補上的內容。\n\n',
+    #
+    # 2026-09-19：素材由「缺段落」改成「per_person 題的漏人」——段落缺漏不再觸發
+    # 補生成（見 completeness_check._missing_bits()），但補生成機制本身仍為多人題服務，
+    # 這條斷言驗的是它與結語句的排序，所以換素材、不刪測試。
+    q = table.get('打造高效會議團隊')
+    two = [Respondent('王智弘', 'R1', {'CIA_05': 'B'}),
+           Respondent('林孟德', 'R2', {'CIA_05': 'B'})]
+    partial = '## 王智弘\n\n他的內容。\n\n'
+    gate = SegmentGate(scanner,
+                       checker=CompletenessChecker(two, q, table.calibration_traits),
+                       completer=lambda reason: '## 林孟德\n\n補上的內容。\n\n',
                        closer=CLOSER)
-    out = ''.join(gate.run([partial + CLOSER]))
-    check('補上的段落有出現', sections[-1] in out, out[-60:])
+    out =''.join(gate.run([partial + CLOSER]))
+    check('補上的段落有出現', '林孟德' in out, out[-60:])
     check('結語句在補充內容之後', out.index(CLOSER) > out.index('補上的內容'),
           repr(out[-40:]))
     check('結語句仍然只有一次', out.count(CLOSER) == 1, out.count(CLOSER))
@@ -251,16 +256,25 @@ def main():
           res.completeness.appendable_reason() == '',
           res.completeness.appendable_reason())
 
-    print('\n[10] 缺段落 -> 補生成照常啟動（附加文字修得好的才跑）')
+    print('\n[10] 缺段落 -> 只記錄，不補生成（2026-09-19）')
+    # 補生成的前提是「缺段落＝缺內容」。2026-09-19 10:23 的真實請求打破了它：模型用
+    # 自己的編號結構寫（「一、傳達任務或指令時」），內容一應俱全，只是標題名稱與
+    # expected_sections 不同；補生成把同樣的建議換個標題又寫一次，使用者讀到兩遍。
+    # 字面真的不同，任何正規化都救不了，所以比照 E-12 對「漏人」的判斷：只記錄不補。
     called = []
     partial = '\n\n'.join(f'{s}\n內容內容內容。' for s in q['expected_sections'][:2])
+    checker = CompletenessChecker(r, q, table.calibration_traits)
     gate = SegmentGate(ExitScanner(injected_names=set(), injected_labels=set()),
-                       checker=CompletenessChecker(r, q, table.calibration_traits),
+                       checker=checker,
                        completer=lambda reason: called.append(reason) or '補生成的內容。')
     list(gate.run([partial]))
-    check('補生成有被呼叫', len(called) == 1, called)
-    check('傳給模型的理由只提缺段落，不提佐證',
-          called and '缺少段落' in called[0] and '佐證' not in called[0], called)
+    check('補生成沒有被呼叫', called == [], called)
+    check('但缺哪幾段仍說得出來',
+          '缺少段落' in gate.result.completeness.reason(),
+          gate.result.completeness.reason())
+    check('appendable_reason() 是空的（不餵給補生成）',
+          gate.result.completeness.appendable_reason() == '',
+          gate.result.completeness.appendable_reason())
 
     print('\n[11] 自由提問超過字數 -> 只記錄，不補生成也不判失敗（U10）')
     # 補生成修不了超字（append 只會更長），所以它從來不該觸發；U10 之後連 status 都不動。

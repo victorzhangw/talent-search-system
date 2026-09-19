@@ -143,7 +143,10 @@ def main():
     check('completeness result is in the audit',
           gate.result.as_audit()['expected_sections_check'] == 'passed')
 
-    print('\n[8] Missing section -> one completion, appended not regenerated (丙-2)')
+    print('\n[8] Missing section -> 只記錄，不補生成（2026-09-19）')
+    # 段落缺漏不再觸發補生成，理由見 completeness_check._missing_bits()：補生成的前提
+    # 是「缺段落＝缺內容」，而 2026-09-19 10:23 的真實請求打破了它——模型用自己的編號
+    # 結構寫，內容一應俱全，補生成把同樣的建議換個標題又寫一次。
     partial = ''.join(f'{i + 1}. {s}\n內容。\n\n' for i, s in enumerate(sections[:-1]))
     reasons = []
 
@@ -154,32 +157,61 @@ def main():
     checker = CompletenessChecker(r1, q5, table.calibration_traits)
     gate = SegmentGate(scanner, checker=checker, completer=completer)
     emitted = list(gate.run(tokens_of(partial)))
-    check('the completer was told what was missing',
-          reasons and sections[-1] in reasons[0], reasons[:1])
-    check('the missing section was appended', sections[-1] in ''.join(emitted))
-    check('earlier segments were not regenerated', ''.join(emitted).startswith('1. '))
-    check('status ok after completion', gate.result.status == STATUS_OK)
-    check('completeness retry counted separately',
+    check('沒有呼叫補生成', not reasons, reasons[:1])
+    check('缺的段落不會被自動補上', sections[-1] not in ''.join(emitted))
+    check('已釋出的段落原樣保留', ''.join(emitted).startswith('1. '))
+    check('沒有計為 completeness retry',
+          gate.result.retry_count == {'leakage': 0, 'completeness': 0},
+          gate.result.retry_count)
+    check('缺哪幾段仍寫進稽核',
+          gate.result.as_audit()['missing_sections'] == [sections[-1]],
+          gate.result.as_audit()['missing_sections'])
+    check('status 落在 manual_review', gate.result.status == STATUS_MANUAL_REVIEW,
+          gate.result.status)
+
+    print('\n[9] 補生成機制本身：走還活著的那條路（per_person 題的漏人）')
+    # [8] 拿掉的是「段落缺漏要不要補」，不是補生成這個機制。機制仍然為 per_person 的
+    # 多人題服務（Q15/Q21/Q22），所以改用那條路驗它還能不能正確呼叫、計數、不重寫。
+    q15 = table.get('打造高效會議團隊')
+    two = [Respondent('王智弘', 'R1', {'CIA_05': 'B'}),
+           Respondent('林孟德', 'R2', {'CIA_05': 'B'})]
+    one_only = '## 王智弘\n\n他的內容。\n\n'
+    reasons = []
+
+    def completer2(reason):
+        reasons.append(reason)
+        return '## 林孟德\n\n他的內容。\n\n'
+
+    checker = CompletenessChecker(two, q15, table.calibration_traits)
+    gate = SegmentGate(scanner, checker=checker, completer=completer2)
+    emitted = list(gate.run(tokens_of(one_only)))
+    check('補生成被呼叫，且說得出漏了誰',
+          reasons and '林孟德' in reasons[0], reasons[:1])
+    check('漏掉的人被補上', '林孟德' in ''.join(emitted))
+    check('已釋出的段落沒有被重寫', ''.join(emitted).startswith('## 王智弘'))
+    check('計為一次 completeness retry',
           gate.result.retry_count == {'leakage': 0, 'completeness': 1},
           gate.result.retry_count)
 
-    print('\n[9] Completion that still misses -> manual_review')
-    checker = CompletenessChecker(r1, q5, table.calibration_traits)
+    print('\n[9b] 補生成之後仍然沒補到 -> manual_review')
+    checker = CompletenessChecker(two, q15, table.calibration_traits)
     gate = SegmentGate(scanner, checker=checker, completer=lambda reason: '無關內容。\n\n')
-    list(gate.run(tokens_of(partial)))
+    list(gate.run(tokens_of(one_only)))
     check('status manual_review', gate.result.status == STATUS_MANUAL_REVIEW)
     check('only one completion attempt', gate.result.retry_count['completeness'] == 1)
     check('no completer at all -> manual_review too',
           _no_completer_status(scanner, r1, q5, partial) == STATUS_MANUAL_REVIEW)
 
     print('\n[10] The two budgets do not share a counter (b §7)')
-    one_bad = '他的 CIA_05 有問題。\n\n' + partial
+    # 同樣改用 per_person 的漏人路徑——段落缺漏在 2026-09-19 之後不再觸發補生成，
+    # 拿它當素材就驗不到「兩個預算各自計數」這件事了。
+    one_bad = '他的 CIA_05 有問題。\n\n' + one_only
 
     def fix_once(segment, banned):
         return '他的表現有起伏。\n\n'
 
-    checker = CompletenessChecker(r1, q5, table.calibration_traits)
-    gate = SegmentGate(scanner, checker=checker, rewriter=fix_once, completer=completer)
+    checker = CompletenessChecker(two, q15, table.calibration_traits)
+    gate = SegmentGate(scanner, checker=checker, rewriter=fix_once, completer=completer2)
     list(gate.run(tokens_of(one_bad)))
     check('a leakage rewrite did not consume the completeness budget',
           gate.result.retry_count == {'leakage': 1, 'completeness': 1},
