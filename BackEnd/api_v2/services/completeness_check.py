@@ -103,8 +103,13 @@ _FULLWIDTH_PUNCT = str.maketrans('？！（），；', '?!(),;')
 # 於是六段全部判缺 -> 補生成把整份報告重寫一次 -> 使用者看到 5420 字裡每一段都出現兩次。
 #
 # 只剝「成對且包住整個標題」的括號，所以 `（2項）` 這種半截的、或內文裡的括號不受影響。
-# 兩側一起處理，normalize_heading 的另一端（expected_sections）也走同一個函式，所以
-# 資料寫有括號或沒括號都能對上。
+# 兩側一起處理，所以資料寫有括號或沒括號都能對上。
+#
+# 2026-09-19 更正這段註解：原文寫「另一端（expected_sections）也走同一個函式」，那已經
+# 不成立——期望側改走 `normalize_heading_keep_numbering()`（見該函式的說明）。剝括號、
+# 剝尾標點、收斂空白與斜線這些動作兩側仍然共用（`_normalize_tail`），變的只有「剝不剝
+# 清單編號」。留著錯的註解很危險：D-9 之所以躲過驗收，就是因為有一條檢查看起來在驗
+# 兩側對稱、實際只驗了恰好對稱的那一種寫法。
 _WRAPPING_BRACKETS = (
     ('【', '】'), ('〔', '〕'), ('［', '］'), ('[', ']'),
     ('《', '》'), ('〈', '〉'), ('「', '」'), ('『', '』'),
@@ -194,9 +199,13 @@ def normalize_heading(line: str) -> str:
     Also collapses runs of whitespace, the spacing/width of a slash, and the width of the
     punctuation that has an ASCII equivalent -- so 「同組織 / 專案角色分配建議」 and
     「同組織／專案角色分配建議」 are the same heading, and so are 「共同或個別?」 and
-    「共同或個別？」. Applied to both sides of the comparison, so the expected list and the
-    answer meet in the middle rather than the data having to guess which form the model
-    will emit. Guessing is how 「（2項）」 got into the data.
+    「共同或個別？」. The expected list and the answer meet in the middle rather than the
+    data having to guess which form the model will emit. Guessing is how 「（2項）」 got
+    into the data.
+
+    **這一支只用在「模型寫的那一側」。** 期望側走 `normalize_heading_keep_numbering()`，
+    差別只在剝不剝清單編號；其餘（括號、尾標點、空白、斜線、全半形）兩側共用
+    `_normalize_tail()`。比對前再各自過一次 `section_key()` 去掉空白。
     """
     text = _BOLD_RE.sub('', line).strip()
     text = _HEADING_PREFIX_RE.sub('', text, count=1)
