@@ -213,7 +213,8 @@ class PipelineResult:
 class LogPipeline:
     def __init__(self, respondents: List[Respondent], question: Optional[dict],
                  user_query: Optional[str] = None, history: Optional[List[dict]] = None,
-                 followup_fn: Optional[FollowupFn] = None):
+                 followup_fn: Optional[FollowupFn] = None,
+                 focus_names: Optional[List[str]] = None):
         # assemble() runs the b §6 unit checks and raises before anything is sent.
         self.log = assemble(respondents, question, user_query=user_query,
                             has_history=bool(history))
@@ -222,7 +223,8 @@ class LogPipeline:
         self.history = list(history or [])
         self.messages = self.log.to_messages(history)
         self.checker = CompletenessChecker(respondents, question, table.calibration_traits,
-                                           user_query=user_query, history=self.history)
+                                           user_query=user_query, history=self.history,
+                                           focus_names=focus_names)
         self.followup_fn = followup_fn
         self.gate = SegmentGate(ExitScanner.for_log(self.log), checker=self.checker,
                                 rewriter=self._rewrite, completer=self._complete,

@@ -432,7 +432,8 @@ class CompletenessChecker:
     def __init__(self, respondents, question: Optional[dict],
                  calibration_traits: Optional[set] = None,
                  user_query: Optional[str] = None,
-                 history: Optional[List[dict]] = None):
+                 history: Optional[List[dict]] = None,
+                 focus_names: Optional[List[str]] = None):
         self.respondents = respondents
         self.question = question
         self.calibration_traits = calibration_traits or set()
@@ -449,6 +450,21 @@ class CompletenessChecker:
         # 19 題可多人的題目裡只有 Q15／Q21／Q22 明寫了「逐一／每位／個別成員」。
         # req ecae89f3（Q13）證明猜不得——見 finalize() 裡的說明。
         self.per_person = bool((question or {}).get('per_person_sections'))
+        # 使用者這一輪點名了誰。有值時它就是覆蓋率檢查的分母，而不是整份名單。
+        #
+        # 為什麼需要：自由提問點名「請只針對林慧嵐說明」時，模型正確地只寫她，檢查卻拿
+        # 整份名單去對，於是其餘每一位都被判成漏人，status 打成 manual_review。
+        # E-12 已經把「自動補生成」拿掉，所以使用者看不到硬接的內容——但 manual_review
+        # 仍然每次都亮，真正需要人看的缺漏被這些誤判淹掉。
+        #
+        # 語料實測（0908-0919 共 10 筆符合這個形狀）：被判缺的人 **10/10 全部**落在點名
+        # 範圍之外，換分母後 missing 會清空；而且從來沒有出現過「被點名的人反而被漏掉」，
+        # 所以這個改動不會遮蔽真實缺漏——點名的人沒寫到，照樣進 missing。
+        #
+        # 只收 source='named' 且 conflict=False（由呼叫端把關）：排除語（「除了 X 之外」）
+        # 的正確語義是「名單減 X」而不是「只有 X」，追問繼承則比點名脆弱得多，兩者維持
+        # 用整份名單。
+        self.focus_names = [n for n in (focus_names or []) if n]
         self.expected, self._fallback_note = expected_sections_for(question, len(respondents))
         self._headings: List[str] = []          # every line, for exact section matching
         # 帶標記的行連同它的候選寫法，供 `_section_labels()` 取冒號前的標籤。
@@ -640,9 +656,14 @@ class CompletenessChecker:
                 covered = {r.name for r in self.respondents
                            if any(_WHITESPACE_RE.sub('', form) in h
                                   for form in name_forms(r.name) for h in haystack)}
+            # 分母：使用者點名了誰就只看那幾位，沒點名才看整份名單。
+            scope = set(self.focus_names) if self.focus_names else None
             result.missing_respondents = [
                 r.name for r in self.respondents
-                if r.name not in self.self_introduced and r.name not in covered]
+                if r.name not in self.self_introduced and r.name not in covered
+                and (scope is None or r.name in scope)]
+            if scope is not None:
+                result.respondents_check += '+focus'
             if result.missing_respondents:
                 result.status = 'failed'
 
@@ -668,9 +689,10 @@ class CompletenessChecker:
 def check_answer(answer: str, respondents, question: Optional[dict],
                  calibration_traits: Optional[set] = None,
                  user_query: Optional[str] = None,
-                 history: Optional[List[dict]] = None) -> CompletenessResult:
+                 history: Optional[List[dict]] = None,
+                 focus_names: Optional[List[str]] = None) -> CompletenessResult:
     """Non-streaming convenience wrapper."""
     checker = CompletenessChecker(respondents, question, calibration_traits,
-                                  user_query, history)
+                                  user_query, history, focus_names=focus_names)
     checker.observe(answer)
     return checker.finalize()

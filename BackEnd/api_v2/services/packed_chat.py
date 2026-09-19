@@ -316,10 +316,31 @@ def packed_stream(rag_service, module_id: Optional[str], query: str,
                 'NO_RESPONDENTS',
                 '請先選擇至少一位有評測資料的受測者，再提出問題。')
 
+        history = rag_service.load_history(session_id)
+
+        # 「使用者這一輪在問誰」。本來就在串流開始前算完，只是結果只寫進稽核；現在提前到
+        # 建 pipeline 之前，好讓覆蓋率檢查拿它當分母（見 CompletenessChecker.focus_names）。
+        # 它只吃 user_query / 名單 / history / respondents，完全不碰回答，所以前移沒有
+        # 任何阻礙。題庫題的「提問」是模組指令不是使用者的話，判「問誰」沒有意義，所以
+        # 只在自由提問算。
+        focus = {}
+        if question is None:
+            try:
+                focus = detect_focus(query, [r.name for r in respondents],
+                                     history=history, respondents=respondents)
+            except Exception as e:                   # 稽核欄位不該弄掉一個請求
+                packer_logger.warning(f"session={session_id} focus detection failed: {e}")
+
+        # 只有「明確點名且沒有衝突」才換分母。排除語與追問繼承維持用整份名單——
+        # 前者的語義是「名單減 X」而不是「只有 X」，後者比點名脆弱得多。
+        focus_names = (focus.get('names') or []) if (
+            focus.get('source') == 'named' and not focus.get('conflict')) else None
+
         pipeline = LogPipeline(respondents, question,
                                user_query=query if question is None else None,
-                               history=rag_service.load_history(session_id),
-                               followup_fn=rag_service.packer_followup)
+                               history=history,
+                               followup_fn=rag_service.packer_followup,
+                               focus_names=focus_names)
     except AudienceMismatch as e:
         # spec b §1.1 要求拒絕。舊路徑是安靜地改用另一份 prompt——那正是 D2 要終結的降級。
         packer_logger.warning(f"session={session_id} audience mismatch: {e}")
@@ -333,13 +354,5 @@ def packed_stream(rag_service, module_id: Optional[str], query: str,
             '特質資料無法組裝成分析依據，請重新載入頁面後再試；若持續發生請聯繫管理員。')
 
     log_payload(pipeline, session_id, module_id, question, req_id, dropped)
-    # 題庫題的「提問」是模組指令不是使用者的話，判「問誰」沒有意義，所以只在自由提問算。
-    focus = {}
-    if question is None:
-        try:
-            focus = detect_focus(query, [r.name for r in respondents],
-                                 history=pipeline.history, respondents=respondents)
-        except Exception as e:                       # 稽核欄位不該弄掉一個請求
-            packer_logger.warning(f"session={session_id} focus detection failed: {e}")
     return PackedStream(pipeline, rag_service.packer_stream, session_id, question, req_id,
                         dropped=dropped, roster=roster, focus=focus)
