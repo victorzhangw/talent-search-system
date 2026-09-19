@@ -2124,11 +2124,16 @@
    "injection_note": "交互過濾集合＝本清單 ∪ 受測者命中之風險端點特質（見 risk_endpoints.adopted）；全塊注入僅限題意匡列（scoped_traits）",
    "note": "Codex band級複核合併(漏3誤4)＋家族補0",
    "expected_sections": [],
-   "expected_sections_note": "（本題指令未定義固定段落標題，§8 不做段落齊全檢查，程式應 log 略過原因）",
+   "expected_sections_note": "（本題**單人版**指令未定義固定段落標題，§8 對單人版不做段落齊全檢查，程式應 log 略過原因。多人版於 2026-09-19 補上四段：指令本來就以「標題: 說明」形式寫著「1. 團隊合作價值: …2. 最能互補: …3. 可能摩擦: …4. 共同合作策略: …」，原本一併標成「未定義標題」是資料誤標，害 11 筆多人版請求全部走 skipped、從未檢查過。已用 10 筆歷史回答重放驗證，全數通過。）",
    "per_person_sections": false,
    "per_person_sections_note": "（本題指令是否要求逐人分段，由此欄決定；判準是 instruction_multi 有沒有明寫「逐一／每位／每個人／各候選人／個別成員」）",
    "expected_sections_single": [],
-   "expected_sections_multi": []
+   "expected_sections_multi": [
+    "團隊合作價值",
+    "最能互補",
+    "可能摩擦",
+    "共同合作策略"
+   ]
   },
   {
    "idx": 15,
