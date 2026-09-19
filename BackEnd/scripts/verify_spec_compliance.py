@@ -119,10 +119,14 @@ def main():
     # V7 把三個校準特質 K 欄的「以行為事例佐證」改成「資訊可信度需交叉驗證」，
     # 四個舊詞一個不剩。這條斷言的用意是「程式的詞表要與 b §8 逐字相同」，所以
     # 期望值跟著 b 文件一起更新，而不是放寬成子集比對。
+    # 2026-09-19：「多方驗證」又拿掉了——它是規則八提醒句的用詞，留著會讓寫了那句
+    # 制式提醒的回答自動通過校準佐證檢查（語料實測 13/13 都在提醒句內）。b §8 同步。
     check('evidence wordlist is the b §8 one',
           "EVIDENCE_TERMS = ('佐證', '行為事例', '工作樣本', '不以單次', "
-          "'交叉驗證', '多方驗證')"
+          "'交叉驗證')"
           in src['completeness_check.py'])
+    check('the rule-8 reminder alone must not satisfy the evidence check',
+          '多方驗證' not in src['completeness_check.py'].split('EVIDENCE_TERMS =')[1][:120])
 
     print('\n[DoD 4] 出口掃描掛上，per-request 動態縮小，紅隊殘留 0')
     check('scanner narrows per request',
