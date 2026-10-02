@@ -1,5 +1,9 @@
 """Assemble the final LOG payload (事項 07, b §5).
 
+題號說明：本檔註解中跟著 req 編號、日期出現的 Qn（Q8／Q13／Q15／Q21…）是當時的 v9
+題號，記錄的是歷史事件；2026-10-02 起題庫改為 v10（28 題、全部重編），對照見
+題庫的 `source_idx_0917` 欄位。描述現況的地方已改用 v10 題號。
+
     [SYSTEM PROMPT]
     <System 靜態規範全文>
     ---
@@ -67,7 +71,7 @@ def log_label_for(index: int) -> str:
 
 
 # 題庫題多人時追加的一句。約束的是「不准漏人」，不是「湊滿格數」——
-# System 規範第 42 條是「缺席不臆測」，Q15 指令第十一節也寫了「若資料不足…不可假裝高度
+# System 規範第 42 條是「缺席不臆測」，Q15（v9）指令第十一節也寫了「若資料不足…不可假裝高度
 # 確定」。寫成「必須輸出 N 段」會和這兩條打架，模型面對資料稀薄的人會傾向硬湊；所以這裡
 # 明講「資料不足者仍須保留段落並說明只能判讀到什麼程度」，給它一條不違規的出路。
 COVERAGE_CLAUSE = (
@@ -108,7 +112,8 @@ def roster_block(respondents: List['Respondent'],
         Victoria 本人是提問者，不替她寫一段才是對的；點名式提問（「請只針對林慧嵐說明」）
         更是只該寫一位。自由提問的覆蓋率屬於 `completeness_check`，不在這裡用指令硬逼。
       * 單人題庫題不加：`instruction_single` 本來就是寫給一個人的，那句話沒有意義。
-      * 多人題庫題**只有 `per_person_sections=true` 的三題（Q15／Q21／Q22）加**。
+      * 多人題庫題**只有 `per_person_sections=true` 的題目加**（v10：Q12／Q14／Q22／Q26；
+        v9 時是 Q15／Q21／Q22）。
         一開始寫成「所有多人題庫題都加」，2026-09-08 15:07 的 `c2f088ee`（Q13）與 15:09 的
         `6bb46227`（Q18）暴露了問題：這兩題的指令通篇寫「對象組合」、而且自己就寫著
         「請嚴格依照以下結構輸出，不得新增、省略或調整順序」，我們卻在前面多要求一句
@@ -345,13 +350,13 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
                        for i, r in enumerate(respondents)],
         'display_name_collision': name_collision,
         'question_id': question['idx'] if question else None,
+        # 題號在 v10（2026-10-01）整批重編；沒有版本就分不出 question_id=5 是哪一題。
+        'question_table_version': question_table.version,
         'question_type': 'free' if question is None
                          else ('whole_person' if QuestionTable.is_whole_person(question)
                                else 'scoped'),
         'audience': 'multi' if len(respondents) > 1 else 'single',
         'respondents': audits,
-        # 題號在 v10（2026-10-01）整批重編；沒有版本就分不出 question_id=5 是哪一題。
-        'question_table_version': question_table.version,
     }
     log = AssembledLog(body, instruction_text, audit,
                        injected_names={n for n in names if n},

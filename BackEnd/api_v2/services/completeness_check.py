@@ -1,5 +1,9 @@
 """Output completeness checks on the answer (事項 10 / 13, b §8).
 
+題號說明：本檔註解中跟著 req 編號、日期出現的 Qn（Q8／Q13／Q15／Q21…）是當時的 v9
+題號，記錄的是歷史事件；2026-10-02 起題庫改為 v10（28 題、全部重編），對照見
+題庫的 `source_idx_0917` 欄位。描述現況的地方已改用 v10 題號。
+
     題庫題    every expected section heading is present (subset test -- extra headings
               are fine). Length is not checked.
     自由提問  answer stays within 1,000 characters.
@@ -69,6 +73,8 @@ UNSPLIT_LOG = '本題 expected_sections 尚未拆分 single/multi，退回使用
 # 「指令明明有編號段落、只是沒人填進資料」的情況，會被讀成「本題指令未定義固定段落
 # 標題」——一個與事實相反的理由。區分依據是 `expected_sections_note`：有 note 表示
 # 內容方確認過這題沒有固定段落（Q14／Q15／Q22），沒有 note 而為空就是資料缺口。
+# （以上為 v9 題號。v10 起 28 題凡適用的單人／多人版都有段落清單，這兩條路徑目前沒有
+# 任何題目會走到，保留給日後的新題。）
 DATA_GAP_LOG = '本題 expected_sections 未填，段落齊全檢查未執行（資料缺口，非指令特性）'
 
 # Leading ordinal/bullet/markdown noise that a heading may carry.
@@ -239,7 +245,8 @@ def normalize_heading_keep_numbering(line: str) -> str:
 
     修法不是把編號剝得更兇——那會把 `31–60 天` 與 `61–90 天` 一起啃成 `天`，兩段撞在一起。
     改成：**期望側只剝 markdown 標記、保留編號**，模型側兩種形態都收進候選，
-    比對時再用 `section_key()` 去掉空白。實測全 22 題 0 碰撞、0 跨段誤判、0 回歸。
+    比對時再用 `section_key()` 去掉空白。實測全 22 題 0 碰撞、0 跨段誤判、0 回歸（v9）。
+    v10 的 28 題另以合成回答重驗（2026-10-02，6 種標題寫法 × 完整／逐段刪除，0 失敗）。
     """
     text = _BOLD_RE.sub('', line).strip()
     text = _MARK_PREFIX_RE.sub('', text, count=1)
@@ -451,8 +458,8 @@ class CompletenessResult:
     def appendable_reason(self) -> str:
         """The part of `reason()` that appending more text could actually fix.
 
-        「漏人」只有在**這一題明定逐人分段**時才補（`per_person_sections`，19 題裡只有
-        Q15／Q21／Q22）。自由提問不補，沒有明定逐人的題庫題也不補——後者是 2026-09-08
+        「漏人」只有在**這一題明定逐人分段**時才補（`per_person_sections`；v10 可多人的
+        20 題裡只有 Q12／Q14／Q22／Q26，v9 時是 Q15／Q21／Q22）。自由提問不補，沒有明定逐人的題庫題也不補——後者是 2026-09-08
         req ecae89f3 補上的條件：Q13 通篇寫「對象組合」，卻因為判定從回答形狀去猜而觸發
         補生成，硬接了 1202 字的重複人名清單。
 
@@ -519,7 +526,7 @@ class CompletenessChecker:
         self.self_introduced = set(self_introduced_names(
             '\n'.join(t for t in (user_query, prior) if t), respondents))
         # 「這一題要不要逐人分段」是題目的屬性，由題庫資料回答，不從回答的形狀猜。
-        # 19 題可多人的題目裡只有 Q15／Q21／Q22 明寫了「逐一／每位／個別成員」。
+        # v10 可多人的 20 題裡只有 Q12／Q14／Q22／Q26 明寫了「逐一／每位／每人／個別成員」。
         # req ecae89f3（Q13）證明猜不得——見 finalize() 裡的說明。
         self.per_person = bool((question or {}).get('per_person_sections'))
         # 使用者這一輪點名了誰。有值時它就是覆蓋率檢查的分母，而不是整份名單。
@@ -700,7 +707,7 @@ class CompletenessChecker:
             #
             # 所以改由題庫資料回答（`per_person_sections`），與 `expected_sections` 同一
             # 種手法：b §8 明講從指令推導輸出結構是語意判斷，那就把判斷留在資料裡，程式
-            # 只讀不推。19 題可多人的題目裡只有 Q15／Q21／Q22 是 True。
+            # 只讀不推。v10 可多人的 20 題裡只有 Q12／Q14／Q22／Q26 是 True。
             #
             # False 的題目退回「有沒有寫到這個人」（整篇比對），而且**只記錄不補**——
             # 2026-08-18 req 5017a070 那種照主題分段的合作題，硬接就是 E-12 的形狀。

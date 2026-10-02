@@ -5,7 +5,7 @@ table identifies questions by `idx` plus a Chinese title, with no shared key -- 
 client's README lists this as an open integration gap ("未補前選題無法自動對接").
 
 The correspondence already exists in practice: `quick_modules.json` and the question
-table hold the same 22 entries, in the same order, with identical titles. But it lives
+table hold the same 28 entries (22 before v10), in the same order, with identical titles. But it lives
 only in the fact that two files happen to be sorted the same way, which breaks silently
 the first time either side inserts or reorders an entry.
 

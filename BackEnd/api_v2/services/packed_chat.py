@@ -14,7 +14,7 @@ the point of the segment gate: nothing reaches the browser until it has been sca
 
 拒絕的四種情形，各有自己的錯誤碼（見 `PackerRefused`）：
   * 沒有可解析的受測者（含完全沒帶 trait_reports 的請求）
-  * `module_id` 不在題庫（`module_map` 在 import 時就驗過 22 個模組全部對得上，
+  * `module_id` 不在題庫（`module_map` 在 import 時就驗過 28 個模組全部對得上，
     所以這只會是客戶端送了未知的 id）
   * 題目的 audience 與受測者人數不符——spec b §1.1 要求拒絕。舊路徑是安靜地改用另一份
     prompt，這正是 D2 要終結的那種降級。

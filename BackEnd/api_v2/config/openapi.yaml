@@ -308,13 +308,14 @@ components:
               properties:
                 categories:
                   type: object
-                  description: 以分類名稱為 key，模組清單為 value
+                  description: 以分類名稱為 key，模組清單為 value；key 的順序即顯示順序（選才深度掃描→管理技能工具箱→團隊合作沙盤→留才培育嚮導→職安管理護盾）
                   additionalProperties:
                     type: array
                     items: { $ref: '#/components/schemas/ModuleItem' }
                   example:
-                    招募:
-                      - { id: recruit_interview, label: 面試問題推薦, mode: single }
+                    選才深度掃描:
+                      - { id: recruit_interview, label: 個人化面試題本, mode: single_only }
+                      - { id: recruit_strengths, label: 工作優勢與發展摘要, mode: both }
 
     # ── Admin ─────────────────────────────────────────────────
     AdminLoginResponse:
