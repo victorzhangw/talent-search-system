@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import sys
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

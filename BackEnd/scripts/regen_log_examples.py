@@ -41,6 +41,7 @@ import argparse
 import difflib
 import os
 import sys
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -109,10 +110,9 @@ def main():
             print(l)
 
         if out_dir:
-            new_name = filename.replace('_v8_260917.txt', '_v9_V7.txt')
-            if new_name == filename:
-                new_name = os.path.splitext(filename)[0] + '_v9_V7.txt'
-            path = os.path.join(out_dir, new_name)
+            # 沿用原檔名：輸出目錄本來就與基準目錄不同，版本由目錄名表達。原本把
+            # `_v8_260917` 換成 `_v9_V7` 的寫法，輸入換成 v9 之後會疊成 `_v9_V7_v9_V7`。
+            path = os.path.join(out_dir, filename)
             with open(path, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(actual) + '\n')
             print(f'\n[Regen] 已寫出 {path}')
