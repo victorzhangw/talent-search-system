@@ -117,7 +117,7 @@ def main():
           bool(narrow.scan('這與 CIA_05 有關')))
 
     print('\n[6] Built from a real assembly')
-    q = table.get('如何面對困難、壓力、挑戰')
+    q = table.get('工作壓力支持')
     r = [Respondent('王智弘', 'RESP_R2', {'CIA_05': 'B', 'CIA_01': 'A', 'CIA_33': 'A'})]
     log = assemble(r, q)
     scanner = ExitScanner.for_log(log)

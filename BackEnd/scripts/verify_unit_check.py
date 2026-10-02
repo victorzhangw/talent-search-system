@@ -24,9 +24,9 @@ from api_v2.services.unit_check import run_unit_checks  # noqa: E402
 PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
                    'Traitty_調整_20260728＿final')
 CASES = [
-    ('新版LOG範例_匡列型_壓力題_v7.txt', '如何面對困難、壓力、挑戰'),
-    ('新版LOG範例_全人型_雙測驗_v7.txt', '個人使用說明書(主管)'),
-    ('新版LOG範例_多人型_會議團隊_v7.txt', '打造高效會議團隊'),
+    ('新版LOG範例_匡列型_壓力題_v7.txt', '工作壓力支持'),
+    ('新版LOG範例_全人型_雙測驗_v7.txt', '主管帶人速查手冊'),
+    ('新版LOG範例_多人型_會議團隊_v7.txt', '團隊會議運作指南'),
 ]
 
 RESPONDENT_RE = re.compile(r'^### \[受測者 \| (.+?) \| (.+?)\]$')
@@ -119,7 +119,8 @@ def main():
           all('- CIA_01_A｜' not in p.message for p in
               run_unit_checks(text, respondents, question, scoped)))
     # Questions 21/22 spell out ids inside the instruction on purpose.
-    q21 = table.get('領導風格與潛能分析')
+    q21 = dict(table.get('領導發展深度分析'))
+    q21['instruction_single'] = '例：自主領導（ANI_05）高者。\n' + q21['instruction_single']
     r = [Respondent('甲', 'R1', {'ANI_01': 'A', 'ANI_05': 'A'})]
     s21 = {'R1': split_traits(r[0].scores, q21).scoped_ids}
     log21 = assemble(r, q21)

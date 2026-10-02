@@ -41,9 +41,9 @@ def sections_answer(q, headings, extra_body=''):
 
 
 def main():
-    q5 = table.get('如何面對困難、壓力、挑戰')          # per_person_sections=False
-    qpp = table.get('領導風格與潛能分析')                # per_person_sections=True
-    q13 = table.get('有效的溝通方法／模式')              # per_person_sections=False（req ecae89f3）
+    q5 = table.get('工作壓力支持')          # per_person_sections=False
+    qpp = table.get('領導發展深度分析')                # per_person_sections=True
+    q13 = table.get('個人化溝通建議')              # per_person_sections=False（req ecae89f3）
     r1 = [Respondent('王智弘', 'R1', {'CIA_05': 'B'})]
 
     print('\n[1] Heading matching -- the spec acceptance table')
@@ -127,8 +127,10 @@ def main():
           res.missing_sections)
 
     print('\n[3] Empty expected_sections must be logged, never silently passed')
-    for idx in (14, 15, 22):
-        q = table.get(idx)
+    # v10 起沒有任何一題刻意留空，改用合成題目驗「留空必記錄」這條路徑本身。
+    for idx in (12, 14, 22):
+        q = dict(table.get(idx), expected_sections_single=[], expected_sections_multi=[],
+                 expected_sections_note='fixture: 驗 skip 路徑')
         n = 2 if q['audience'] == 'multi_only' else 1
         rs = [Respondent(f'受測者{i}', f'R{i}', {'CIA_05': 'B'}) for i in range(1, n + 1)]
         res = check_answer('任意回答', rs, q, CALIB)
@@ -305,8 +307,8 @@ def main():
     # Q13 通篇寫「對象組合」，一句要求逐人的話都沒有；但 2026-09-08 req ecae89f3 的第 4 節
     # 寫成 `- **與洪 玉芳溝通時：** …`，三個這種標籤讓判定以為「這篇是照人分段的」，
     # 於是把寫在內文裡的其餘 8 位全判成漏人，補生成硬接了 1202 字重複的人名清單。
-    check('Q15 / Q21 / Q22 是 per_person_sections=True，其餘為 False',
-          [q['idx'] for q in table.all() if q.get('per_person_sections')] == [15, 21, 22],
+    check('Q12 / Q14 / Q22 / Q26 是 per_person_sections=True，其餘為 False',
+          [q['idx'] for q in table.all() if q.get('per_person_sections')] == [12, 14, 22, 26],
           [q['idx'] for q in table.all() if q.get('per_person_sections')])
     # 段落要寫齊，否則 appendable_reason() 會混進「缺少段落」，測不到受測者那一半。
     prefixed = (sections_answer(q13, expected_sections_for(q13, 2)[0])

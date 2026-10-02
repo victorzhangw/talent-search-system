@@ -24,9 +24,9 @@ PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0730',
 
 # example file -> the question it was rendered from
 CASES = [
-    ('新版LOG範例_匡列型_壓力題_v7.txt', '如何面對困難、壓力、挑戰'),
-    ('新版LOG範例_全人型_雙測驗_v7.txt', '個人使用說明書(主管)'),
-    ('新版LOG範例_多人型_會議團隊_v7.txt', '打造高效會議團隊'),
+    ('新版LOG範例_匡列型_壓力題_v7.txt', '工作壓力支持'),
+    ('新版LOG範例_全人型_雙測驗_v7.txt', '主管帶人速查手冊'),
+    ('新版LOG範例_多人型_會議團隊_v7.txt', '團隊會議運作指南'),
 ]
 
 RESPONDENT_RE = re.compile(r'^### \[受測者 \| ')
@@ -81,7 +81,7 @@ def main():
                 check(f'{label}: scoped emits the index header', INDEX_HEADER in chunk)
 
     print('\n[Rules that the examples alone would not catch]')
-    q = table.get('如何面對困難、壓力、挑戰')
+    q = table.get('工作壓力支持')
 
     # Calibration traits must stay in the index unless the question scopes them.
     P = {'CIA_05': 'B', 'CIA_33': 'A', 'CIA_01': 'A'}

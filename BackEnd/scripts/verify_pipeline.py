@@ -38,20 +38,20 @@ def tokens(text, size=7):
 
 def main():
     print('\n[1] 事項 04: module_id <-> question')
-    check('all 22 modules map', len(module_map) == 22, len(module_map))
+    check('all 28 modules map', len(module_map) == 28, len(module_map))
     check('recruit_interview -> idx 1', module_map.idx_for('recruit_interview') == 1)
-    check('team_meeting -> idx 15', module_map.idx_for('team_meeting') == 15)
-    check('reverse lookup works', module_map.module_for(15) == 'team_meeting')
+    check('team_meeting -> idx 12', module_map.idx_for('team_meeting') == 12)
+    check('reverse lookup works', module_map.module_for(12) == 'team_meeting')
     check('unknown module returns None', module_map.idx_for('nope') is None)
     check('question_for returns the row',
-          module_map.question_for('recruit_interview')['title'] == '快速面試提問指南')
+          module_map.question_for('recruit_interview')['title'] == '個人化面試題本')
     check('mapping is by title, not position',
           all(module_map.question_for(m)['title'] == cfg['display_name']
               for m, cfg in module_map.modules.items()))
     check('an inconsistent mapping raises instead of degrading',
           _rejects_bad_mapping())
 
-    q5 = table.get('如何面對困難、壓力、挑戰')
+    q5 = table.get('工作壓力支持')
     r1 = [Respondent('王智弘', 'R1', {'CIA_01': 'A', 'CIA_05': 'B', 'CIA_33': 'A'})]
     sections = q5['expected_sections']
     good = ''.join(f'{i + 1}. {s}\n以行為事例佐證其表現。\n\n' for i, s in enumerate(sections))
@@ -81,7 +81,7 @@ def main():
     check('question_id is the idx', audit['question_id'] == q5['idx'])
 
     print('\n[4] Leak -> rewrite follow-up')
-    leaky = ('1. 壓力情境下的典型反應模式\n他的 CIA_05 表現尚可。\n\n'
+    leaky = (f'1. {sections[0]}\n他的 CIA_05 表現尚可。\n\n'
              + ''.join(f'{i + 2}. {s}\n以行為事例佐證。\n\n'
                        for i, s in enumerate(sections[1:])))
     prompts = []
@@ -89,8 +89,8 @@ def main():
     def followup(messages, instruction):
         prompts.append((messages, instruction))
         if instruction.startswith('上一段輸出'):
-            return '1. 壓力情境下的典型反應模式\n他在壓力下的自我控制表現尚可。\n\n'
-        return '4. 恢復與調適建議\n安排交付後緩衝期。\n\n'
+            return f'1. {sections[0]}\n他在壓力下的自我控制表現尚可。\n\n'
+        return f'{len(sections)}. {sections[-1]}\n安排交付後緩衝期。\n\n'
 
     pipe = LogPipeline(r1, q5, followup_fn=followup)
     out = ''.join(pipe.stream(lambda m: tokens(leaky)))
@@ -137,7 +137,7 @@ def main():
 
     print('\n[7] audience is enforced before the model is called')
     called = []
-    single_only = table.get('快速面試提問指南')
+    single_only = table.get('個人化面試題本')
     two = r1 + [Respondent('林孟德', 'R2', {'CIA_01': 'A'})]
     try:
         LogPipeline(two, single_only)

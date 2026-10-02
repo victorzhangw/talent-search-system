@@ -36,13 +36,17 @@ from verify_system_prompt import strip_language_rule  # noqa: E402
 # 產出的，而 DB 已匯入 V7，基準與資料不同版本就不可能綠。新範例由
 # scripts/regen_log_examples.py 以同一批受測者、同一題重跑產生，總行數與原範例
 # 完全相同（294 / 860 / 1139），差異只有內容文字。
-PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0918',
-                   '範例_V7_已簽核')
+# 2026-10-02：改指 1002 的 v10 範例。客戶 2026-10-01 的快速提問正本把 22 題指令全部
+# 改寫，而範例的 [任務指令] 區是指令正本的複本，舊範例因此必然紅。依使用者 2026-10-02
+# 指示「以客戶現在的文件為準」，以同一批受測者重產，未另行送客戶簽核。已實測三份在
+# [任務指令] 之前與 0918 簽核版 0 行差異，差異只在指令區，且該區逐字等於客戶正本。
+PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '1002',
+                   '範例_V10_依客戶正本')
 
 CASES = [
-    ('07_新版LOG範例_匡列型_壓力題_v9_V7.txt', '如何面對困難、壓力、挑戰'),
-    ('06_新版LOG範例_全人型_雙測驗_v9_V7.txt', '個人使用說明書(主管)'),
-    ('08_新版LOG範例_多人型_會議團隊_v9_V7.txt', '打造高效會議團隊'),
+    ('07_新版LOG範例_匡列型_壓力題_v10.txt', '工作壓力支持'),
+    ('06_新版LOG範例_全人型_雙測驗_v10.txt', '主管帶人速查手冊'),
+    ('08_新版LOG範例_多人型_會議團隊_v10.txt', '團隊會議運作指南'),
 ]
 
 RESPONDENT_RE = re.compile(r'^### \[受測者 \| (.+?) \| (.+?)\]$')
@@ -168,19 +172,19 @@ def main():
     one = [Respondent('甲', 'R1', {'CIA_01': 'A'})]
     two = one + [Respondent('乙', 'R2', {'CIA_01': 'A'})]
 
-    single_only = table.get('快速面試提問指南')
+    single_only = table.get('個人化面試題本')
     check('single_only + 2 respondents -> rejected',
           _raises(lambda: check_audience(two, single_only)))
     check('single_only + 1 respondent -> accepted',
           not _raises(lambda: check_audience(one, single_only)))
 
-    multi_only = table.get('打造高效會議團隊')
+    multi_only = table.get('團隊會議運作指南')
     check('multi_only + 1 respondent -> rejected',
           _raises(lambda: check_audience(one, multi_only)))
     check('multi_only + 2 respondents -> accepted',
           not _raises(lambda: check_audience(two, multi_only)))
 
-    both = table.get('如何面對困難、壓力、挑戰')
+    both = table.get('工作壓力支持')
     check('both accepts either count',
           not _raises(lambda: check_audience(one, both))
           and not _raises(lambda: check_audience(two, both)))
@@ -221,7 +225,7 @@ def main():
     # 2026-09-08 req e332a385：名單 11 位、11 份特質全送，模型寫「根據您提供的八位成員
     # 特質資料」，逐人分析只寫 7 位。題庫題原本不加名單區塊是為了維持 v7 的 0 差異，
     # 那份範例只有 2 個人——這個取捨在 11 人的規模下不成立。
-    pp = table.get('領導風格與潛能分析')          # per_person_sections=True
+    pp = table.get('領導發展深度分析')          # per_person_sections=True
     quiz_multi = assemble(two, both).instruction    # 如何面對困難…＝False
     check('題庫題 also carries the roster block (req e332a385)',
           quiz_multi.startswith(ROSTER_MARKER), repr(quiz_multi[:30]))

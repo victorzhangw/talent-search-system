@@ -40,7 +40,7 @@ def check(label, condition, detail=''):
 
 
 def main():
-    q = table.get('打造高效會議團隊') or table.get('如何面對困難、壓力、挑戰')
+    q = table.get('團隊會議運作指南') or table.get('工作壓力支持')
     people = [Respondent('許品優', '55', {'CIA_05': 'B'}),
               Respondent('游品堯', '63', {'CIA_05': 'A'})]
     log = assemble(people, q)

@@ -56,7 +56,7 @@ def main():
           all(registry.types_for(t, b) for t in CALIB for b in 'ABC'))
 
     # The item's worked example: S = {CIA_16, CIA_18}, respondent also has CIA_33_A.
-    q = table.get('如何面對困難、壓力、挑戰')
+    q = table.get('工作壓力支持')
     S = scoped_of(q)
     check('the worked example is representative: CIA_16/CIA_18 scoped, CIA_33 not',
           {'CIA_16', 'CIA_18'} <= S and 'CIA_33' not in S)
@@ -161,8 +161,8 @@ def main():
     for trait_id, project in (('ANI_23', 'ANI'), ('SPA_12', 'SPA')):
         other = f'{project}_01'
         s2 = {trait_id: 'A', other: 'A'}
-        q_other = table.get('個人使用說明書(主管)')      # whole-person, so no index region
-        sp = split_traits(s2, table.get('如何面對困難、壓力、挑戰'))
+        q_other = table.get('主管帶人速查手冊')      # whole-person, so no index region
+        sp = split_traits(s2, table.get('工作壓力支持'))
         check(f'{trait_id} stays in the index when unscoped',
               (trait_id, 'A') in sp.index, sp.index)
         r4 = check_answer('內容。', [Respondent('王', 'R', s2)], q_other, CALIB)

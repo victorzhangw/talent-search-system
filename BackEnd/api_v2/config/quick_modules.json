@@ -1,112 +1,142 @@
 {
   "recruit_interview": {
-    "category": "招募",
-    "display_name": "快速面試提問指南",
+    "category": "選才深度掃描",
+    "display_name": "個人化面試題本",
     "candidate_mode": "single_only"
   },
   "recruit_strengths": {
-    "category": "招募",
-    "display_name": "工作中的主要優勢與潛力",
-    "candidate_mode": "both"
-  },
-  "recruit_team_role": {
-    "category": "招募",
-    "display_name": "在團隊合作中適合的角色",
+    "category": "選才深度掃描",
+    "display_name": "工作優勢與發展摘要",
     "candidate_mode": "both"
   },
   "recruit_risk": {
-    "category": "招募",
-    "display_name": "需注意的管理問題或潛在風險",
+    "category": "管理技能工具箱",
+    "display_name": "管理注意事項與因應",
     "candidate_mode": "both"
   },
   "mgmt_pressure": {
-    "category": "管理",
-    "display_name": "如何面對困難、壓力、挑戰",
+    "category": "管理技能工具箱",
+    "display_name": "工作壓力支持",
     "candidate_mode": "both"
   },
   "mgmt_style": {
-    "category": "管理",
-    "display_name": "合適的管理方式與風格",
-    "candidate_mode": "both"
-  },
-  "mgmt_leadership": {
-    "category": "管理",
-    "display_name": "展現何種領導風格",
+    "category": "管理技能工具箱",
+    "display_name": "帶領與授權建議",
     "candidate_mode": "both"
   },
   "mgmt_onboarding": {
-    "category": "管理",
-    "display_name": "入職前 90 天的帶領重點",
+    "category": "管理技能工具箱",
+    "display_name": "新人 90 天帶領",
     "candidate_mode": "both"
   },
   "mgmt_manual_mgr": {
-    "category": "管理",
-    "display_name": "個人使用說明書(主管)",
+    "category": "管理技能工具箱",
+    "display_name": "主管帶人速查手冊",
     "candidate_mode": "single_only"
   },
   "mgmt_manual_self": {
-    "category": "管理",
-    "display_name": "個人使用說明書(個人)",
+    "category": "管理技能工具箱",
+    "display_name": "我的合作說明書",
     "candidate_mode": "single_only"
   },
-  "mgmt_change": {
-    "category": "管理",
-    "display_name": "變動(AI/轉型)情境的角色與風險",
-    "candidate_mode": "both"
-  },
-  "mgmt_hipo": {
-    "category": "管理",
-    "display_name": "高潛人才識別要點",
-    "candidate_mode": "both"
-  },
   "team_comm": {
-    "category": "團隊合作",
-    "display_name": "有效的溝通方法／模式",
+    "category": "管理技能工具箱",
+    "display_name": "個人化溝通建議",
+    "candidate_mode": "both"
+  },
+  "recruit_team_role": {
+    "category": "團隊合作沙盤",
+    "display_name": "團隊角色與合作配置",
     "candidate_mode": "both"
   },
   "team_complement": {
-    "category": "團隊合作",
-    "display_name": "團隊合作的互補與摩擦",
+    "category": "團隊合作沙盤",
+    "display_name": "團隊合作調整",
     "candidate_mode": "both"
   },
   "team_meeting": {
-    "category": "團隊合作",
-    "display_name": "打造高效會議團隊",
+    "category": "團隊合作沙盤",
+    "display_name": "團隊會議運作指南",
     "candidate_mode": "multi_only"
   },
-  "retain_turnover": {
-    "category": "留才",
-    "display_name": "離職風險因素分析",
-    "candidate_mode": "both"
-  },
-  "retain_engagement": {
-    "category": "留才",
-    "display_name": "穩定性和投入度的驅動動機",
-    "candidate_mode": "both"
-  },
-  "dev_direction": {
-    "category": "培育發展",
-    "display_name": "培育重點與發展方向",
-    "candidate_mode": "both"
-  },
-  "dev_training": {
-    "category": "培育發展",
-    "display_name": "適合的培訓方式與學習節奏",
-    "candidate_mode": "both"
-  },
   "dev_assignment": {
-    "category": "培育發展",
-    "display_name": "適合承擔的任務與專案",
-    "candidate_mode": "both"
-  },
-  "deep_leadership": {
-    "category": "深度分析",
-    "display_name": "領導風格與潛能分析",
+    "category": "團隊合作沙盤",
+    "display_name": "任務類型與合作搭配",
     "candidate_mode": "both"
   },
   "deep_communication": {
-    "category": "深度分析",
-    "display_name": "高效溝通模式解析",
+    "category": "團隊合作沙盤",
+    "display_name": "深度溝通模式分析",
     "candidate_mode": "both"
+  },
+  "mgmt_leadership": {
+    "category": "留才培育嚮導",
+    "display_name": "帶隊風格與發展",
+    "candidate_mode": "both"
+  },
+  "mgmt_change": {
+    "category": "留才培育嚮導",
+    "display_name": "轉型參與與支持",
+    "candidate_mode": "both"
+  },
+  "mgmt_hipo": {
+    "category": "留才培育嚮導",
+    "display_name": "成長與培育觀察",
+    "candidate_mode": "both"
+  },
+  "retain_turnover": {
+    "category": "留才培育嚮導",
+    "display_name": "留才關懷與支持",
+    "candidate_mode": "both"
+  },
+  "retain_engagement": {
+    "category": "留才培育嚮導",
+    "display_name": "工作動機與激勵行動",
+    "candidate_mode": "both"
+  },
+  "dev_direction": {
+    "category": "留才培育嚮導",
+    "display_name": "個人培育重點",
+    "candidate_mode": "both"
+  },
+  "dev_training": {
+    "category": "留才培育嚮導",
+    "display_name": "個人化培育與學習",
+    "candidate_mode": "both"
+  },
+  "deep_leadership": {
+    "category": "留才培育嚮導",
+    "display_name": "領導發展深度分析",
+    "candidate_mode": "both"
+  },
+  "safety_improvement": {
+    "category": "職安管理護盾",
+    "display_name": "改善要求溝通",
+    "candidate_mode": "single_only"
+  },
+  "safety_delegation": {
+    "category": "職安管理護盾",
+    "display_name": "交辦與追蹤界線",
+    "candidate_mode": "single_only"
+  },
+  "safety_teaching": {
+    "category": "職安管理護盾",
+    "display_name": "工作教學與改善",
+    "candidate_mode": "single_only"
+  },
+  "safety_respect": {
+    "category": "職安管理護盾",
+    "display_name": "職場尊重與互動界線",
+    "candidate_mode": "multi_only"
+  },
+  "safety_care": {
+    "category": "職安管理護盾",
+    "display_name": "關懷談話與提問界線",
+    "candidate_mode": "single_only"
+  },
+  "safety_feedback": {
+    "category": "職安管理護盾",
+    "display_name": "員工反映預防與承接",
+    "candidate_mode": "single_only"
   }
 }

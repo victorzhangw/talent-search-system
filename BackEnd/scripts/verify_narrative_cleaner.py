@@ -26,11 +26,11 @@ from api_v2.services.narrative_cleaner import cleaner  # noqa: E402
 # 產出的，而 DB 已匯入 V7，基準與資料不同版本就不可能綠。新範例由
 # scripts/regen_log_examples.py 以同一批受測者、同一題重跑產生，總行數與原範例
 # 完全相同（294 / 860 / 1139），差異只有內容文字。
-PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '0918',
-                   '範例_V7_已簽核')
-EXAMPLES = ['07_新版LOG範例_匡列型_壓力題_v9_V7.txt',
-            '06_新版LOG範例_全人型_雙測驗_v9_V7.txt',
-            '08_新版LOG範例_多人型_會議團隊_v9_V7.txt']
+PKG = os.path.join(os.path.dirname(__file__), '..', '..', 'docs', '1002',
+                   '範例_V10_依客戶正本')
+EXAMPLES = ['07_新版LOG範例_匡列型_壓力題_v10.txt',
+            '06_新版LOG範例_全人型_雙測驗_v10.txt',
+            '08_新版LOG範例_多人型_會議團隊_v10.txt']
 
 HEADER_RE = re.compile(r'^\[交互 \| ([A-Z]{3}_\d+)_([ABC]) × ([A-Z]{3}_\d+)_([ABC]) \| (.+)\]$')
 TRAIT_ID_RE = re.compile(r'[A-Z]{3}_\d+')

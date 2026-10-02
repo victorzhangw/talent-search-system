@@ -104,7 +104,7 @@ def main():
 
     one = [Respondent('甲', 'R1', {'CIA_01': 'A'})]
     two = one + [Respondent('乙', 'R2', {'CIA_01': 'B'})]
-    q = table.get('如何面對困難、壓力、挑戰')
+    q = table.get('工作壓力支持')
     for label, log in (('題庫題單人', assemble(one, q)),
                        ('題庫題多人', assemble(two, q)),
                        ('自由提問', assemble(one, None, user_query='他適合帶新人嗎？')),

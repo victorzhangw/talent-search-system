@@ -38,7 +38,7 @@ def tokens_of(text, size=3):
 
 
 def main():
-    q5 = table.get('如何面對困難、壓力、挑戰')
+    q5 = table.get('工作壓力支持')
     r1 = [Respondent('王智弘', 'R1', {'CIA_05': 'B'})]
     scanner = ExitScanner(injected_names={'衝動管理'}, injected_labels={'情境波動'})
 
@@ -172,7 +172,8 @@ def main():
     print('\n[9] 補生成機制本身：走還活著的那條路（per_person 題的漏人）')
     # [8] 拿掉的是「段落缺漏要不要補」，不是補生成這個機制。機制仍然為 per_person 的
     # 多人題服務（Q15/Q21/Q22），所以改用那條路驗它還能不能正確呼叫、計數、不重寫。
-    q15 = table.get('打造高效會議團隊')
+    q15 = dict(table.get('團隊會議運作指南'), expected_sections_multi=[],
+               expected_sections_note='fixture: 只驗逐人補生成機制')
     two = [Respondent('王智弘', 'R1', {'CIA_05': 'B'}),
            Respondent('林孟德', 'R2', {'CIA_05': 'B'})]
     one_only = '## 王智弘\n\n他的內容。\n\n'

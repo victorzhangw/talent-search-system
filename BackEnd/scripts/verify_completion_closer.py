@@ -155,7 +155,7 @@ def verify_rewrite_closer():
     # 2026-09-19：素材由「缺段落」改成「per_person 題的漏人」——段落缺漏不再觸發
     # 補生成（見 completeness_check._missing_bits()），但補生成機制本身仍為多人題服務，
     # 這條斷言驗的是它與結語句的排序，所以換素材、不刪測試。
-    q = table.get('打造高效會議團隊')
+    q = table.get('團隊會議運作指南')
     two = [Respondent('王智弘', 'R1', {'CIA_05': 'B'}),
            Respondent('林孟德', 'R2', {'CIA_05': 'B'})]
     partial = '## 王智弘\n\n他的內容。\n\n'
@@ -233,7 +233,7 @@ def main():
     print('\n[9] 只有佐證措辭沒過 -> 不呼叫補生成，改判 manual_review')
     calib = sorted(table.calibration_traits)[0]
     r = [Respondent('張詠婕', 'R1', {calib: 'A'})]
-    q = table.get('如何面對困難、壓力、挑戰')
+    q = table.get('工作壓力支持')
     answer = '\n\n'.join(f'{s}\n內容內容內容。' for s in (q['expected_sections'] or []))
 
     called = []

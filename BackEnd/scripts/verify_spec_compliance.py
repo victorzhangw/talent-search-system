@@ -137,7 +137,7 @@ def main():
     print('\n[DoD 5] 標頭 ID 必須保留在 payload')
     from api_v2.services.question_table import table
     from api_v2.services.log_assembler import Respondent, assemble
-    q = table.get('如何面對困難、壓力、挑戰')
+    q = table.get('工作壓力支持')
     log = assemble([Respondent('王', 'R1', {'CIA_05': 'B', 'CIA_01': 'A', 'CIA_33': 'A'})], q)
     text = log.to_log_text()
     check('trait headers keep their ID', '[特質 | CIA_05_B |' in text)

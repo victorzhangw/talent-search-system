@@ -39,7 +39,7 @@ from typing import Dict, List, Optional
 from .interaction_selector import select_interactions
 from .log_system_prompt import load_system_prompt
 from .name_normalize import display_name, name_variants, resolve_roster_names
-from .question_table import QuestionTable
+from .question_table import QuestionTable, table as question_table
 from .trait_blocks import TraitBlockRenderer
 from .trait_splitter import split_traits, INDEX_HEADER
 
@@ -350,6 +350,8 @@ def assemble(respondents: List[Respondent], question: Optional[dict],
                                else 'scoped'),
         'audience': 'multi' if len(respondents) > 1 else 'single',
         'respondents': audits,
+        # 題號在 v10（2026-10-01）整批重編；沒有版本就分不出 question_id=5 是哪一題。
+        'question_table_version': question_table.version,
     }
     log = AssembledLog(body, instruction_text, audit,
                        injected_names={n for n in names if n},

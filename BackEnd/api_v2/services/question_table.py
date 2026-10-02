@@ -1,9 +1,12 @@
 """Access to the quick-question table (T1 in b §0).
 
-Runtime copy of the client's `question_injection_table_v9.json` lives in config/. The
-instruction text in it is the client's property -- `_source_of_truth` states the master
-is `c_快速提問重構版_v9.xlsx` and that only derived fields are regenerated -- so this
-module reads it and never rewrites it.
+Runtime copy of the client's question table lives in config/ (`question_injection_table_v10.json`
+since 2026-10-02). The instruction text in it is the client's property -- `_source_of_truth`
+states the master is `docs/1002/快速提問整合版_20261001_v2.xlsx` and that only derived fields
+are regenerated -- so this module reads it and never rewrites it.
+
+v10 renumbered every question (22 -> 28, `source_idx_0917` keeps the old number), so an
+`idx` read from an audit record only means something together with the table version.
 
 Questions are identified by `idx` (b §1.1: "請以 idx 為 question_id；title 僅供人閱").
 Mapping the frontend's `module_id` onto an idx is a separate, still-open item (事項 04).
@@ -22,7 +25,7 @@ import os
 from typing import Dict, Iterable, List, Optional
 
 _CONFIG = os.path.join(os.path.dirname(__file__), '..', 'config',
-                       'question_injection_table_v9.json')
+                       'question_injection_table_v10.json')
 
 WHOLE_PERSON = 'whole_person'
 SCOPED = 'scoped'
