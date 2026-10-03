@@ -160,15 +160,36 @@ def init_service():
     if rag_service is None:
         rag_service = RAGService()
 
+def owns_session(session_user_id, email) -> bool:
+    """這筆對話是不是 `email` 的。
+
+    兩邊都來自前端的 `currentUserEmail()`（存檔時是 payload 的 user_id，token 是用同一個
+    email 換的），所以正常情況下逐字相同；比對時仍去空白、不分大小寫，避免同一個人因為
+    大小寫不同而看不到自己的對話。沒有擁有者的對話（`anonymous`、空值）一律不算任何人的。
+    """
+    owner = (session_user_id or '').strip().lower()
+    return bool(owner) and owner != 'anonymous' and owner == (email or '').strip().lower()
+
+
 @bp.route('/history', methods=['GET', 'OPTIONS'])
 def get_user_history():
     if request.method == 'OPTIONS':
         return '', 200
         
-    user_id = request.args.get('user_id')
-    if not user_id:
-        return err('MISSING_FIELD', 'user_id parameter is required', 400, field='user_id')
-        
+    # 身分一律取自驗簽過的 token，不取 query string。原本直接用 `?user_id=`（就是 email），
+    # 不帶任何 token 也回 200——知道一個人的 email 就能列出他的對話清單，標題裡有受測者
+    # 姓名（2026-10-03 本機實測）。其餘 /api/v2/* 路由與 /chat/ 早就走 resolve_user_email，
+    # 只有這三條歷史路由漏掉。
+    #
+    # 舊版 widget 仍會帶 `user_id`，參數照收但不採用；與 token 不一致時記一筆，那代表前端
+    # 送錯或有人在試別人的 email。
+    user_id, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
+    claimed = (request.args.get('user_id') or '').strip()
+    if claimed and claimed.lower() != user_id.lower():
+        print(f"[History] user_id param ignored: does not match the token identity", flush=True)
+
     session_store = SqlSessionStore()
     sessions = session_store.get_user_sessions(user_id=user_id, days=30)
     
@@ -222,12 +243,17 @@ def get_user_history():
 def get_session_details(session_id):
     if request.method == 'OPTIONS':
         return '', 200
-        
+
+    email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
+
     session_store = SqlSessionStore()
     session = session_store.get_session(session_id)
-    if not session:
+    # 不是本人的對話與不存在的對話回同一個 404：回 403 等於告訴對方「這個 id 存在」。
+    if not session or not owns_session(session.user_id, email):
         return err('NOT_FOUND', 'Session not found', 404)
-        
+
     messages = session_store.get_messages(session_id)
     
     # 過濾掉 system role（如背景任務產生的系統訊息），並將 assistant → ai 以符合前端渲染規則
@@ -251,7 +277,11 @@ def get_session_details(session_id):
 def update_message_rating(message_id):
     if request.method == 'OPTIONS':
         return '', 200
-        
+
+    email, auth_error = resolve_user_email()
+    if auth_error:
+        return auth_error
+
     data = request.get_json()
     if not data or 'rating' not in data:
         return err('MISSING_FIELD', 'rating is required', 400, field='rating')
@@ -259,6 +289,9 @@ def update_message_rating(message_id):
     rating = int(data['rating'])
 
     session_store = SqlSessionStore()
+    # 訊息 id 是連號整數，比 session id 好猜得多；只有該對話的擁有者能評分。
+    if not owns_session(session_store.get_message_owner(message_id), email):
+        return err('NOT_FOUND', 'Message not found or update failed', 404)
     success = session_store.update_message_rating(message_id, rating)
 
     if success:

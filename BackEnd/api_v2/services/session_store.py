@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import json
@@ -96,6 +97,17 @@ class SqlSessionStore:
         finally:
             db.close()
 
+    def get_message_owner(self, message_id: int):
+        """這則訊息所屬對話的 user_id；訊息不存在回 None。"""
+        db = get_db_session()
+        try:
+            row = db.query(ChatSession.user_id).join(
+                ChatMessage, ChatMessage.session_id == ChatSession.session_id
+            ).filter(ChatMessage.id == message_id).first()
+            return row[0] if row else None
+        finally:
+            db.close()
+
     def get_session(self, session_id: str):
         db = get_db_session()
         try:
@@ -107,8 +119,10 @@ class SqlSessionStore:
         db = get_db_session()
         try:
             cutoff_date = datetime.utcnow() - timedelta(days=days)
+            # 不分大小寫，與 routes/chat.py 的 owns_session() 同一套比對——列表看得到的
+            # 對話一定點得開，點得開的也一定列得出來。
             sessions = db.query(ChatSession).filter(
-                ChatSession.user_id == user_id,
+                func.lower(ChatSession.user_id) == (user_id or '').strip().lower(),
                 ChatSession.last_active_at >= cutoff_date
             ).order_by(ChatSession.last_active_at.desc()).all()
             return sessions

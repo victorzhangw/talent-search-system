@@ -522,24 +522,25 @@ paths:
       parameters:
         - name: user_id
           in: query
-          required: true
+          required: false
+          deprecated: true
           schema: { type: string, format: email }
-          description: 使用者 Email
+          description: 已不採用。身分一律取自 bearer token 的 email；舊版 widget 仍會帶，照收但忽略。
       responses:
         "200":
-          description: 成功，回傳今日與過去 30 天的 session 清單
+          description: 成功，回傳 token 本人今日與過去 30 天的 session 清單
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ChatHistoryResponse' }
-        "400":
-          description: 缺少 user_id 參數
+        "401":
+          description: 未帶 token、token 無效或過期（TOKEN_EXPIRED）
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
               example:
                 success: false
                 data: null
-                error: { code: MISSING_FIELD, message: user_id parameter is required, field: user_id }
+                error: { code: UNAUTHORIZED, message: 請先登入後再試 }
                 meta: null
 
   /chat/{session_id}:
@@ -559,8 +560,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SessionDetailResponse' }
+        "401":
+          description: 未帶 token、token 無效或過期
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         "404":
-          description: Session 不存在
+          description: Session 不存在，或不屬於 token 本人（兩者刻意回相同結果，避免洩漏 id 是否存在）
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
@@ -601,8 +607,13 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "401":
+          description: 未帶 token、token 無效或過期
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         "404":
-          description: 訊息不存在
+          description: 訊息不存在，或所屬對話不屬於 token 本人
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
