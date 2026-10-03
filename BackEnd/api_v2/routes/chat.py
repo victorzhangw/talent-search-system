@@ -352,19 +352,50 @@ def chat():
     # 防不到這一類——它管的是洩漏內部標記，不管無中生有。
     #
     # 只擋「有指定受測者」的請求：沒選受測者的一般對話本來就不需要特質資料。
-    if (module_id or candidate_ids) and candidates_info:
-        missing = [c for c in candidates_info
-                   if str(c.get('candidate_id')) not in {str(k) for k in (trait_reports or {})}]
-        if missing:
-            # 從未受測與「報告還沒送到」是兩回事：前者重試永遠不會好，訊息必須不同。
-            no_assessment = [c for c in missing if not c.get('latest_assessment')]
-            names = '、'.join(str(c.get('name') or c.get('candidate_id')) for c in missing)
-            if len(no_assessment) == len(missing):
+    #
+    # 基準是 `candidate_ids`，與 `packed_chat.apply_roster` 同一份名單。原本是走訪
+    # `candidates_info`，那是單向的 `candidates_info ⊆ trait_reports`——名單上有、而
+    # `candidates_info` 裡沒有的人，這道門完全看不到。2026-09-20 就是這樣放行的：名單 8
+    # 位、`candidates_info` 7 位，第 8 位沒有報告也沒有資料列，打包器直接把他丟掉，使用者
+    # 拿到一份只涵蓋 7 個人、卻沒有任何異常提示的回答。
+    #
+    # 舊版 widget 可能只送 `candidates_info` 不送 `candidate_ids`，那就退回用前者，行為不變。
+    info_by_id = {str(c.get('candidate_id')): c for c in (candidates_info or [])
+                  if c.get('candidate_id') is not None}
+    roster_ids, seen_ids = [], set()
+    for cid in ([str(c) for c in candidate_ids] if candidate_ids else list(info_by_id)):
+        if cid not in seen_ids:           # candidate_ids 可能有重複
+            seen_ids.add(cid)
+            roster_ids.append(cid)
+
+    if (module_id or candidate_ids) and roster_ids:
+        have = {str(k) for k in (trait_reports or {})}
+        absent = [cid for cid in roster_ids if cid not in have]
+        # 三種缺法要分開處置。混在一起講會給出假的指示——「請稍候幾秒後再送出」對前兩種
+        # 都是錯的，使用者會一直重試一個永遠不會好的請求。
+        #
+        #   unlisted   名單上有、`candidates_info` 沒有 -> 前端送壞了，要重選
+        #   unassessed 有資料列、但從未受測             -> 重試永遠不會好
+        #   pending    有評測、報告還在路上             -> 等幾秒就好
+        unlisted = [cid for cid in absent if cid not in info_by_id]
+        listed = [info_by_id[cid] for cid in absent if cid in info_by_id]
+
+        if unlisted:
+            print(f"[Chat] Rejected: {len(unlisted)} of {len(roster_ids)} candidate_ids have "
+                  f"no candidates_info entry: {unlisted} -- the client sent an inconsistent "
+                  f"roster, so these people would silently vanish from the answer", flush=True)
+            return err('ROSTER_INCOMPLETE',
+                       '分析對象的名單不完整，請重新選擇人選後再提問。', 422)
+
+        if listed:
+            names = '、'.join(str(c.get('name') or c.get('candidate_id')) for c in listed)
+            unassessed = [c for c in listed if not c.get('latest_assessment')]
+            if len(unassessed) == len(listed):
                 print(f"[Chat] Rejected: no assessment on file for {names}", flush=True)
                 return err('NO_ASSESSMENT_DATA',
                            f'{names} 尚無評測資料，無法進行特質判讀。', 422)
             print(f"[Chat] Rejected: trait reports not yet loaded for {names} "
-                  f"(got {len(trait_reports or {})} of {len(candidates_info)})", flush=True)
+                  f"(got {len(have)} of {len(roster_ids)})", flush=True)
             return err('TRAIT_REPORTS_NOT_READY',
                        '特質資料尚未載入完成，請稍候幾秒後再送出。', 409)
 

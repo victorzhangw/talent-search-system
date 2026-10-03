@@ -159,8 +159,13 @@ export function useChatLogic(emit) {
     // `openNewTab` 存進 localStorage 的 `selectedCandidates` 也一樣。
     //
     // 同一個 filter 還決定送給後端的 `candidates_info`，而 `chat.py` 的守門是
-    // `candidates_info ⊆ trait_reports` 單向檢查，截短永遠不會被擋——掉了姓名的人在
-    // payload 裡會變成 `Candidate-<id>`。
+    // `candidates_info ⊆ trait_reports` 單向檢查，截短永遠不會被擋。2026-09-20 就這樣
+    // 掉了一位：名單 8 位、payload 只有 7 位，而且那位連 `Candidate-<id>` 都沒變成——
+    // 他沒有特質報告，`apply_roster` 直接不把他放進 payload。
+    //
+    // 補這個 ref 只解決了「畫面顯示」；真正的來源問題是那個 filter 本身，已由
+    // `resolveCandidateObjects()` 取代——寫入這個 ref 的兩條路徑（lockSelectionAndStart、
+    // addCandidates）現在都先把物件湊齊才決定名單。
     const activeCandidateObjects = ref([])
 
     const isLoadingCandidates = ref(false)
@@ -435,6 +440,68 @@ export function useChatLogic(emit) {
 
         // Close the widget in current window if emit is provided
         if (emit) emit('close')
+    }
+
+    /** 依 id 取回完整人物件；`candidates.value` 沒有的就跟後端要。
+     *
+     * 為什麼不能只查 `candidates.value`：它是**當前分頁或搜尋結果**，`fetchCandidates(false)`
+     * 會把它整個取代掉。而選取視窗裡的勾選是跨搜尋累積的（CandidateSelector 的
+     * `selectedIds`），兩者一搭，只要使用者在按下確認之前換過搜尋字串，先前勾的人就查不到
+     * 物件了。
+     *
+     * 2026-09-20 就是這樣掉人的：搜「古承翔」勾起來、再搜「吳」勾四位、按確認新增——名單
+     * 進了 8 位，反查得到物件的只有 7 位。掉了物件就等於掉了 `latest_assessment`，他的特質
+     * 報告從頭到尾沒被抓，`candidates_info` 也少一筆；畫面顯示 8 位，回答只涵蓋 7 位，而
+     * `chat.py` 的守門是 `candidates_info ⊆ trait_reports` 單向檢查，擋不到這種截短。
+     *
+     * 回傳 { found, missing }。`missing` 是連後端都查不到的人（上游已刪除或停用），呼叫端
+     * **不可以**把他們放進鎖定名單——那只是換一條路徑製造出一模一樣的「id 在、物件不在」。
+     */
+    const resolveCandidateObjects = async (ids) => {
+        const wanted = (ids || []).map(String)
+        if (wanted.length === 0) return { found: [], missing: [] }
+
+        const byId = new Map()
+        for (const c of candidates.value) {
+            if (c && c.candidate_id != null) byId.set(String(c.candidate_id), c)
+        }
+
+        // 多數情況下這是空的（沒搜尋過，整份名單都在清單裡），不會多打一次後端。
+        const unresolved = wanted.filter(id => !byId.has(id))
+        if (unresolved.length > 0) {
+            const { apiBaseUrl } = getApiConfig()
+            try {
+                const res = await authFetch(`${apiBaseUrl}/candidates/by-ids`
+                    + `?ids=${unresolved.map(encodeURIComponent).join(',')}`)
+                if (res.ok) {
+                    const resp = await res.json()
+                    const rows = resp.success ? (resp.data ?? []) : []
+                    for (const c of rows) {
+                        if (c && c.candidate_id != null) {
+                            // 補 `id`：清單與鎖定晶片共用這個欄位（`fetchCandidates` 也是這樣
+                            // 補的），而 /by-ids 回的是未加工的上游物件。少了它，晶片上的移除
+                            // 鈕會送 undefined 進 removeCandidate，按了沒反應。
+                            byId.set(String(c.candidate_id), { ...c, id: c.candidate_id })
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[ChatLogic] Failed to resolve candidate objects by ids:', e)
+            }
+        }
+
+        // 順序跟著呼叫端給的 ids 走，RESP_nn 的編號依賴它。
+        const found = []
+        const missing = []
+        for (const id of wanted) {
+            const c = byId.get(id)
+            if (c) found.push(c)
+            else missing.push(id)
+        }
+        if (missing.length > 0) {
+            console.warn('[ChatLogic] These candidate ids could not be resolved:', missing)
+        }
+        return { found, missing }
     }
 
     // Reports
@@ -959,16 +1026,18 @@ export function useChatLogic(emit) {
         if (selectedCandidateIds.value.length === 0) return
 
         const ids = selectedCandidateIds.value
-        // Logic: Promote UI selection to Active Conversation
-        activeConversationCandidateIds.value = [...ids]
 
-        // Identify objects for report fetching
-        const selectedCandidates = candidates.value.filter(c => idIncludes(ids, c.candidate_id))
+        // 先把人物件湊齊，再決定名單——不能拿 `candidates.value` 過濾，搜尋過的話它已經
+        // 不是完整母體了（見 resolveCandidateObjects）。
+        const { found: selectedCandidates, missing } = await resolveCandidateObjects(ids)
+        // 名單只收解析得到的人：id 進了名單而物件沒進，就是 0920 那個 bug 的形狀。
+        const lockedIds = selectedCandidates.map(c => c.candidate_id)
+        activeConversationCandidateIds.value = lockedIds
         rememberActiveCandidates(selectedCandidates)
 
         // Save to Session Storage for New Tab Restoration
         try {
-            sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(ids))
+            sessionStorage.setItem('traitty_session_active_ids', JSON.stringify(lockedIds))
             sessionStorage.setItem('traitty_selected_candidates', JSON.stringify(selectedCandidates))
         } catch (e) {
             console.error('[ChatContainer] Failed to save to Session Storage:', e)
@@ -990,7 +1059,10 @@ export function useChatLogic(emit) {
         // Push Helper Message
         messages.value.push({
             role: 'ai',
-            content: `已鎖定 ${ids.length} 位候選人。您現在可以針對他們進行提問。`
+            content: `已鎖定 ${lockedIds.length} 位候選人。您現在可以針對他們進行提問。`
+                + (missing.length > 0
+                    ? `有 ${missing.length} 位的資料已無法取得（可能已被刪除或停用），未納入本次分析。`
+                    : '')
         })
     }
 
@@ -1106,11 +1178,21 @@ export function useChatLogic(emit) {
         const realNewIds = newIds.filter(id => !idIncludes(activeConversationCandidateIds.value, id))
         if (realNewIds.length === 0) return
 
-        // 找出新增候選人的完整物件
-        const newCandidateObjects = candidates.value.filter(c => idIncludes(realNewIds, c.candidate_id))
+        // 找出新增候選人的完整物件。不能拿 `candidates.value` 過濾——使用者在按下確認之前
+        // 換過搜尋字串的話，先前勾的人已經不在那份清單裡了（見 resolveCandidateObjects）。
+        const { found: newCandidateObjects, missing } = await resolveCandidateObjects(realNewIds)
+        if (newCandidateObjects.length === 0) {
+            messages.value.push({
+                role: 'ai',
+                content: '所選人選的資料已無法取得（可能已被刪除或停用），未新增任何人。'
+            })
+            return
+        }
 
-        // 將新 IDs 合併到現有對話
-        const mergedIds = [...activeConversationCandidateIds.value, ...realNewIds]
+        // 只合併解析得到的人。解析不到的 id 不得進名單：進了名單而沒有物件，就會少一筆
+        // `candidates_info`、少一份特質報告，而畫面上的人數照樣加上去。
+        const addedIds = newCandidateObjects.map(c => c.candidate_id)
+        const mergedIds = [...activeConversationCandidateIds.value, ...addedIds]
 
         // 僅對新增候選人抓報告（增量）
         await trackTraitReportsFetch(fetchBatchTraitReportsIncremental(newCandidateObjects))
@@ -1131,7 +1213,10 @@ export function useChatLogic(emit) {
         // AI 提示訊息
         messages.value.push({
             role: 'ai',
-            content: `已新增 ${realNewIds.length} 位候選人，目前共鎖定 ${mergedIds.length} 位。您可繼續針對他們發問。`
+            content: `已新增 ${addedIds.length} 位候選人，目前共鎖定 ${mergedIds.length} 位。您可繼續針對他們發問。`
+                + (missing.length > 0
+                    ? `有 ${missing.length} 位的資料已無法取得（可能已被刪除或停用），未納入本次分析。`
+                    : '')
         })
     }
 
@@ -1227,8 +1312,10 @@ export function useChatLogic(emit) {
             // Using activeConversationCandidateIds here!
             const activeIds = activeConversationCandidateIds.value
             // Define activeCandidates for usage in body.
-            // 不能再拿分頁清單過濾：鎖定的人不在當前頁就會從 candidates_info 掉出去，
-            // 而後端的守門是 candidates_info ⊆ trait_reports 單向檢查，擋不到截短。
+            // 不能再拿分頁／搜尋清單過濾：那份清單不是完整母體，鎖定的人只要不在裡面就會
+            // 從 candidates_info 掉出去，而後端的守門是 candidates_info ⊆ trait_reports
+            // 單向檢查，擋不到截短。名單與物件的一致性改在寫入端保證（見
+            // resolveCandidateObjects），這裡直接用鎖定名單。
             const activeCandidates = activeConversationCandidatesObjects.value
 
             // 快速提問時攜帶 module_id。這也是後端唯一用來分辨「題庫題／自由提問」的欄位——
@@ -1276,7 +1363,8 @@ export function useChatLogic(emit) {
                     throw new Error("QUOTA_EXCEEDED")
                 }
                 // 後端拒絕了「有選受測者但沒有特質報告」的請求，而不是讓模型憑姓名編答案。
-                // 兩者的處置不同：尚未載入可重試，尚無評測資料重試永遠不會好。
+                // 三者的處置不同：尚未載入可重試，尚無評測資料重試永遠不會好，名單不完整
+                // 則要重選人選——訊息由後端給，這裡只負責原樣顯示。
                 if (response.status === 409 || response.status === 422) {
                     let code = ''
                     let message = ''
@@ -1285,7 +1373,8 @@ export function useChatLogic(emit) {
                         code = body?.error?.code || ''
                         message = body?.error?.message || ''
                     } catch (e) { }
-                    if (code === 'TRAIT_REPORTS_NOT_READY' || code === 'NO_ASSESSMENT_DATA') {
+                    if (code === 'TRAIT_REPORTS_NOT_READY' || code === 'NO_ASSESSMENT_DATA'
+                        || code === 'ROSTER_INCOMPLETE') {
                         const e = new Error(code)
                         e.userMessage = message
                         throw e
@@ -1363,7 +1452,8 @@ export function useChatLogic(emit) {
             if (aiMsgIndex !== -1) {
                 if (e.message === 'QUOTA_EXCEEDED') {
                     messages.value[aiMsgIndex].content = '今日使用額度已達上限，請明天再試。'
-                } else if (e.message === 'TRAIT_REPORTS_NOT_READY' || e.message === 'NO_ASSESSMENT_DATA') {
+                } else if (e.message === 'TRAIT_REPORTS_NOT_READY' || e.message === 'NO_ASSESSMENT_DATA'
+                           || e.message === 'ROSTER_INCOMPLETE') {
                     // 後端給的訊息已針對兩種情形分別措辭，直接用，不要再包一層「請重試」。
                     messages.value[aiMsgIndex].content = e.userMessage
                         || '特質資料尚未載入完成，請稍候幾秒後再送出。'

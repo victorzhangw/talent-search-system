@@ -8,6 +8,7 @@ serve it or hand it back? Handing it back must be the outcome whenever anything 
 missing, because the caller then runs the untouched legacy route.
 """
 
+import logging
 import os
 import sys
 from datetime import datetime
@@ -20,7 +21,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'api_v2', '.env'), enc
 from sqlalchemy import text  # noqa: E402
 from api_v2.database.connection import get_db_engine  # noqa: E402
 from api_v2.services.packed_chat import (packed_stream, PackedStream, PackerRefused,  # noqa: E402
-                                         apply_roster)
+                                         apply_roster, packer_logger)
 from api_v2.services.respondent_adapter import from_trait_reports  # noqa: E402
 
 failures = []
@@ -30,6 +31,29 @@ def check(label, condition, detail=''):
     print(f"  [{'OK' if condition else 'FAIL'}] {label}{(' -- ' + str(detail)) if detail else ''}")
     if not condition:
         failures.append(label)
+
+
+class _CaptureWarnings(logging.Handler):
+    """收集 packer_logger 的 WARNING。
+
+    稽核欄位對了不等於有人會看到——欄位躺在 JSON 裡，警告才是實際會被注意到的東西。
+    這兩件事要分開驗。
+    """
+
+    def __init__(self):
+        super().__init__(level=logging.WARNING)
+        self.lines = []
+
+    def emit(self, record):
+        self.lines.append(record.getMessage())
+
+    def __enter__(self):
+        packer_logger.addHandler(self)
+        return self
+
+    def __exit__(self, *exc):
+        packer_logger.removeHandler(self)
+        return False
 
 
 class FakeRag:
@@ -271,9 +295,20 @@ def main():
     check('空清單同樣視為未指定', len(kept) == 3, sorted(kept))
     kept, _ = apply_roster({1: 'a', 2: 'b'}, ['1', 2], None, 'S14')
     check('int 與 str 混用的 id 比得起來', sorted(map(str, kept)) == ['1', '2'], sorted(kept))
-    kept, roster = apply_roster(stale, ['C1', 'C9'], info3, 'S14')
+    with _CaptureWarnings() as cap:
+        kept, roster = apply_roster(stale, ['C1', 'C9'], info3, 'S14')
     check('candidate_ids 有而 trait_reports 沒有的人不會炸',
           sorted(kept) == ['C1'] and roster['used'] == 1, roster)
+    check('而且記下是誰沒有報告，不是只留下 requested/used 的數字差',
+          roster.get('no_trait_report') == ['C9'], roster)
+    check('這件事會發出警告，不必靠人去比對兩個整數',
+          any('no trait report' in ln and 'C9' in ln for ln in cap.lines), cap.lines)
+    with _CaptureWarnings() as cap:
+        _, roster_clean = apply_roster(stale, ['C1', 'C3'], info3, 'S14')
+    check('名單齊全時回報零而不是省略這個欄位',
+          roster_clean.get('no_trait_report') == [], roster_clean)
+    check('名單齊全時不發這條警告',
+          not any('no trait report' in ln for ln in cap.lines), cap.lines)
     _, roster = apply_roster(stale, ['C1', 'C2', 'C3'],
                              [{'candidate_id': 'C1', 'name': '人C1'}], 'S14')
     check('candidates_info 被前端截短時留下伺服器端信號',

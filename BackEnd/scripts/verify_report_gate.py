@@ -75,7 +75,45 @@ def main():
     check('names the candidate', '林孟德' in (body.get('error', {}).get('message') or ''),
           body.get('error', {}).get('message'))
 
-    print('\n[4] 沒選受測者的一般對話 -> 不受影響')
+    print('\n[4] 名單上有、candidates_info 沒有 -> 第三種結果，不能說「請稍候」')
+    # 2026-09-20 的形狀：前端新增人選時掉了一位的人物件，名單 2 位、資料列 1 位。
+    # 舊版守門走訪 candidates_info，這種截短完全看不到，於是放行——打包器把那位丟掉，
+    # 使用者拿到一份少一個人、卻毫無提示的回答。
+    r = post({**base, 'module_id': 'mgmt_pressure', 'candidate_ids': ['56', '391'],
+              'candidates_info': [assessed],
+              'trait_reports': {'56': {'project_name_abbreviation': 'CIA', 'traits': []}}})
+    body = r.get_json()
+    check('status 422（重試永遠不會好，不是 409）', r.status_code == 422, r.status_code)
+    check('code is ROSTER_INCOMPLETE',
+          body.get('error', {}).get('code') == 'ROSTER_INCOMPLETE', body.get('error'))
+    check('沒有產生任何回答', 'text/event-stream' not in (r.content_type or ''), r.content_type)
+    msg = body.get('error', {}).get('message') or ''
+    check('訊息叫使用者重選，而不是等一下', '重新選擇' in msg and '稍候' not in msg, msg)
+
+    print('\n[5] 名單不完整優先於「報告還沒到」——後者的指示對前者是錯的')
+    r = post({**base, 'module_id': 'deep_communication', 'candidate_ids': ['56', '77', '391'],
+              'candidates_info': [assessed, {'candidate_id': '77', 'name': '林孟德',
+                                             'latest_assessment': {'assessment_id': 901}}],
+              'trait_reports': {'56': {'project_name_abbreviation': 'CIA', 'traits': []}}})
+    check('兩種缺法同時存在時，先報名單不完整',
+          r.get_json().get('error', {}).get('code') == 'ROSTER_INCOMPLETE',
+          r.get_json().get('error'))
+
+    print('\n[6] candidates_info 比名單多出來的人不再被誤擋（打包器本來就會丟掉他們）')
+    r = post({**base, 'module_id': 'mgmt_pressure', 'candidate_ids': ['56'],
+              'candidates_info': [assessed, never_assessed],
+              'trait_reports': {'56': {'project_name_abbreviation': 'CIA', 'traits': []}}})
+    check('名單內的人報告齊全就放行', r.status_code not in (409, 422), r.status_code)
+
+    print('\n[7] 舊版 widget 只送 candidates_info、不送 candidate_ids -> 行為不變')
+    r = post({**base, 'module_id': 'mgmt_pressure', 'candidates_info': [never_assessed],
+              'trait_reports': {}})
+    check('仍然擋下並回 NO_ASSESSMENT_DATA',
+          r.status_code == 422
+          and r.get_json().get('error', {}).get('code') == 'NO_ASSESSMENT_DATA',
+          (r.status_code, r.get_json().get('error')))
+
+    print('\n[8] 沒選受測者的一般對話 -> 不受影響')
     r = post({**base, 'module_id': None, 'candidate_ids': [], 'candidates_info': [],
               'trait_reports': {}})
     check('not rejected by the gate', r.status_code != 409 and r.status_code != 422,

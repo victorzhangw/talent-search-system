@@ -163,9 +163,10 @@ def apply_roster(trait_reports, candidate_ids, candidates_info, session_id):
     少了這道過濾，前端任何一條清快取的路徑漏掉一次，被移除的人就繼續留在 payload 裡。
 
     順帶記一件 `chat.py` 的守門看不到的事：那裡的檢查是 `candidates_info ⊆ trait_reports`，
-    單向，所以 `candidates_info` 被截短永遠不會被擋。而 `sendMessage` 的 `candidates_info`
-    是拿分頁清單（20 筆）過濾出來的，鎖定的人只要不在當前頁就會掉——掉了姓名就退化成
-    `Candidate-<id>`。全語料還沒出現過，但這裡是唯一能在伺服器端看到它的地方。
+    單向，所以 `candidates_info` 被截短永遠不會被擋。2026-09-20 實際發生過一次：前端在
+    候選人清單搜尋過之後新增人選，`candidates.value` 已被搜尋結果整個取代，查不到的那
+    一位就從 `candidates_info` 掉了出去——名單 8 位、payload 只有 7 位。這裡是唯一能在
+    伺服器端看到它的地方。
 
     回傳 (要用的 reports, 稽核用的 roster 記錄)。
     """
@@ -190,12 +191,30 @@ def apply_roster(trait_reports, candidate_ids, candidates_info, session_id):
                 seen.add(cid)
                 kept[cid] = by_id[cid]
         dropped = sorted(str(k) for k in reports if str(k) not in wanted)
+        # 反方向：名單上有、但 `trait_reports` 裡沒有報告的人。
+        #
+        # 這一邊原本只有 `requested` 與 `used` 兩個數字的差，沒有任何警告——要發現少了
+        # 人，得有人主動去比對同一個 JSON 裡的兩個整數。2026-09-20 就是這樣漏掉的：
+        # 前端新增人選時拿當前搜尋結果反查人物件，換過搜尋字串的那一位查不到，於是他的
+        # 報告從頭到尾沒被抓，而名單裡有他。那次看得到警告純屬僥倖——`candidates_info`
+        # 剛好也跟著短了一位，是下面那條在響。前端修好之後那個附帶信號就不會再響，所以
+        # 這一邊需要自己的警告。
+        #
+        # 只記錄，不改變 payload：這種人本來就沒有資料可打包，擋不擋是 `chat.py` 守門的
+        # 職責，不是這裡的。
+        no_report = sorted(wanted - set(kept))
         audit = {'source': 'candidate_ids', 'requested': len(wanted),
-                 'used': len(kept), 'dropped': dropped, 'ordered_by': 'candidate_ids'}
+                 'used': len(kept), 'dropped': dropped,
+                 'no_trait_report': no_report, 'ordered_by': 'candidate_ids'}
         if dropped:
             packer_logger.warning(
                 f"session={session_id} dropped {len(dropped)} stale trait report(s) not in "
                 f"this turn's candidate_ids: {dropped}")
+        if no_report:
+            packer_logger.warning(
+                f"session={session_id} {len(no_report)} of {len(wanted)} candidate_ids have "
+                f"no trait report and are absent from the payload entirely: {no_report} "
+                f"-- the answer will cover fewer people than the user selected")
         reports = kept
         if candidates_info is not None and len(candidates_info) < len(wanted):
             audit['candidates_info_short_by'] = len(wanted) - len(candidates_info)
