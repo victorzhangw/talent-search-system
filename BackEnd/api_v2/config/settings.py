@@ -34,6 +34,26 @@ if os.path.exists(_env_path):
 else:
     print(f"WARNING: .env not found at {_env_path}")
 
+def _int_env(name, default, minimum, maximum):
+    """讀一個整數設定；缺值用預設，非數字或超出範圍也退回預設並印一行 WARNING。
+
+    寧可退回預設而不是讓服務起不來：這類設定打錯（1800 打成 180 的多一個 0、或貼進
+    中文全形數字）的代價應該是「行為回到預設」，不是整個後端停擺。
+    """
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        print(f"WARNING: {name}={raw!r} is not an integer; using {default}")
+        return default
+    if not minimum <= value <= maximum:
+        print(f"WARNING: {name}={value} is outside {minimum}..{maximum}; using {default}")
+        return default
+    return value
+
+
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
     INTEGRATION_MODE = os.getenv('INTEGRATION_MODE', 'REAL') # MOCK or REAL
@@ -82,6 +102,10 @@ class Config:
 
     # Conversation history depth (1 turn = user + assistant pair)
     MAX_HISTORY_TURNS = int(os.getenv('MAX_HISTORY_TURNS', 6))
+    # 左側歷史清單顯示多少天內（依最後活動時間）的對話。只作用於 /chat/history?v=2；
+    # 舊版 widget 走的舊介面固定 30 天，否則它的「過去30天」標題會跟內容對不上。
+    # 上限 730 只是防打錯，需要更長時再調。
+    HISTORY_DAYS = _int_env('HISTORY_DAYS', 180, 1, 730)
     # 除了彙總的 prompts.log，另外把每筆記錄寫一份到 logs/<date>/prompts/<session_id>.log。
     # 驗收一段對話時可以只讀一個檔、不必在別人的請求之間翻找。預設關閉：一個 session 一個檔，
     # 檔數沒有上限，上線前要先有清理策略。

@@ -1,6 +1,6 @@
 
 from sqlalchemy import (Column, Integer, SmallInteger, String, Text, DateTime, JSON,
-                        ForeignKey, Boolean, CheckConstraint, UniqueConstraint)
+                        ForeignKey, Boolean, CheckConstraint, UniqueConstraint, Index, func)
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
@@ -30,6 +30,18 @@ class ChatSession(Base):
     metadata_ = Column('metadata', JSON, default={}) # 'metadata' is reserved in SQLAlchemy sometimes, safer naming? No, JSON is fine.
 
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+
+# 左側歷史清單（/chat/history?v=2）的查詢：lower(user_id) = ? AND last_active_at >= ?
+# ORDER BY last_active_at DESC, session_id DESC，再用 (last_active_at, session_id) 當游標。
+# 單欄的 user_id 索引用不上（查詢比的是 lower(user_id)），也排不了序。
+# 與 scripts/migrations/2026-10-03_add_chat_sessions_history_index.sql 同步；
+# 全新資料庫由 create_all() 直接建出。
+Index('ix_chat_sessions_user_lower_active',
+      func.lower(ChatSession.user_id),
+      ChatSession.last_active_at.desc(),
+      ChatSession.session_id.desc())
+
 
 class ChatMessage(Base):
     __tablename__ = 'chat_messages'

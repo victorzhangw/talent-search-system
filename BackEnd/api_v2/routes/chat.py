@@ -12,6 +12,7 @@ from sqlalchemy.exc import OperationalError
 from ..services.rag_engine import RAGService
 from ..services.segment_gate import STATUS_BLOCKED
 from ..services.session_store import SqlSessionStore
+from ..services import history_list
 from ..services.session_title import (clamp_title, compose_title, fallback_title,
                                       is_placeholder, strip_model_names,
                                       title_for_metadata)
@@ -190,6 +191,11 @@ def get_user_history():
     if claimed and claimed.lower() != user_id.lower():
         print(f"[History] user_id param ignored: does not match the token identity", flush=True)
 
+    if request.args.get('v') == '2':
+        return _history_v2(user_id)
+
+    # 以下是舊介面，給舊版 widget：一次回傳、30 天、{today, past_30_days}。
+    # 刻意不跟著 HISTORY_DAYS 走——它的標題寫死「過去30天」，放進更舊的對話會名實不符。
     session_store = SqlSessionStore()
     sessions = session_store.get_user_sessions(user_id=user_id, days=30)
     
@@ -238,6 +244,35 @@ def get_user_history():
         'past_30_days': past_sessions,
         'has_more': False
     })
+
+def _history_v2(user_id):
+    """GET /chat/history?v=2[&cursor=...][&limit=30]
+
+    一頁新到舊的對話，每筆帶 `bucket`／`bucket_label`（台北時間的分組），外加
+    `next_cursor`、`has_more` 與 `history_days`（前端用它寫「僅顯示近 N 天」，天數改 env
+    不必重新建置前端）。分組、游標格式見 services/history_list.py。
+    """
+    days = current_app.config.get('HISTORY_DAYS', 180)
+    limit = history_list.parse_limit(request.args.get('limit'))
+    cursor = None
+    raw_cursor = (request.args.get('cursor') or '').strip()
+    if raw_cursor:
+        try:
+            cursor = history_list.decode_cursor(raw_cursor)
+        except history_list.InvalidCursor:
+            return err('INVALID_CURSOR', 'cursor is malformed', 400, field='cursor')
+
+    rows, has_more = SqlSessionStore().get_user_sessions_page(user_id, days, limit, cursor)
+    now = datetime.utcnow()
+    last = rows[-1] if rows else None
+    return ok({
+        'items': [history_list.item(s, now) for s in rows],
+        'has_more': has_more,
+        'next_cursor': (history_list.encode_cursor(last.last_active_at, last.session_id)
+                        if has_more and last else None),
+        'history_days': days,
+    })
+
 
 @bp.route('/<session_id>', methods=['GET', 'OPTIONS'])
 def get_session_details(session_id):

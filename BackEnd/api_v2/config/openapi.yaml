@@ -196,6 +196,31 @@ components:
                 past_30_days: { type: array, items: { $ref: '#/components/schemas/SessionSummary' } }
                 has_more:     { type: boolean }
 
+    ChatHistoryV2Response:
+      description: /chat/history?v=2 的回應。一頁新到舊，分組已依 Asia/Taipei 算好。
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      session_id:     { type: string }
+                      title:          { type: string }
+                      started_at:     { type: string, format: date-time, description: 帶 +00:00 }
+                      last_active_at: { type: string, format: date-time, description: 帶 +00:00 }
+                      status:         { type: string }
+                      bucket:         { type: string, description: "today | yesterday | last_7_days | last_30_days | YYYY-MM" }
+                      bucket_label:   { type: string, example: "2026 年 8 月" }
+                has_more:     { type: boolean }
+                next_cursor:  { type: string, nullable: true, description: 下一頁時原樣帶回 cursor；最後一頁為 null }
+                history_days: { type: integer, example: 180, description: 後端 HISTORY_DAYS 設定值，前端用來顯示「僅顯示近 N 天」 }
+
     ChatMessage:
       type: object
       properties:
@@ -526,12 +551,35 @@ paths:
           deprecated: true
           schema: { type: string, format: email }
           description: 已不採用。身分一律取自 bearer token 的 email；舊版 widget 仍會帶，照收但忽略。
+        - name: v
+          in: query
+          required: false
+          schema: { type: string, enum: ["2"] }
+          description: 帶 2 走分頁版（HISTORY_DAYS 天、游標分頁、每筆帶分組）；不帶走舊版（固定 30 天、一次回傳、today/past_30_days）。
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+          description: 僅 v=2。上一頁回傳的 next_cursor，原樣帶回；格式不對回 400 INVALID_CURSOR。
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 30 }
+          description: 僅 v=2。超出範圍會被夾到 1..50，非數字用 30。
       responses:
         "200":
-          description: 成功，回傳 token 本人今日與過去 30 天的 session 清單
+          description: 成功。不帶 v 時回 ChatHistoryResponse（token 本人今日與過去 30 天）；v=2 回 ChatHistoryV2Response。
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ChatHistoryResponse' }
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/ChatHistoryResponse' }
+                  - { $ref: '#/components/schemas/ChatHistoryV2Response' }
+        "400":
+          description: v=2 且 cursor 格式不對（INVALID_CURSOR）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         "401":
           description: 未帶 token、token 無效或過期（TOKEN_EXPIRED）
           content:

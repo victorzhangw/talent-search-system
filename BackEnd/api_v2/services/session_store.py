@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import func, tuple_
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import json
@@ -126,6 +126,29 @@ class SqlSessionStore:
                 ChatSession.last_active_at >= cutoff_date
             ).order_by(ChatSession.last_active_at.desc()).all()
             return sessions
+        finally:
+            db.close()
+
+    def get_user_sessions_page(self, user_id: str, days: int, limit: int, cursor=None):
+        """一頁歷史清單（新到舊），回 (rows, has_more)。
+
+        cursor 是上一頁最後一筆的 (last_active_at, session_id)。排序與游標都帶 session_id，
+        兩筆同一時間的對話才有確定的先後，不會在換頁時重複或漏掉。
+        多抓一筆用來判斷還有沒有下一頁，比另外 count 便宜。
+        """
+        db = get_db_session()
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            query = db.query(ChatSession).filter(
+                func.lower(ChatSession.user_id) == (user_id or '').strip().lower(),
+                ChatSession.last_active_at >= cutoff_date
+            )
+            if cursor is not None:
+                query = query.filter(tuple_(ChatSession.last_active_at, ChatSession.session_id)
+                                     < tuple_(cursor[0], cursor[1]))
+            rows = query.order_by(ChatSession.last_active_at.desc(),
+                                  ChatSession.session_id.desc()).limit(limit + 1).all()
+            return rows[:limit], len(rows) > limit
         finally:
             db.close()
 
