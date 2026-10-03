@@ -96,33 +96,19 @@
                     </button>
                 </div>
 
-                <div class="history-lists" v-if="historySessions">
-                    <!-- Today -->
-                    <div class="history-group" v-if="historySessions.today && historySessions.today.length > 0">
-                        <div class="group-title">今天</div>
-                        <div 
-                            class="history-item" 
-                            v-for="s in historySessions.today" 
-                            :key="s.session_id" 
-                            @click="loadHistorySession(s)"
-                            :class="{ active: currentSessionId === s.session_id }"
-                        >
-                            {{ s.title }}
-                        </div>
-                    </div>
-                    <!-- Past 30 Days -->
-                    <div class="history-group" v-if="historySessions.past_30_days && historySessions.past_30_days.length > 0">
-                        <div class="group-title">過去30天</div>
-                        <div 
-                            class="history-item" 
-                            v-for="s in historySessions.past_30_days" 
-                            :key="s.session_id" 
-                            @click="loadHistorySession(s)"
-                            :class="{ active: currentSessionId === s.session_id }"
-                        >
-                            {{ s.title }}
-                        </div>
-                    </div>
+                <div class="history-lists">
+                    <HistoryList
+                        variant="sidebar"
+                        :items="historyItems"
+                        :currentSessionId="currentSessionId"
+                        :isLoading="historyIsLoading"
+                        :hasMore="historyHasMore"
+                        :error="historyError"
+                        :historyDays="historyDays"
+                        @select="loadHistorySession"
+                        @load-more="loadMoreHistory"
+                        @retry="retryHistory"
+                    />
                 </div>
                 
                 <div class="quota-info" v-if="quotaSummary">
@@ -398,11 +384,14 @@
     <!-- Mobile History Drawer -->
     <HistoryDrawer 
         v-model="showMobileHistoryDrawer"
-        :historySessions="historySessions"
+        :items="historyItems"
         :currentSessionId="currentSessionId"
         :isLoading="historyIsLoading"
         :hasMore="historyHasMore"
+        :error="historyError"
+        :historyDays="historyDays"
         @load-more="loadMoreHistory"
+        @retry="retryHistory"
         @select-session="loadHistorySession"
         @new-analysis="resetAndReselect"
     />
@@ -416,6 +405,7 @@ import MessageList from './MessageList.vue'
 import CandidateSelector from './CandidateSelector.vue'
 import QuickQuestionPanel from './QuickQuestionPanel.vue'
 import HistoryDrawer from './HistoryDrawer.vue'
+import HistoryList from './HistoryList.vue'
 
 import LoginView from './LoginView.vue'
 import TraitReportModal from './TraitReportModal.vue'
@@ -474,10 +464,11 @@ const {
     filteredQuickQuestions,
     filteredQuickQuestionCategories,
     isTraitReportsLoading,
-    historySessions,
-    historyPage,
+    historyItems,
     historyHasMore,
     historyIsLoading,
+    historyError,
+    historyDays,
     showMobileHistoryDrawer,
 
     // Computed
@@ -513,6 +504,7 @@ const {
     loadHistorySession,
     switchContextToPreview,
     loadMoreHistory,
+    retryHistory,
     rateMessage
 } = useChatLogic(emit)
 

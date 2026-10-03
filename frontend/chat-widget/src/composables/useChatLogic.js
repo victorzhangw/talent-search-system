@@ -69,6 +69,53 @@ export const createTypewriter = (append, { charsPerSecond = 60, maxLagMs = 1200 
     }
 }
 
+/**
+ * 左側歷史清單（/chat/history?v=2）的合併規則。純函式，`scripts/verify_history_merge.mjs`
+ * 直接拿它測。
+ *
+ * state = { items, cursor, hasMore }；data = 後端的 { items, next_cursor, has_more }。
+ */
+
+// 依 (last_active_at, session_id) 新到舊；a 比 b 舊回 true。與後端游標同一個順序。
+export const isHistoryOlder = (a, b) => {
+    const ta = Date.parse(a.last_active_at || '') || 0
+    const tb = Date.parse(b.last_active_at || '') || 0
+    if (ta !== tb) return ta < tb
+    return a.session_id < b.session_id
+}
+
+// 捲到底接著抓的下一頁：接在後面，已經有的不重複加。
+export const appendHistoryPage = (state, data) => {
+    const seen = new Set(state.items.map(s => s.session_id))
+    return {
+        items: [...state.items, ...(data.items || []).filter(s => !seen.has(s.session_id))],
+        cursor: data.next_cursor || null,
+        hasMore: !!data.has_more
+    }
+}
+
+/**
+ * 重抓的第一頁：換掉第一頁，已經往下載過的較舊頁保留（使用者捲到的位置不會被清掉）。
+ *
+ * 保留的條件是「不在新第一頁裡、而且比新第一頁最後一筆還舊」——剛被聊到而跳到最上面的
+ * 那筆會出現在新第一頁，它在舊位置的那一份就此去掉。有保留時沿用原本的游標與 hasMore，
+ * 因為它們指向的是已載入的最舊一筆之後；沒保留時用新第一頁的。
+ * 新第一頁已經是最後一頁（has_more=false）時不保留任何舊資料：窗內的全在這一頁了，
+ * 留下來的只會是已經掉出天數範圍的。
+ */
+export const mergeHistoryFirstPage = (state, data) => {
+    const page = data.items || []
+    const pageIds = new Set(page.map(s => s.session_id))
+    const tail = page[page.length - 1]
+    const keep = (data.has_more && tail)
+        ? state.items.filter(s => !pageIds.has(s.session_id) && isHistoryOlder(s, tail))
+        : []
+    if (keep.length === 0) {
+        return { items: page, cursor: data.next_cursor || null, hasMore: !!data.has_more }
+    }
+    return { items: [...page, ...keep], cursor: state.cursor, hasMore: state.hasMore }
+}
+
 export function useChatLogic(emit) {
     // --- 型別安全的 candidate_id 比對輔助函式 ---
     // 上游 API 回傳的 candidate_id 可能是 number 或 string，
@@ -289,10 +336,14 @@ export function useChatLogic(emit) {
         return result
     })
 
-    const historySessions = ref({ today: [], past_30_days: [] })
-    const historyPage = ref(1)
+    // 左側歷史清單（/chat/history?v=2）。一份平面清單，新到舊；分組標題由 HistoryList 依
+    // 每筆的 `bucket` 切段（後端用台北時間算好）。
+    const historyItems = ref([])
+    const historyCursor = ref(null)
     const historyHasMore = ref(false)
     const historyIsLoading = ref(false)
+    const historyError = ref('')
+    const historyDays = ref(null)
     const showMobileHistoryDrawer = ref(false)
 
     // --- Computed ---
@@ -631,41 +682,79 @@ export function useChatLogic(emit) {
     }
 
     // History Logic
-    const fetchHistory = async (page = 1, append = false) => {
-        if (historyIsLoading.value) return;
-        historyIsLoading.value = true;
-        try {
-            const { serverRoot } = getApiConfig()
-            const userId = currentUserEmail() || 'anonymous'
+    //
+    // 兩種抓法：
+    //   refreshHistory()   重抓第一頁，與已載入的較舊頁合併。頁面載入、打開手機抽屜、送出
+    //                      訊息之後都會叫——原本清單只在頁面載入時抓一次，新開的對話要重新
+    //                      整理才看得到。
+    //   loadMoreHistory()  用上一頁給的游標接著抓下一頁（捲到底時由 HistoryList 觸發）。
+    // 同一時間只跑一個請求；載入中又要求刷新時記下來，載完再補一次，避免送出訊息後的那次
+    // 刷新因為剛好在翻頁而被吃掉。
+    let historyRefreshPending = false
 
-            const res = await authFetch(`${serverRoot}/chat/history?user_id=${userId}&page=${page}`)
-            if (res.ok) {
-                const resp = await res.json()
-                const d = resp.success ? (resp.data || {}) : {}
-                if (append) {
-                    historySessions.value.today = [...(historySessions.value.today || []), ...(d.today || [])]
-                    historySessions.value.past_30_days = [...(historySessions.value.past_30_days || []), ...(d.past_30_days || [])]
-                } else {
-                    historySessions.value = {
-                        today: d.today || [],
-                        past_30_days: d.past_30_days || []
-                    }
-                }
-                historyPage.value = page
-                historyHasMore.value = d.has_more ?? false
+    const requestHistoryPage = async (cursor) => {
+        const { serverRoot } = getApiConfig()
+        const qs = new URLSearchParams({ v: '2' })
+        if (cursor) qs.set('cursor', cursor)
+        const res = await authFetch(`${serverRoot}/chat/history?${qs.toString()}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const resp = await res.json()
+        if (!resp.success) throw new Error(resp.error?.code || 'HISTORY_FAILED')
+        return resp.data || {}
+    }
+
+    const fetchHistory = async ({ append = false } = {}) => {
+        if (historyIsLoading.value) {
+            if (!append) historyRefreshPending = true
+            return
+        }
+        historyIsLoading.value = true
+        historyError.value = ''
+        try {
+            const d = await requestHistoryPage(append ? historyCursor.value : null)
+            historyDays.value = d.history_days ?? historyDays.value
+            const current = {
+                items: historyItems.value, cursor: historyCursor.value, hasMore: historyHasMore.value
             }
+            const next = append ? appendHistoryPage(current, d) : mergeHistoryFirstPage(current, d)
+            historyItems.value = next.items
+            historyCursor.value = next.cursor
+            historyHasMore.value = next.hasMore
         } catch (e) {
-            console.error("[ChatContainer] Failed to load history", e)
+            console.error('[ChatLogic] Failed to load history', e)
+            historyError.value = '歷史紀錄載入失敗'
         } finally {
-            historyIsLoading.value = false;
+            historyIsLoading.value = false
+            if (historyRefreshPending) {
+                historyRefreshPending = false
+                fetchHistory()
+            }
         }
     }
+
+    const refreshHistory = () => fetchHistory()
 
     const loadMoreHistory = async () => {
-        if (historyHasMore.value && !historyIsLoading.value) {
-            await fetchHistory(historyPage.value + 1, true);
+        if (historyHasMore.value && historyCursor.value && !historyIsLoading.value) {
+            await fetchHistory({ append: true })
         }
     }
+
+    // 失敗時的重試：清單是空的就重抓第一頁，否則重試下一頁。
+    const retryHistory = () => (historyItems.value.length ? loadMoreHistory() : refreshHistory())
+
+    const resetHistory = () => {
+        historyItems.value = []
+        historyCursor.value = null
+        historyHasMore.value = false
+        historyError.value = ''
+        historyRefreshPending = false
+    }
+
+    // 手機抽屜每次打開都刷新第一頁：抽屜關著的時候可能已經開過新對話或改過標題。
+    watch(showMobileHistoryDrawer, (open) => {
+        if (open) refreshHistory()
+    })
 
     const loadHistorySession = async (sessionData) => {
         const { serverRoot } = getApiConfig()
@@ -841,7 +930,7 @@ export function useChatLogic(emit) {
         // Fetch quick question modules from API
         await fetchQuickModules()
         // Fetch history
-        await fetchHistory()
+        await refreshHistory()
         currentTab.value = 'main' // Switch to split view
 
         // After login and candidates load, check if we need to restore state (New Tab scenario)
@@ -1087,7 +1176,7 @@ export function useChatLogic(emit) {
             candidates.value = []
             candidateOffset.value = 0
             hasMoreCandidates.value = true
-            historySessions.value = { today: [], past_30_days: [] }
+            resetHistory()
             userToken.value = null
             autoLoginError.value = ''
             upstreamBaseUrl.value = ''
@@ -1472,6 +1561,9 @@ export function useChatLogic(emit) {
             isTyping.value = false
             // 重置 module_id（確保下次自由提問不會攜帶舊值）
             currentModuleId.value = null
+            // 新對話要出現在左側、剛聊過的要移到最上面。只重抓第一頁（約 5KB），已往下載過的
+            // 較舊頁保留；以前清單只在頁面載入時抓一次，要重新整理才看得到新對話。
+            refreshHistory()
 
             // Save state to Session Storage
             try {
@@ -1581,10 +1673,11 @@ export function useChatLogic(emit) {
         filteredQuickQuestionCategories,
 
         // History
-        historySessions,
-        historyPage,
+        historyItems,
         historyHasMore,
         historyIsLoading,
+        historyError,
+        historyDays,
         showMobileHistoryDrawer,
 
         // Computed
@@ -1622,7 +1715,9 @@ export function useChatLogic(emit) {
         toggleQuickQuestionCategory,
         selectQuickQuestionCategory,
         fetchHistory,
+        refreshHistory,
         loadMoreHistory,
+        retryHistory,
         loadHistorySession,
         switchContextToPreview,
         rateMessage

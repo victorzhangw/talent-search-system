@@ -5,9 +5,11 @@
       <div v-if="modelValue" class="mobile-history-overlay" @click="closeDrawer"></div>
     </transition>
 
-    <!-- Mobile History Drawer (Slide from Left) -->
+    <!-- Mobile History Drawer (Slide from Left)
+         用 v-show 不用 v-if：關掉抽屜時保留 DOM，捲動位置跟著保留。清單拉到 180 天後要捲很多
+         頁，v-if 每次重開都回到最上面。 -->
     <transition name="slide-in-left">
-      <div v-if="modelValue" class="mobile-history-drawer">
+      <div v-show="modelValue" class="mobile-history-drawer">
         <div class="drawer-inner">
           <div class="drawer-header">
             <h3>歷史紀錄</h3>
@@ -16,7 +18,7 @@
             </button>
           </div>
 
-          <div class="drawer-content history-lists" @scroll="handleScroll">
+          <div class="drawer-content">
             <!-- New Analysis Action -->
             <div class="history-actions">
               <button class="primary-btn full-width new-analysis-btn" @click="onNewAnalysis">
@@ -25,43 +27,18 @@
               </button>
             </div>
 
-            <template v-if="historySessions">
-              <!-- Today -->
-              <div class="history-group" v-if="historySessions.today && historySessions.today.length > 0">
-                <div class="group-title">今天</div>
-                <div 
-                  class="history-item" 
-                  v-for="s in historySessions.today" 
-                  :key="s.session_id" 
-                  @click="onSelectSession(s)"
-                  :class="{ active: currentSessionId === s.session_id }"
-                >
-                  {{ s.title }}
-                </div>
-              </div>
-              
-              <!-- Past 30 Days -->
-              <div class="history-group" v-if="historySessions.past_30_days && historySessions.past_30_days.length > 0">
-                <div class="group-title">過去30天</div>
-                <div 
-                  class="history-item" 
-                  v-for="s in historySessions.past_30_days" 
-                  :key="s.session_id" 
-                  @click="onSelectSession(s)"
-                  :class="{ active: currentSessionId === s.session_id }"
-                >
-                  {{ s.title }}
-                </div>
-              </div>
-
-              <!-- Loading Indicator -->
-              <div v-if="isLoading" class="history-loading">
-                <div class="spinner"></div>載入中...
-              </div>
-            </template>
-            <div v-else class="empty-state">
-              無歷史紀錄
-            </div>
+            <HistoryList
+              variant="drawer"
+              :items="items"
+              :currentSessionId="currentSessionId"
+              :isLoading="isLoading"
+              :hasMore="hasMore"
+              :error="error"
+              :historyDays="historyDays"
+              @select="onSelectSession"
+              @load-more="$emit('load-more')"
+              @retry="$emit('retry')"
+            />
           </div>
         </div>
       </div>
@@ -70,17 +47,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import HistoryList from './HistoryList.vue'
 
-const props = defineProps({
+defineProps({
   modelValue: Boolean, // controls drawer open/close
-  historySessions: Object,
+  items: { type: Array, default: () => [] },
   currentSessionId: String,
   isLoading: Boolean,
-  hasMore: Boolean
+  hasMore: Boolean,
+  error: { type: String, default: '' },
+  historyDays: { type: Number, default: null }
 })
 
-const emit = defineEmits(['update:modelValue', 'select-session', 'new-analysis', 'load-more'])
+const emit = defineEmits(['update:modelValue', 'select-session', 'new-analysis', 'load-more', 'retry'])
 
 const closeDrawer = () => {
   emit('update:modelValue', false)
@@ -93,15 +72,6 @@ const onSelectSession = (session) => {
 const onNewAnalysis = () => {
   emit('new-analysis')
   closeDrawer()
-}
-
-const handleScroll = (e) => {
-  const { scrollTop, scrollHeight, clientHeight } = e.target
-  if (scrollTop + clientHeight >= scrollHeight - 50) {
-    if (!props.isLoading && props.hasMore) {
-      emit('load-more')
-    }
-  }
 }
 </script>
 
@@ -208,68 +178,7 @@ const handleScroll = (e) => {
     }
   }
 
-  .history-lists {
-    padding-bottom: 2rem;
-  }
-
-  .history-group {
-    margin-bottom: 1rem;
-    padding: 0 1rem;
-  }
-
-  .group-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: var(--glass-text-secondary);
-    margin-bottom: 0.3rem;
-    padding-left: 0.5rem;
-  }
-
-  .history-item {
-    min-height: 40px; /* Adjusted touch target size for compactness */
-    padding: 8px 12px;
-    margin-bottom: 2px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    color: var(--glass-text-primary);
-    transition: background-color 0.2s;
-    display: flex;
-    align-items: center;
-
-    &:active {
-      background: rgba(106, 37, 244, 0.08);
-    }
-
-    &.active {
-      background: rgba(106, 37, 244, 0.1);
-      color: #6A25F4;
-      font-weight: 600;
-    }
-  }
-
-  .history-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 1rem;
-    color: var(--glass-text-secondary);
-    font-size: 0.9rem;
-    
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(127,127,127,0.3);
-      border-top-color: var(--primary-color);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-  }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+  /* 清單（分組標題、項目、載入中、空狀態）的樣式在 HistoryList.vue，與桌機側欄共用。 */
 }
 
 .fade-enter-active, .fade-leave-active {
