@@ -25,6 +25,10 @@
       僅顯示近 {{ historyDays }} 天的對話
     </div>
 
+    <!-- 底部漸層：最後一筆被淡出切掉，告訴使用者下面還有東西。捲到底（哨兵可見）就拿掉，
+         免得蓋住結尾那行「僅顯示近 N 天」。sticky 讓它貼著外層捲動容器的底邊，不必知道容器是誰。 -->
+    <div class="history-fade" :class="{ hidden: atEnd }" aria-hidden="true"></div>
+
     <!-- 捲到這裡就載下一頁。root 用 null（視窗）：外層捲動容器的裁切本來就會算進可見範圍，
          所以桌機側欄與手機抽屜不必各自傳入自己的捲動容器。 -->
     <div ref="sentinel" class="history-sentinel" aria-hidden="true"></div>
@@ -68,6 +72,10 @@ const groups = computed(() => {
 const sentinel = ref(null)
 let observer = null
 
+// 漸層要的是「真的看到底了」，不能用載入用的 observer（它提前 120px 觸發）。
+const atEnd = ref(false)
+let endObserver = null
+
 const maybeLoadMore = (entries) => {
   const visible = entries.some(e => e.isIntersecting)
   if (visible && props.hasMore && !props.isLoading && !props.error) {
@@ -88,11 +96,18 @@ const reobserve = async () => {
 onMounted(() => {
   observer = new IntersectionObserver(maybeLoadMore, { root: null, rootMargin: '0px 0px 120px 0px' })
   if (sentinel.value) observer.observe(sentinel.value)
+
+  endObserver = new IntersectionObserver((entries) => {
+    atEnd.value = entries[entries.length - 1].isIntersecting
+  })
+  if (sentinel.value) endObserver.observe(sentinel.value)
 })
 
 onBeforeUnmount(() => {
   if (observer) observer.disconnect()
+  if (endObserver) endObserver.disconnect()
   observer = null
+  endObserver = null
 })
 
 watch(() => props.isLoading, (loading, was) => {
@@ -156,9 +171,26 @@ watch(() => props.isLoading, (loading, was) => {
   height: 1px;
 }
 
+.history-fade {
+  --fade-bg: #F9FAFF;
+  position: sticky;
+  bottom: 0;
+  height: 40px;
+  margin-top: -40px;          /* 不佔高度，疊在最後幾筆上 */
+  pointer-events: none;       /* 底下的項目照樣點得到 */
+  background: linear-gradient(to bottom, transparent, var(--fade-bg));
+  transition: opacity 0.2s;
+
+  &.hidden { opacity: 0; }
+}
+
 /* ---- 桌機側欄 ---- */
 .variant-sidebar {
   .history-group { margin-bottom: 1.5em; }
+
+  .history-fade {
+    [data-theme="midnight"] & { --fade-bg: var(--sidebar-bg, #262033); }
+  }
 
   .group-title {
     font-size: 1em;
@@ -197,6 +229,12 @@ watch(() => props.isLoading, (loading, was) => {
 /* ---- 手機抽屜 ---- */
 .variant-drawer {
   padding-bottom: 2rem;
+
+  /* 抽屜底色見 HistoryDrawer.vue 的 .mobile-history-drawer */
+  .history-fade {
+    --fade-bg: var(--glass-bg);
+    [data-theme="midnight"] & { --fade-bg: #1e1e2d; }
+  }
 
   .history-group {
     margin-bottom: 1rem;

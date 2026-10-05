@@ -149,7 +149,9 @@ const onNewAnalysis = () => {
   .drawer-content {
     flex: 1;
     overflow-y: auto;
-    padding: 1rem 0;
+    /* 底部不留 padding：sticky 的底部漸層會停在 padding 內緣，下面多出一條沒淡出、被硬切的項目。
+       底部留白改由清單自己的 padding-bottom（HistoryList .variant-drawer）提供。 */
+    padding: 1rem 0 0;
     -webkit-overflow-scrolling: touch;
   }
 
