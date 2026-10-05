@@ -479,6 +479,25 @@
         flex: 1;
         overflow-y: auto;
         padding: 0 0.7em;
+
+        /* 全域滑塊是白色（glass.scss），在淺色側欄 #F9FAFF 上看不見，使用者不知道清單能捲。
+           Chrome 121+ / Firefox 吃 scrollbar-color（設了就忽略 ::-webkit-scrollbar），Safari 吃後者。 */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(106, 37, 244, 0.25) transparent;
+
+        &:hover { scrollbar-color: rgba(106, 37, 244, 0.45) transparent; }
+
+        &::-webkit-scrollbar-thumb { background-color: rgba(106, 37, 244, 0.25); }
+        &:hover::-webkit-scrollbar-thumb { background-color: rgba(106, 37, 244, 0.45); }
+
+        [data-theme="midnight"] & {
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+
+            &:hover { scrollbar-color: rgba(255, 255, 255, 0.5) transparent; }
+
+            &::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.3); }
+            &:hover::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.5); }
+        }
     }
 
     .quota-info {
